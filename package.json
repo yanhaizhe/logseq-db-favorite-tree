@@ -1,0 +1,34 @@
+{
+  "name": "logseq-db-favorite-tree",
+  "version": "0.1.0",
+  "description": "A Logseq plugin that renders favorite pages as roots in a property-driven tree for DB graphs.",
+  "type": "module",
+  "main": "dist/index.html",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc --noEmit && vite build"
+  },
+  "keywords": [
+    "logseq",
+    "plugin",
+    "favorite",
+    "tree",
+    "db-graph"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@logseq/libs": "^0.0.17"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  },
+  "logseq": {
+    "id": "logseq-db-favorite-tree",
+    "title": "DB Favorite Tree",
+    "main": "dist/index.html",
+    "icon": "./icon.svg",
+    "unsupportedGraphType": "file"
+  }
+}
