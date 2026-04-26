@@ -107,8 +107,7 @@ Notes:
 
 ## Screenshots
 
-- Add at least one screenshot or GIF here before Marketplace submission
-- Recommended examples: floating panel, bubble mode, search result, and `parent` hierarchy setup
+![Plugin screenshot](./docs/2026-04-26.gif)
 
 ## Documentation
 
