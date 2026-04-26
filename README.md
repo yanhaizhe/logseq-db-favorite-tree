@@ -2,6 +2,22 @@
 
 基于 Logseq DB 图谱与页面属性关系构建的“收藏夹树”插件。
 
+## English Summary
+
+`Logseq DB Favorite Tree` is a Logseq plugin for `DB graph` that renders favorite pages as root nodes in a property-driven tree.
+
+- Uses favorite pages as tree roots
+- Uses page property `parent` to build hierarchy
+- Supports search, breadcrumbs, current-page location, drag sort, floating panel, and bubble mode
+- Follows the current Logseq UI language with English fallback
+- Supports `DB graph` only and does not support `file graph`
+
+For Marketplace review:
+
+- GitHub repo: `https://github.com/yanhaizhe/logseq-db-favorite-tree`
+- Release page should include a custom build zip asset
+- README should include screenshots or GIF before submission
+
 ## 项目定位
 
 - 以 Logseq 收藏页作为树根入口

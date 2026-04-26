@@ -82,10 +82,12 @@ packages/db-favorite-tree/manifest.json
 - `supportsDBOnly: true`
 - `effect: false`
 
-需要替换的字段：
+当前示例已按当前仓库地址预填：
 
-- `<your-name>`
-- `<github-user>`
+- `author: "yanhaizhe"`
+- `repo: "yanhaizhe/logseq-db-favorite-tree"`
+
+如需迁移到其他仓库，再替换为你的真实 GitHub 信息。
 
 ## 5. Marketplace 提交流程
 

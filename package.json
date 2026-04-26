@@ -15,8 +15,16 @@
     "tree",
     "db-graph"
   ],
-  "author": "",
+  "author": "yanhaizhe",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yanhaizhe/logseq-db-favorite-tree.git"
+  },
+  "homepage": "https://github.com/yanhaizhe/logseq-db-favorite-tree",
+  "bugs": {
+    "url": "https://github.com/yanhaizhe/logseq-db-favorite-tree/issues"
+  },
   "dependencies": {
     "@logseq/libs": "^0.0.17"
   },

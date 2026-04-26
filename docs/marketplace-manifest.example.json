@@ -1,9 +1,9 @@
 {
   "title": "DB Favorite Tree",
   "description": "Render favorite pages as a property-driven tree for Logseq DB graph.",
-  "author": "<your-name>",
-  "repo": "<github-user>/logseq-db-favorite-tree",
-  "icon": "https://raw.githubusercontent.com/<github-user>/logseq-db-favorite-tree/main/icon.svg",
+  "author": "yanhaizhe",
+  "repo": "yanhaizhe/logseq-db-favorite-tree",
+  "icon": "https://raw.githubusercontent.com/yanhaizhe/logseq-db-favorite-tree/main/icon.svg",
   "theme": false,
   "web": false,
   "effect": false,

@@ -8,8 +8,8 @@
 
 ## Repository
 
-- Repo: `https://github.com/<github-user>/logseq-db-favorite-tree`
-- Latest Release: `https://github.com/<github-user>/logseq-db-favorite-tree/releases`
+- Repo: `https://github.com/yanhaizhe/logseq-db-favorite-tree`
+- Latest Release: `https://github.com/yanhaizhe/logseq-db-favorite-tree/releases`
 
 ## Plugin Details
 
