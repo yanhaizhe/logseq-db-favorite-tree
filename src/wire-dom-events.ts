@@ -31,7 +31,7 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
 
     const kind = handle.dataset.dragHandle
-    if (kind === 'panel' || kind === 'bubble') {
+    if (kind === 'panel' || kind === 'bubble' || kind === 'panel-resize') {
       handlers.onStartDrag(kind, event, handle)
     }
   })

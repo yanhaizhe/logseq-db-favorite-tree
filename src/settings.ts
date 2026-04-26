@@ -2,6 +2,7 @@ import { DEFAULT_POLL_INTERVAL_SECONDS, INTERNAL_SETTINGS } from './constants'
 import type {
   GraphScopedPersistedState,
   GraphScopedStateMap,
+  PanelSize,
   PersistedPluginState,
   PluginSettings,
   RestoredPluginState,
@@ -52,6 +53,7 @@ export class FavoriteTreeSettingsStore {
       lastLocatedNodeKey: graphState.lastLocatedNodeKey,
       viewMode: graphState.viewMode,
       layout: graphState.layout,
+      panelSize: graphState.panelSize,
     }
   }
 
@@ -127,6 +129,10 @@ export class FavoriteTreeSettingsStore {
         bubbleX: this.getNumber(INTERNAL_SETTINGS.bubbleX, 0),
         bubbleY: this.getNumber(INTERNAL_SETTINGS.bubbleY, 0),
       },
+      panelSize: {
+        width: this.getPanelWidth(),
+        height: 0,
+      },
     }
   }
 
@@ -146,6 +152,7 @@ export class FavoriteTreeSettingsStore {
         bubbleX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.bubbleX, 0),
         bubbleY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.bubbleY, 0),
       },
+      panelSize: this.normalizePanelSize(value.panelSize),
     }
   }
 
@@ -161,6 +168,18 @@ export class FavoriteTreeSettingsStore {
         bubbleX: Math.round(state.layout.bubbleX),
         bubbleY: Math.round(state.layout.bubbleY),
       },
+      panelSize: {
+        width: Math.round(state.panelSize.width),
+        height: Math.round(state.panelSize.height),
+      },
+    }
+  }
+
+  private normalizePanelSize(value: unknown): PanelSize {
+    const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined
+    return {
+      width: this.toFiniteNumber(record?.width, this.getPanelWidth()),
+      height: this.toFiniteNumber(record?.height, 0),
     }
   }
 

@@ -2,7 +2,7 @@ import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
 
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export type ViewMode = 'panel' | 'bubble'
-export type DragKind = 'panel' | 'bubble'
+export type DragKind = 'panel' | 'bubble' | 'panel-resize'
 export type SidebarPosition = 'left' | 'right'
 
 export type DragState = {
@@ -12,6 +12,8 @@ export type DragState = {
   startScreenY: number
   originX: number
   originY: number
+  originWidth?: number
+  originHeight?: number
   moved: boolean
   handleElement: HTMLElement | null
 }
@@ -41,6 +43,11 @@ export type FloatingPositions = {
   bubbleY: number
 }
 
+export type PanelSize = {
+  width: number
+  height: number
+}
+
 export type FloatingFrame = {
   x: number
   y: number
@@ -54,6 +61,7 @@ export type PersistedPluginState = {
   lastLocatedNodeKey: string | null
   viewMode: ViewMode
   layout: FloatingPositions
+  panelSize: PanelSize
 }
 
 export type RestoredPluginState = PersistedPluginState & {

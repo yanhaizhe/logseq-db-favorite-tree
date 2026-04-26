@@ -2,11 +2,13 @@ import {
   BUBBLE_SIZE,
   DRAG_THRESHOLD_PX,
   MAIN_UI_MARGIN,
+  PANEL_MAX_WIDTH,
   PANEL_MAX_HEIGHT,
+  PANEL_MIN_WIDTH,
   PANEL_MIN_HEIGHT,
   PANEL_TOP_OFFSET,
 } from './constants'
-import type { DragKind, DragState, FloatingFrame, FloatingPositions, SidebarPosition, ViewMode } from './types'
+import type { DragKind, DragState, FloatingFrame, FloatingPositions, PanelSize, SidebarPosition, ViewMode } from './types'
 
 export class FloatingLayoutManager {
   private positions: FloatingPositions = {
@@ -14,6 +16,10 @@ export class FloatingLayoutManager {
     panelY: PANEL_TOP_OFFSET,
     bubbleX: MAIN_UI_MARGIN,
     bubbleY: 120,
+  }
+  private panelSize: PanelSize = {
+    width: PANEL_MIN_WIDTH + 40,
+    height: PANEL_MIN_HEIGHT,
   }
   private dragState: DragState | null = null
   private dragFrameId: number | null = null
@@ -29,9 +35,15 @@ export class FloatingLayoutManager {
     }
   }
 
-  restore(positions: Partial<FloatingPositions>, sidebarPosition: SidebarPosition, panelWidth: number): void {
+  restore(
+    positions: Partial<FloatingPositions>,
+    panelSize: Partial<PanelSize>,
+    sidebarPosition: SidebarPosition,
+    defaultPanelWidth: number,
+  ): void {
     const viewport = this.getViewportSize()
-    const panelDefaults = this.getDefaultPanelPosition(viewport.width, viewport.height, sidebarPosition, panelWidth)
+    this.panelSize = this.getClampedPanelSize(panelSize.width ?? defaultPanelWidth, panelSize.height ?? 0)
+    const panelDefaults = this.getDefaultPanelPosition(viewport.width, viewport.height, sidebarPosition)
     const bubbleDefaults = this.getDefaultBubblePosition(viewport.width, viewport.height, sidebarPosition)
 
     this.positions = {
@@ -41,24 +53,28 @@ export class FloatingLayoutManager {
       bubbleY: positions.bubbleY && positions.bubbleY > 0 ? positions.bubbleY : bubbleDefaults.y,
     }
 
-    this.ensureInViewport(panelWidth, sidebarPosition)
+    this.ensureInViewport(sidebarPosition)
   }
 
   getPositions(): FloatingPositions {
     return { ...this.positions }
   }
 
-  getFrame(viewMode: ViewMode, panelWidth: number, sidebarPosition: SidebarPosition): FloatingFrame {
-    this.ensureInViewport(panelWidth, sidebarPosition)
-    return viewMode === 'bubble' ? this.getBubbleFrame() : this.getPanelFrame(panelWidth)
+  getPanelSize(): PanelSize {
+    return { ...this.panelSize }
   }
 
-  ensureInViewport(panelWidth: number, sidebarPosition: SidebarPosition): void {
+  getFrame(viewMode: ViewMode, sidebarPosition: SidebarPosition): FloatingFrame {
+    this.ensureInViewport(sidebarPosition)
+    return viewMode === 'bubble' ? this.getBubbleFrame() : this.getPanelFrame()
+  }
+
+  ensureInViewport(sidebarPosition: SidebarPosition): void {
     const panel = this.getClampedPosition(
       this.positions.panelX,
       this.positions.panelY,
-      panelWidth,
-      this.getPanelHeight(),
+      this.panelSize.width,
+      this.panelSize.height,
     )
     const bubble = this.getClampedPosition(this.positions.bubbleX, this.positions.bubbleY, BUBBLE_SIZE, BUBBLE_SIZE)
 
@@ -71,8 +87,8 @@ export class FloatingLayoutManager {
 
     if (!Number.isFinite(this.positions.panelX) || !Number.isFinite(this.positions.bubbleX)) {
       const viewport = this.getViewportSize()
-      this.restore({}, sidebarPosition, panelWidth)
-      this.getDefaultPanelPosition(viewport.width, viewport.height, sidebarPosition, panelWidth)
+      this.restore({}, this.panelSize, sidebarPosition, this.panelSize.width)
+      this.getDefaultPanelPosition(viewport.width, viewport.height, sidebarPosition)
     }
   }
 
@@ -95,6 +111,8 @@ export class FloatingLayoutManager {
       startScreenY: event.screenY,
       originX: origin.x,
       originY: origin.y,
+      originWidth: this.panelSize.width,
+      originHeight: this.panelSize.height,
       moved: false,
       handleElement,
     }
@@ -103,7 +121,7 @@ export class FloatingLayoutManager {
     event.preventDefault()
   }
 
-  handlePointerMove(event: PointerEvent, panelWidth: number, sidebarPosition: SidebarPosition): void {
+  handlePointerMove(event: PointerEvent, sidebarPosition: SidebarPosition): void {
     if (!this.dragState || event.pointerId !== this.dragState.pointerId) {
       return
     }
@@ -120,16 +138,21 @@ export class FloatingLayoutManager {
     }
 
     if (this.dragState.kind === 'panel') {
-      const panel = this.getClampedPosition(nextX, nextY, panelWidth, this.getPanelHeight())
+      const panel = this.getClampedPosition(nextX, nextY, this.panelSize.width, this.panelSize.height)
       this.positions.panelX = panel.x
       this.positions.panelY = panel.y
+    } else if (this.dragState.kind === 'panel-resize') {
+      this.panelSize = this.getClampedPanelSize(
+        (this.dragState.originWidth ?? this.panelSize.width) + event.screenX - this.dragState.startScreenX,
+        (this.dragState.originHeight ?? this.panelSize.height) + event.screenY - this.dragState.startScreenY,
+      )
     } else {
       const bubble = this.getClampedPosition(nextX, nextY, BUBBLE_SIZE, BUBBLE_SIZE)
       this.positions.bubbleX = bubble.x
       this.positions.bubbleY = bubble.y
     }
 
-    this.ensureInViewport(panelWidth, sidebarPosition)
+    this.ensureInViewport(sidebarPosition)
     if (this.dragFrameId !== null) {
       return
     }
@@ -140,7 +163,7 @@ export class FloatingLayoutManager {
     })
   }
 
-  finishDrag(event: PointerEvent, panelWidth: number, sidebarPosition: SidebarPosition): { moved: boolean; kind: DragKind } | null {
+  finishDrag(event: PointerEvent, sidebarPosition: SidebarPosition): { moved: boolean; kind: DragKind } | null {
     if (!this.dragState || event.pointerId !== this.dragState.pointerId) {
       return null
     }
@@ -150,7 +173,7 @@ export class FloatingLayoutManager {
       this.dragFrameId = null
     }
 
-    this.ensureInViewport(panelWidth, sidebarPosition)
+    this.ensureInViewport(sidebarPosition)
     if (this.dragState.kind === 'bubble') {
       this.snapBubbleToClosestEdge()
     }
@@ -191,17 +214,17 @@ export class FloatingLayoutManager {
     }
   }
 
-  private getPanelHeight(): number {
+  private getDefaultPanelHeight(): number {
     const viewport = this.getViewportSize()
     return Math.max(PANEL_MIN_HEIGHT, Math.min(PANEL_MAX_HEIGHT, viewport.height - MAIN_UI_MARGIN * 2))
   }
 
-  private getPanelFrame(panelWidth: number): FloatingFrame {
+  private getPanelFrame(): FloatingFrame {
     return {
       x: this.positions.panelX,
       y: this.positions.panelY,
-      width: panelWidth,
-      height: this.getPanelHeight(),
+      width: this.panelSize.width,
+      height: this.panelSize.height,
     }
   }
 
@@ -218,11 +241,9 @@ export class FloatingLayoutManager {
     viewportWidth: number,
     viewportHeight: number,
     sidebarPosition: SidebarPosition,
-    panelWidth: number,
   ): { x: number; y: number } {
-    const height = Math.max(PANEL_MIN_HEIGHT, Math.min(PANEL_MAX_HEIGHT, viewportHeight - MAIN_UI_MARGIN * 2))
-    const x = sidebarPosition === 'right' ? viewportWidth - panelWidth - MAIN_UI_MARGIN : MAIN_UI_MARGIN
-    return this.getClampedPosition(x, PANEL_TOP_OFFSET, panelWidth, height)
+    const x = sidebarPosition === 'right' ? viewportWidth - this.panelSize.width - MAIN_UI_MARGIN : MAIN_UI_MARGIN
+    return this.getClampedPosition(x, PANEL_TOP_OFFSET, this.panelSize.width, this.panelSize.height)
   }
 
   private getDefaultBubblePosition(
@@ -243,6 +264,17 @@ export class FloatingLayoutManager {
     return {
       x: Math.round(Math.min(maxX, Math.max(MAIN_UI_MARGIN, x))),
       y: Math.round(Math.min(maxY, Math.max(MAIN_UI_MARGIN, y))),
+    }
+  }
+
+  private getClampedPanelSize(width: number, height: number): PanelSize {
+    const viewport = this.getViewportSize()
+    const maxWidth = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, viewport.width - MAIN_UI_MARGIN * 2))
+    const maxHeight = Math.max(PANEL_MIN_HEIGHT, Math.min(PANEL_MAX_HEIGHT, viewport.height - MAIN_UI_MARGIN * 2))
+
+    return {
+      width: Math.round(Math.min(maxWidth, Math.max(PANEL_MIN_WIDTH, width))),
+      height: Math.round(Math.min(maxHeight, Math.max(PANEL_MIN_HEIGHT, height || this.getDefaultPanelHeight()))),
     }
   }
 }

@@ -94,6 +94,7 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
         <span>${escapeHtml(state.lastRefreshLabel)}</span>
         <span>${state.refreshing ? '刷新中...' : `${autoRefreshState} · ${state.rootFavorites.length} 个根节点`}</span>
       </div>
+      <div class="favorite-tree__resize-handle" data-drag-handle="panel-resize" title="拖动调整面板大小"></div>
     </div>
   `
 }

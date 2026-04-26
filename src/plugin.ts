@@ -90,7 +90,7 @@ export class FavoriteTreePlugin {
 
   togglePanel = async (): Promise<void> => {
     this.panelVisible = !this.panelVisible
-    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
     this.applyMainUIState()
     this.render()
@@ -119,7 +119,7 @@ export class FavoriteTreePlugin {
 
     this.captureBodyScrollTop()
     this.viewMode = 'bubble'
-    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
     this.applyMainUIState()
     this.render()
@@ -128,7 +128,7 @@ export class FavoriteTreePlugin {
   expandFromBubble = async (): Promise<void> => {
     this.panelVisible = true
     this.viewMode = 'panel'
-    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
     this.applyMainUIState()
     this.render()
@@ -324,7 +324,7 @@ export class FavoriteTreePlugin {
         }
 
         if (widthChanged || positionChanged) {
-          this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+          this.layout.ensureInViewport(this.settings.getSidebarPosition())
           this.applyMainUIState()
         }
 
@@ -483,6 +483,7 @@ export class FavoriteTreePlugin {
       lastLocatedNodeKey: this.lastLocatedNodeKey,
       viewMode: this.viewMode,
       layout: this.layout.getPositions(),
+      panelSize: this.layout.getPanelSize(),
     })
   }
 
@@ -492,7 +493,7 @@ export class FavoriteTreePlugin {
       resizable: false,
     })
 
-    const frame = this.layout.getFrame(this.viewMode, this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    const frame = this.layout.getFrame(this.viewMode, this.settings.getSidebarPosition())
     logseq.setMainUIInlineStyle({
       position: 'fixed',
       top: `${frame.y}px`,
@@ -537,16 +538,16 @@ export class FavoriteTreePlugin {
   }
 
   private readonly handleWindowResize = (): void => {
-    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.applyMainUIState()
   }
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    this.layout.handlePointerMove(event, this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.handlePointerMove(event, this.settings.getSidebarPosition())
   }
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    const result = this.layout.finishDrag(event, this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    const result = this.layout.finishDrag(event, this.settings.getSidebarPosition())
     if (!result) {
       return
     }
@@ -577,7 +578,7 @@ export class FavoriteTreePlugin {
     this.loadStates.clear()
     this.loadErrors.clear()
 
-    this.layout.restore(restored.layout, this.settings.getSidebarPosition(), this.settings.getPanelWidth())
+    this.layout.restore(restored.layout, restored.panelSize, this.settings.getSidebarPosition(), this.settings.getPanelWidth())
     for (const key of restored.expandedKeys) {
       this.expandedKeys.add(key)
       this.loadedKeys.add(key)
@@ -589,7 +590,7 @@ export class FavoriteTreePlugin {
     this.currentGraphKey = await this.resolveCurrentGraphKey()
     this.restoreGraphState()
     this.treeService.invalidateIndex()
-    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.applyMainUIState()
     this.render()
     await this.refresh('graph-changed')
