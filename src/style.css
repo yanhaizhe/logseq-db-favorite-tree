@@ -25,6 +25,11 @@ body {
   box-sizing: border-box;
 }
 
+#app {
+  width: 100%;
+  height: 100%;
+}
+
 *,
 *::before,
 *::after {
@@ -48,14 +53,71 @@ code {
   box-shadow: var(--ft-shadow);
 }
 
+.favorite-tree-bubble {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--ft-accent) 28%, var(--ft-border) 72%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ft-accent) 12%, var(--ft-bg) 88%);
+  color: var(--ft-text);
+  box-shadow: var(--ft-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.favorite-tree-bubble:active {
+  cursor: grabbing;
+}
+
+.favorite-tree-bubble.is-refreshing {
+  animation: ft-bubble-pulse 1.2s ease-in-out infinite;
+}
+
+.favorite-tree-bubble__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.favorite-tree-bubble__count {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ft-bg);
+  border: 1px solid var(--ft-border);
+  color: var(--ft-text-muted);
+  font-size: 10px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.favorite-tree.is-embedded {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  box-shadow: none;
+}
+
 .favorite-tree__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--ft-border);
   background: color-mix(in srgb, var(--ft-bg) 82%, var(--ft-bg-muted) 18%);
+  cursor: grab;
+  user-select: none;
+}
+
+.favorite-tree__header:active {
+  cursor: grabbing;
 }
 
 .favorite-tree__header-main {
@@ -64,14 +126,16 @@ code {
 
 .favorite-tree__title {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
+  pointer-events: none;
 }
 
 .favorite-tree__subtitle {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 10px;
   color: var(--ft-text-muted);
+  pointer-events: none;
 }
 
 .favorite-tree__subtitle code {
@@ -83,17 +147,28 @@ code {
 .favorite-tree__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  cursor: default;
+}
+
+.favorite-tree__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ft-border);
+  background: color-mix(in srgb, var(--ft-bg) 88%, var(--ft-bg-muted) 12%);
+  overflow-x: auto;
 }
 
 .favorite-tree__icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--ft-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--ft-bg);
   color: var(--ft-text);
   cursor: pointer;
@@ -109,11 +184,46 @@ code {
   background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
 }
 
+.favorite-tree__text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--ft-border);
+  border-radius: 999px;
+  background: var(--ft-bg);
+  color: var(--ft-text);
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.favorite-tree__text-btn:hover {
+  background: var(--ft-bg-muted);
+}
+
+.favorite-tree__text-btn.is-active {
+  color: var(--ft-accent);
+  border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
+  background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
+}
+
+.favorite-tree__text-btn.is-disabled {
+  opacity: 0.6;
+}
+
+body.is-dragging,
+body.is-dragging * {
+  user-select: none;
+}
+
 .favorite-tree__body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 10px 10px 12px;
+  padding: 6px 6px 8px;
   background: var(--ft-bg);
 }
 
@@ -138,12 +248,12 @@ code {
 .tree-node__row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 4px 8px;
-  margin-left: calc(var(--depth, 0) * 16px);
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 6px;
+  margin-left: calc(var(--depth, 0) * 14px);
   border-left: 3px solid transparent;
-  border-radius: 8px;
+  border-radius: 7px;
 }
 
 .tree-node__row:hover {
@@ -155,6 +265,15 @@ code {
   background: color-mix(in srgb, var(--ft-accent) 12%, var(--ft-bg) 88%);
 }
 
+.tree-node__row.is-located:not(.is-current) {
+  border-left-color: color-mix(in srgb, var(--ft-accent) 60%, var(--ft-border) 40%);
+  background: color-mix(in srgb, var(--ft-accent) 7%, var(--ft-bg) 93%);
+}
+
+.tree-node__row.is-flashing {
+  animation: ft-locate-flash 1.2s ease-out;
+}
+
 .tree-node__row.is-cycle {
   opacity: 0.82;
 }
@@ -163,8 +282,8 @@ code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -194,7 +313,7 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .tree-node__meta {
@@ -210,7 +329,7 @@ code {
   justify-content: center;
   padding: 2px 6px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.2;
   border: 1px solid var(--ft-border);
   color: var(--ft-text-muted);
@@ -224,9 +343,9 @@ code {
 }
 
 .tree-node__hint {
-  margin: 2px 0 4px calc((var(--depth, 0) + 1) * 16px + 8px);
-  padding: 6px 10px;
-  font-size: 12px;
+  margin: 2px 0 4px calc((var(--depth, 0) + 1) * 14px + 6px);
+  padding: 5px 8px;
+  font-size: 11px;
   color: var(--ft-text-muted);
   border-left: 1px dashed var(--ft-border);
 }
@@ -235,10 +354,38 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 14px 12px;
+  gap: 8px;
+  padding: 6px 10px 8px;
   border-top: 1px solid var(--ft-border);
   background: color-mix(in srgb, var(--ft-bg) 84%, var(--ft-bg-muted) 16%);
-  font-size: 12px;
+  font-size: 10px;
   color: var(--ft-text-muted);
+}
+
+@keyframes ft-locate-flash {
+  0% {
+    background: color-mix(in srgb, var(--ft-accent) 22%, var(--ft-bg) 78%);
+    transform: translateX(0);
+  }
+
+  30% {
+    background: color-mix(in srgb, var(--ft-accent) 28%, var(--ft-bg) 72%);
+    transform: translateX(1px);
+  }
+
+  100% {
+    background: inherit;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ft-bubble-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
 }
