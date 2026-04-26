@@ -4,6 +4,19 @@ export type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export type ViewMode = 'panel' | 'bubble'
 export type DragKind = 'panel' | 'bubble' | 'panel-resize'
 export type SidebarPosition = 'left' | 'right'
+export type SortPlacement = 'before' | 'after'
+
+export type SortOrderMap = Record<string, string[]>
+
+export type SortableItem = {
+  itemId: string
+  parentKey: string
+  title: string
+}
+
+export type SortDropTarget = SortableItem & {
+  placement: SortPlacement
+}
 
 export type DragState = {
   kind: DragKind
@@ -61,6 +74,7 @@ export type PersistedPluginState = {
   lastLocatedNodeKey: string | null
   viewMode: ViewMode
   controlsCollapsed: boolean
+  sortOrders: SortOrderMap
   layout: FloatingPositions
   panelSize: PanelSize
 }

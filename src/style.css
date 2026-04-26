@@ -455,6 +455,14 @@ body.is-dragging * {
   border-radius: 7px;
 }
 
+.tree-node__row.is-sort-before {
+  box-shadow: inset 0 2px 0 var(--ft-accent);
+}
+
+.tree-node__row.is-sort-after {
+  box-shadow: inset 0 -2px 0 var(--ft-accent);
+}
+
 .tree-node__row:hover {
   background: var(--ft-bg-muted);
 }
@@ -497,6 +505,34 @@ body.is-dragging * {
 
 .tree-node__toggle.is-passive {
   cursor: default;
+}
+
+.tree-node__sort-handle,
+.tree-node__sort-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.tree-node__sort-handle {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ft-text-muted);
+  cursor: grab;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.tree-node__sort-handle:hover {
+  background: color-mix(in srgb, var(--ft-border) 35%, transparent 65%);
+}
+
+.tree-node__sort-handle:active {
+  cursor: grabbing;
 }
 
 .tree-node__title {

@@ -56,3 +56,4 @@ export const PANEL_MIN_HEIGHT = 360
 export const PANEL_MAX_HEIGHT = 720
 export const BUBBLE_SIZE = 56
 export const DRAG_THRESHOLD_PX = 4
+export const ROOT_SORT_KEY = '__root__'

@@ -42,6 +42,10 @@ async function main(): Promise<void> {
       void plugin.onNodeToggle(key)
     },
     onOpenPage: plugin.openPage,
+    onStartSortDrag: plugin.startSortDrag,
+    onMoveSortDropTarget: plugin.moveSortDropTarget,
+    onFinishSortDrop: plugin.finishSortDrop,
+    onEndSortDrag: plugin.endSortDrag,
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
   registerToolbar(plugin.togglePanel)

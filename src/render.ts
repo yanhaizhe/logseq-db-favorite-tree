@@ -1,3 +1,4 @@
+import { ROOT_SORT_KEY } from './constants'
 import type { LoadState, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
@@ -38,7 +39,7 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     : state.rootFavorites
 
   const rootMarkup = visibleRoots.length
-    ? visibleRoots.map((title) => renderNode(title, 0, [], state, accessors, normalizedQuery)).join('')
+    ? visibleRoots.map((title) => renderNode(title, 0, [], null, state, accessors, normalizedQuery)).join('')
     : ''
 
   const breadcrumbMarkup = renderBreadcrumbs(state)
@@ -129,6 +130,7 @@ function renderNode(
   title: string,
   depth: number,
   ancestors: string[],
+  parentKey: string | null,
   state: TreeStateSnapshot,
   accessors: TreeRenderAccessors,
   normalizedQuery: string,
@@ -147,6 +149,23 @@ function renderNode(
   const hasKnownChildren = visibleChildren.length > 0
   const effectiveExpanded = isSearching ? hasKnownChildren : isExpanded
   const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, hasKnownChildren, state)
+  const sortParentKey = parentKey ?? ROOT_SORT_KEY
+  const sortItemId = buildSortItemId(sortParentKey, key)
+  const sortHandleMarkup = isSearching
+    ? '<span class="tree-node__sort-placeholder"></span>'
+    : `
+      <button
+        class="tree-node__sort-handle"
+        data-no-drag="true"
+        data-sort-handle="true"
+        data-sort-item-id="${escapeHtml(sortItemId)}"
+        data-sort-parent-key="${escapeHtml(sortParentKey)}"
+        data-sort-title="${escapeHtml(title)}"
+        draggable="true"
+        title="拖动自定义排序"
+        aria-label="拖动自定义排序"
+      >⋮⋮</button>
+    `
 
   let childrenMarkup = ''
   if (effectiveExpanded && loadState !== 'loading' && loadState !== 'error' && hasKnownChildren) {
@@ -157,7 +176,7 @@ function renderNode(
         if (nextAncestors.includes(childKey)) {
           return renderCycleNode(childTitle, depth + 1)
         }
-        return renderNode(childTitle, depth + 1, nextAncestors, state, accessors, normalizedQuery)
+        return renderNode(childTitle, depth + 1, nextAncestors, key, state, accessors, normalizedQuery)
       })
       .join('')}</div>`
   }
@@ -169,8 +188,15 @@ function renderNode(
 
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
-      <div class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''}" style="--depth:${depth}">
+      <div
+        class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''}"
+        style="--depth:${depth}"
+        data-sort-item-id="${escapeHtml(sortItemId)}"
+        data-sort-parent-key="${escapeHtml(sortParentKey)}"
+        data-sort-title="${escapeHtml(title)}"
+      >
         ${toggleMarkup}
+        ${sortHandleMarkup}
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="打开页面 ${escapeHtml(title)}">
           <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
         </button>
@@ -291,4 +317,8 @@ function renderHighlightedTitle(title: string, normalizedQuery: string): string 
 
   const end = start + normalizedQuery.length
   return `${escapeHtml(title.slice(0, start))}<mark class="tree-node__highlight">${escapeHtml(title.slice(start, end))}</mark>${escapeHtml(title.slice(end))}`
+}
+
+function buildSortItemId(parentKey: string, itemKey: string): string {
+  return `${parentKey}::${itemKey}`
 }

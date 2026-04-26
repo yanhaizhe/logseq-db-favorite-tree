@@ -1,10 +1,10 @@
 import type { ThemeMode } from '@logseq/libs/dist/LSPlugin'
-import { REFRESH_DEBOUNCE_MS } from './constants'
+import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
 import { FloatingLayoutManager } from './floating-layout'
 import { renderFavoriteTree } from './render'
 import { FavoriteTreeSettingsStore } from './settings'
 import { FavoriteTreeTreeService } from './tree-service'
-import type { DragKind, LoadState, PluginSettings, TreeStateSnapshot, ViewMode } from './types'
+import type { DragKind, LoadState, PluginSettings, SortDropTarget, SortOrderMap, SortableItem, TreeStateSnapshot, ViewMode } from './types'
 import { applyTheme } from './theme'
 import { escapeSelectorValue, normalizeTitle } from './utils'
 
@@ -21,10 +21,12 @@ export class FavoriteTreePlugin {
   private rootFavorites: string[] = []
   private autoRefreshPaused = false
   private controlsCollapsed = false
+  private sortOrders: SortOrderMap = {}
   private bodyScrollTop = 0
   private lastLocatedNodeKey: string | null = null
   private flashLocatedNodeKey: string | null = null
   private suppressBubbleClick = false
+  private sortDragItem: SortableItem | null = null
   private readonly expandedKeys = new Set<string>()
   private readonly loadedKeys = new Set<string>()
   private readonly loadStates = new Map<string, LoadState>()
@@ -282,6 +284,52 @@ export class FavoriteTreePlugin {
     logseq.App.pushState('page', { name: pageName })
   }
 
+  startSortDrag = (item: SortableItem): void => {
+    if (this.searchQuery) {
+      return
+    }
+    this.sortDragItem = item
+  }
+
+  moveSortDropTarget = (target: SortDropTarget): boolean => {
+    if (!this.sortDragItem || this.searchQuery) {
+      return false
+    }
+    if (target.parentKey !== this.sortDragItem.parentKey) {
+      return false
+    }
+    return target.itemId !== this.sortDragItem.itemId
+  }
+
+  finishSortDrop = (target: SortDropTarget): boolean => {
+    if (!this.sortDragItem || this.searchQuery) {
+      this.clearSortDrag()
+      return false
+    }
+    if (target.parentKey !== this.sortDragItem.parentKey || target.itemId === this.sortDragItem.itemId) {
+      this.clearSortDrag()
+      return false
+    }
+
+    const siblings = this.getOrderedTitlesForParent(target.parentKey)
+    const nextOrder = this.moveTitleWithinSiblings(
+      siblings,
+      this.sortDragItem.title,
+      target.title,
+      target.placement,
+    )
+
+    this.applyCustomSortOrderForParent(target.parentKey, nextOrder)
+    this.persistInternalState()
+    this.render()
+    this.clearSortDrag()
+    return true
+  }
+
+  endSortDrag = (): void => {
+    this.clearSortDrag()
+  }
+
   startDrag = (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null): void => {
     this.layout.startDrag(kind, event, handleElement)
   }
@@ -386,7 +434,7 @@ export class FavoriteTreePlugin {
     this.render()
 
     try {
-      this.rootFavorites = await this.treeService.loadFavoriteRoots()
+      this.rootFavorites = this.applySortOrder(await this.treeService.loadFavoriteRoots(), ROOT_SORT_KEY)
       this.treeService.invalidateIndex()
       await this.syncDerivedTreeState()
 
@@ -422,7 +470,7 @@ export class FavoriteTreePlugin {
     const selectionEnd = shouldRestoreSearchFocus ? activeElement.selectionEnd ?? this.searchQuery.length : null
 
     this.root.innerHTML = renderFavoriteTree(this.getRenderState(), {
-      getChildrenFor: (title) => this.treeService.getChildrenFor(title),
+      getChildrenFor: (title) => this.getOrderedChildrenFor(title),
     })
 
     const body = this.getBodyElement()
@@ -503,6 +551,7 @@ export class FavoriteTreePlugin {
       lastLocatedNodeKey: this.lastLocatedNodeKey,
       viewMode: this.viewMode,
       controlsCollapsed: this.controlsCollapsed,
+      sortOrders: this.sortOrders,
       layout: this.layout.getPositions(),
       panelSize: this.layout.getPanelSize(),
     })
@@ -590,10 +639,12 @@ export class FavoriteTreePlugin {
     this.lastLocatedNodeKey = restored.lastLocatedNodeKey
     this.viewMode = restored.viewMode
     this.controlsCollapsed = restored.controlsCollapsed
+    this.sortOrders = restored.sortOrders
     this.searchQuery = ''
     this.searching = false
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
+    this.sortDragItem = null
 
     this.expandedKeys.clear()
     this.loadedKeys.clear()
@@ -681,6 +732,77 @@ export class FavoriteTreePlugin {
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
     this.currentPagePath = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName) ?? []
+  }
+
+  private getOrderedChildrenFor(parentTitle: string): string[] {
+    return this.applySortOrder(this.treeService.getChildrenFor(parentTitle), normalizeTitle(parentTitle))
+  }
+
+  private getOrderedTitlesForParent(parentKey: string): string[] {
+    return parentKey === ROOT_SORT_KEY ? [...this.rootFavorites] : this.getOrderedChildrenFor(parentKey)
+  }
+
+  private applySortOrder(titles: string[], parentKey: string): string[] {
+    const key = parentKey.trim()
+    if (!key) {
+      return [...titles]
+    }
+
+    const customOrder = this.sortOrders[key]
+    if (!customOrder?.length) {
+      return [...titles]
+    }
+
+    const remaining = [...titles]
+    const ordered: string[] = []
+    for (const title of customOrder) {
+      const index = remaining.indexOf(title)
+      if (index >= 0) {
+        ordered.push(title)
+        remaining.splice(index, 1)
+      }
+    }
+    return [...ordered, ...remaining]
+  }
+
+  private applyCustomSortOrderForParent(parentKey: string, titles: string[]): void {
+    const key = parentKey.trim()
+    if (!key) {
+      return
+    }
+
+    this.sortOrders = {
+      ...this.sortOrders,
+      [key]: [...titles],
+    }
+
+    if (key === ROOT_SORT_KEY) {
+      this.rootFavorites = [...titles]
+    }
+  }
+
+  private moveTitleWithinSiblings(
+    siblings: string[],
+    sourceTitle: string,
+    targetTitle: string,
+    placement: 'before' | 'after',
+  ): string[] {
+    const next = [...siblings]
+    const sourceIndex = next.indexOf(sourceTitle)
+    const targetIndex = next.indexOf(targetTitle)
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return next
+    }
+
+    const [moved] = next.splice(sourceIndex, 1)
+    const adjustedTargetIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex
+    const insertIndex = placement === 'after' ? adjustedTargetIndex + 1 : adjustedTargetIndex
+    next.splice(insertIndex, 0, moved)
+    return next
+  }
+
+  private clearSortDrag(): void {
+    this.sortDragItem = null
   }
 
   private formatRefreshLabel(reason: string): string {

@@ -7,6 +7,7 @@ import type {
   PluginSettings,
   RestoredPluginState,
   SidebarPosition,
+  SortOrderMap,
   ViewMode,
 } from './types'
 
@@ -53,6 +54,7 @@ export class FavoriteTreeSettingsStore {
       lastLocatedNodeKey: graphState.lastLocatedNodeKey,
       viewMode: graphState.viewMode,
       controlsCollapsed: graphState.controlsCollapsed,
+      sortOrders: graphState.sortOrders,
       layout: graphState.layout,
       panelSize: graphState.panelSize,
     }
@@ -125,6 +127,7 @@ export class FavoriteTreeSettingsStore {
       lastLocatedNodeKey: this.getString(INTERNAL_SETTINGS.lastLocatedNodeKey),
       viewMode: this.getViewMode(),
       controlsCollapsed: false,
+      sortOrders: {},
       layout: {
         panelX: this.getNumber(INTERNAL_SETTINGS.panelX, 0),
         panelY: this.getNumber(INTERNAL_SETTINGS.panelY, 0),
@@ -149,6 +152,7 @@ export class FavoriteTreeSettingsStore {
         : null,
       viewMode: value.viewMode === 'bubble' ? 'bubble' : 'panel',
       controlsCollapsed: Boolean(value.controlsCollapsed),
+      sortOrders: this.normalizeSortOrders(value.sortOrders),
       layout: {
         panelX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelX, 0),
         panelY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelY, 0),
@@ -166,6 +170,7 @@ export class FavoriteTreeSettingsStore {
       lastLocatedNodeKey: state.lastLocatedNodeKey,
       viewMode: state.viewMode,
       controlsCollapsed: state.controlsCollapsed,
+      sortOrders: this.normalizeSortOrders(state.sortOrders),
       layout: {
         panelX: Math.round(state.layout.panelX),
         panelY: Math.round(state.layout.panelY),
@@ -185,6 +190,24 @@ export class FavoriteTreeSettingsStore {
       width: this.toFiniteNumber(record?.width, this.getPanelWidth()),
       height: this.toFiniteNumber(record?.height, 0),
     }
+  }
+
+  private normalizeSortOrders(value: unknown): SortOrderMap {
+    if (!value || typeof value !== 'object') {
+      return {}
+    }
+
+    const result: SortOrderMap = {}
+    for (const [key, candidate] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof key !== 'string' || !key.trim() || !Array.isArray(candidate)) {
+        continue
+      }
+      const normalized = candidate.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      if (normalized.length > 0) {
+        result[key] = normalized
+      }
+    }
+    return result
   }
 
   private getSettings(): PluginSettings | undefined {
