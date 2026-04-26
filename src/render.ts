@@ -28,14 +28,40 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
   const hasExpandedNodes = state.expandedKeys.size > 0
   const expandActionLabel = hasExpandedNodes ? '折叠' : '展开'
   const expandActionTitle = hasExpandedNodes ? '折叠所有已展开目录' : '展开所有已匹配目录'
+  const normalizedQuery = normalizeTitle(state.searchQuery)
+  const isSearching = normalizedQuery.length > 0
 
-  const rootMarkup = state.rootFavorites.length
-    ? state.rootFavorites.map((title) => renderNode(title, 0, [], state, accessors)).join('')
-    : '<div class="favorite-tree__status">当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。</div>'
+  const visibleRoots = isSearching
+    ? state.rootFavorites.filter((title) => isNodeVisible(title, normalizedQuery, accessors, []))
+    : state.rootFavorites
 
-  const bodyMarkup = state.refreshing && !state.rootFavorites.length
+  const rootMarkup = visibleRoots.length
+    ? visibleRoots.map((title) => renderNode(title, 0, [], state, accessors, normalizedQuery)).join('')
+    : ''
+
+  const breadcrumbMarkup = renderBreadcrumbs(state)
+  const searchMarkup = `
+    <div class="favorite-tree__searchbar">
+      <input
+        class="favorite-tree__search-input"
+        data-role="search-input"
+        type="search"
+        value="${escapeHtml(state.searchQuery)}"
+        placeholder="搜索页面标题"
+        spellcheck="false"
+      />
+    </div>
+  `
+
+  const bodyMarkup = state.searching && isSearching
+    ? '<div class="favorite-tree__status">正在建立搜索索引...</div>'
+    : state.refreshing && !state.rootFavorites.length
     ? '<div class="favorite-tree__status">正在加载收藏树...</div>'
-    : rootMarkup
+    : isSearching && !visibleRoots.length
+    ? '<div class="favorite-tree__status">没有匹配的页面，试试更短的关键词。</div>'
+    : state.rootFavorites.length
+    ? rootMarkup
+    : '<div class="favorite-tree__status">当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。</div>'
 
   return `
     <div class="favorite-tree">
@@ -51,6 +77,8 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
           <button class="favorite-tree__icon-btn" data-action="close" title="隐藏插件">×</button>
         </div>
       </div>
+      ${searchMarkup}
+      ${breadcrumbMarkup}
       <div class="favorite-tree__toolbar">
         <button class="favorite-tree__text-btn" data-action="locate-current" title="快速定位当前页">定位</button>
         <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
@@ -76,6 +104,7 @@ function renderNode(
   ancestors: string[],
   state: TreeStateSnapshot,
   accessors: TreeRenderAccessors,
+  normalizedQuery: string,
 ): string {
   const key = normalizeTitle(title)
   const isCurrent = key === normalizeTitle(state.currentPageName)
@@ -84,33 +113,41 @@ function renderNode(
   const isExpanded = state.expandedKeys.has(key)
   const loadState = state.loadStates.get(key) ?? 'idle'
   const children = accessors.getChildrenFor(title)
-  const hasKnownChildren = children.length > 0
-  const statusHint = renderNodeHint(key, depth, isExpanded, loadState, hasKnownChildren, state)
+  const isSearching = normalizedQuery.length > 0
+  const visibleChildren = isSearching
+    ? children.filter((childTitle) => isNodeVisible(childTitle, normalizedQuery, accessors, [...ancestors, key]))
+    : children
+  const hasKnownChildren = visibleChildren.length > 0
+  const effectiveExpanded = isSearching ? hasKnownChildren : isExpanded
+  const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, hasKnownChildren, state)
 
   let childrenMarkup = ''
-  if (isExpanded && loadState !== 'loading' && loadState !== 'error' && hasKnownChildren) {
+  if (effectiveExpanded && loadState !== 'loading' && loadState !== 'error' && hasKnownChildren) {
     const nextAncestors = [...ancestors, key]
-    childrenMarkup = `<div class="tree-node__children">${children
+    childrenMarkup = `<div class="tree-node__children">${visibleChildren
       .map((childTitle) => {
         const childKey = normalizeTitle(childTitle)
         if (nextAncestors.includes(childKey)) {
           return renderCycleNode(childTitle, depth + 1)
         }
-        return renderNode(childTitle, depth + 1, nextAncestors, state, accessors)
+        return renderNode(childTitle, depth + 1, nextAncestors, state, accessors, normalizedQuery)
       })
       .join('')}</div>`
   }
 
-  const chevron = isExpanded ? '▾' : '▸'
+  const chevron = effectiveExpanded ? '▾' : '▸'
+  const toggleMarkup = isSearching
+    ? `<span class="tree-node__toggle is-passive">${hasKnownChildren ? chevron : '•'}</span>`
+    : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="展开或折叠">${chevron}</button>`
 
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
       <div class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''}" style="--depth:${depth}">
-        <button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="展开或折叠">${chevron}</button>
+        ${toggleMarkup}
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="打开页面 ${escapeHtml(title)}">
-          <span class="tree-node__title-text">${escapeHtml(title)}</span>
+          <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
         </button>
-        <span class="tree-node__meta">${isCurrent ? '<span class="tree-node__badge">当前页</span>' : ''}${isLocated ? '<span class="tree-node__badge">定位</span>' : ''}</span>
+        <span class="tree-node__meta">${isCurrent ? '<span class="tree-node__badge">当前页</span>' : ''}${isLocated ? '<span class="tree-node__badge">定位</span>' : ''}${isSearching && key.includes(normalizedQuery) ? '<span class="tree-node__badge">匹配</span>' : ''}</span>
       </div>
       ${statusHint}
       ${childrenMarkup}
@@ -141,6 +178,10 @@ function renderNodeHint(
   hasKnownChildren: boolean,
   state: TreeStateSnapshot,
 ): string {
+  if (state.searchQuery) {
+    return ''
+  }
+
   if (!isExpanded) {
     return ''
   }
@@ -159,4 +200,68 @@ function renderNodeHint(
   }
 
   return ''
+}
+
+function renderBreadcrumbs(state: TreeStateSnapshot): string {
+  if (state.currentPagePath.length > 0) {
+    const items = state.currentPagePath
+      .map((title, index) => {
+        const isLast = index === state.currentPagePath.length - 1
+        return `
+          <button
+            class="favorite-tree__breadcrumb ${isLast ? 'is-current' : ''}"
+            data-action="open-page"
+            data-page="${escapeHtml(title)}"
+            title="打开页面 ${escapeHtml(title)}"
+          >${escapeHtml(title)}</button>
+        `
+      })
+      .join('<span class="favorite-tree__breadcrumb-separator">/</span>')
+
+    return `<div class="favorite-tree__breadcrumbs">${items}</div>`
+  }
+
+  if (state.currentPageName) {
+    return '<div class="favorite-tree__breadcrumbs is-muted">当前页不在收藏树中</div>'
+  }
+
+  return ''
+}
+
+function isNodeVisible(
+  title: string,
+  normalizedQuery: string,
+  accessors: TreeRenderAccessors,
+  ancestors: string[],
+): boolean {
+  if (!normalizedQuery) {
+    return true
+  }
+
+  const key = normalizeTitle(title)
+  if (!key || ancestors.includes(key)) {
+    return false
+  }
+
+  if (key.includes(normalizedQuery)) {
+    return true
+  }
+
+  const nextAncestors = [...ancestors, key]
+  return accessors.getChildrenFor(title).some((childTitle) => isNodeVisible(childTitle, normalizedQuery, accessors, nextAncestors))
+}
+
+function renderHighlightedTitle(title: string, normalizedQuery: string): string {
+  if (!normalizedQuery) {
+    return escapeHtml(title)
+  }
+
+  const lowered = title.toLocaleLowerCase()
+  const start = lowered.indexOf(normalizedQuery)
+  if (start < 0) {
+    return escapeHtml(title)
+  }
+
+  const end = start + normalizedQuery.length
+  return `${escapeHtml(title.slice(0, start))}<mark class="tree-node__highlight">${escapeHtml(title.slice(start, end))}</mark>${escapeHtml(title.slice(end))}`
 }

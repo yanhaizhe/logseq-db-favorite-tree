@@ -66,9 +66,12 @@ export type TreeStateSnapshot = {
   loadStates: Map<string, LoadState>
   loadErrors: Map<string, string>
   currentPageName: string | null
+  currentPagePath: string[]
   lastLocatedNodeKey: string | null
   flashLocatedNodeKey: string | null
   refreshing: boolean
+  searching: boolean
+  searchQuery: string
   autoRefreshPaused: boolean
   pollIntervalSeconds: number
   hierarchyProperty: string

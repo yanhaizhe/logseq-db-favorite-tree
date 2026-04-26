@@ -5,6 +5,10 @@ export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
   private childIndexPromise: Promise<void> | null = null
 
+  hasChildIndex(): boolean {
+    return this.childIndex !== null
+  }
+
   invalidateIndex(): void {
     this.childIndex = null
     this.childIndexPromise = null

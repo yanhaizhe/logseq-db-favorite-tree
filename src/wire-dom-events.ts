@@ -3,6 +3,7 @@ import type { DragKind } from './types'
 export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
   onHeaderDoubleClick: () => void
+  onSearchQueryChange: (value: string) => void
   onRefresh: () => void
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
@@ -49,6 +50,15 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
 
     event.preventDefault()
     handlers.onHeaderDoubleClick()
+  })
+
+  root.addEventListener('input', (event) => {
+    const target = event.target as HTMLInputElement | null
+    if (!target || target.dataset.role !== 'search-input') {
+      return
+    }
+
+    handlers.onSearchQueryChange(target.value)
   })
 
   root.addEventListener('click', (event) => {

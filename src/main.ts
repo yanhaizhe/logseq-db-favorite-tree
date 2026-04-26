@@ -17,6 +17,9 @@ async function main(): Promise<void> {
   wireDOMEvents(root, {
     onStartDrag: plugin.startDrag,
     onHeaderDoubleClick: plugin.collapseToBubble,
+    onSearchQueryChange: (value) => {
+      void plugin.setSearchQuery(value)
+    },
     onRefresh: () => {
       void plugin.manualRefresh()
     },

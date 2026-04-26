@@ -12,7 +12,10 @@ export class FavoriteTreePlugin {
   private panelVisible = false
   private viewMode: ViewMode = 'panel'
   private refreshing = false
+  private searching = false
+  private searchQuery = ''
   private currentPageName: string | null = null
+  private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
   private autoRefreshPaused = false
@@ -155,6 +158,28 @@ export class FavoriteTreePlugin {
     this.autoRefreshPaused = !this.autoRefreshPaused
     this.persistInternalState()
     this.startPolling()
+    this.render()
+  }
+
+  setSearchQuery = async (value: string): Promise<void> => {
+    const nextQuery = value.trim()
+    this.searchQuery = nextQuery
+
+    if (!nextQuery) {
+      this.searching = false
+      this.render()
+      return
+    }
+
+    this.searching = !this.treeService.hasChildIndex()
+    this.render()
+
+    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    if (this.searchQuery !== nextQuery) {
+      return
+    }
+
+    this.searching = false
     this.render()
   }
 
@@ -359,15 +384,7 @@ export class FavoriteTreePlugin {
     try {
       this.rootFavorites = await this.treeService.loadFavoriteRoots()
       this.treeService.invalidateIndex()
-
-      if (this.hasExpandedNodes()) {
-        await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-        for (const key of this.expandedKeys) {
-          this.loadedKeys.add(key)
-          this.loadStates.set(key, 'loaded')
-          this.loadErrors.delete(key)
-        }
-      }
+      await this.syncDerivedTreeState()
 
       this.lastRefreshLabel = this.formatRefreshLabel(reason)
     } catch (error) {
@@ -383,11 +400,18 @@ export class FavoriteTreePlugin {
   private async updateCurrentPage(): Promise<void> {
     const current = await logseq.Editor.getCurrentPage()
     this.currentPageName = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    await this.syncCurrentPagePath()
     this.render()
   }
 
   private render(): void {
     this.captureBodyScrollTop()
+    const activeElement = document.activeElement
+    const shouldRestoreSearchFocus =
+      activeElement instanceof HTMLInputElement && activeElement.dataset.role === 'search-input'
+    const selectionStart = shouldRestoreSearchFocus ? activeElement.selectionStart ?? this.searchQuery.length : null
+    const selectionEnd = shouldRestoreSearchFocus ? activeElement.selectionEnd ?? this.searchQuery.length : null
+
     this.root.innerHTML = renderFavoriteTree(this.getRenderState(), {
       getChildrenFor: (title) => this.treeService.getChildrenFor(title),
     })
@@ -396,6 +420,14 @@ export class FavoriteTreePlugin {
     if (body) {
       body.scrollTop = this.bodyScrollTop
       body.addEventListener('scroll', this.handleBodyScroll, { passive: true })
+    }
+
+    if (shouldRestoreSearchFocus) {
+      const nextInput = this.root.querySelector<HTMLInputElement>('[data-role="search-input"]')
+      if (nextInput) {
+        nextInput.focus({ preventScroll: true })
+        nextInput.setSelectionRange(selectionStart, selectionEnd)
+      }
     }
   }
 
@@ -407,9 +439,12 @@ export class FavoriteTreePlugin {
       loadStates: this.loadStates,
       loadErrors: this.loadErrors,
       currentPageName: this.currentPageName,
+      currentPagePath: this.currentPagePath,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
       flashLocatedNodeKey: this.flashLocatedNodeKey,
       refreshing: this.refreshing,
+      searching: this.searching,
+      searchQuery: this.searchQuery,
       autoRefreshPaused: this.autoRefreshPaused,
       pollIntervalSeconds: this.settings.getPollIntervalSeconds(),
       hierarchyProperty: this.settings.getHierarchyProperty(),
@@ -528,6 +563,46 @@ export class FavoriteTreePlugin {
 
     this.suppressBubbleClick = result.kind === 'bubble' && result.moved
     this.persistInternalState()
+  }
+
+  private async syncDerivedTreeState(): Promise<void> {
+    const shouldBuildIndex = this.hasExpandedNodes() || Boolean(this.currentPageName) || Boolean(this.searchQuery)
+    if (!shouldBuildIndex) {
+      this.currentPagePath = []
+      this.searching = false
+      return
+    }
+
+    if (this.searchQuery) {
+      this.searching = true
+    }
+
+    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    this.syncExpandedLoadState()
+    await this.syncCurrentPagePath()
+    this.searching = false
+  }
+
+  private syncExpandedLoadState(): void {
+    if (!this.hasExpandedNodes()) {
+      return
+    }
+
+    for (const key of this.expandedKeys) {
+      this.loadedKeys.add(key)
+      this.loadStates.set(key, 'loaded')
+      this.loadErrors.delete(key)
+    }
+  }
+
+  private async syncCurrentPagePath(): Promise<void> {
+    if (!this.currentPageName || !this.rootFavorites.length) {
+      this.currentPagePath = []
+      return
+    }
+
+    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    this.currentPagePath = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName) ?? []
   }
 
   private formatRefreshLabel(reason: string): string {
