@@ -39,7 +39,7 @@ export class FavoriteTreeTreeService {
       resolved.push(title)
     }
 
-    return resolved
+    return this.sortTitles(resolved)
   }
 
   async ensureChildIndex(hierarchyProperty: string): Promise<void> {
@@ -141,10 +141,14 @@ export class FavoriteTreeTreeService {
     }
 
     for (const [key, children] of index.entries()) {
-      index.set(key, [...children].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN', { sensitivity: 'base' })))
+      index.set(key, this.sortTitles(children))
     }
 
     this.childIndex = index
+  }
+
+  private sortTitles(titles: string[]): string[] {
+    return [...titles].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN', { sensitivity: 'base' }))
   }
 
   private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<string[]> {

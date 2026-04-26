@@ -21,6 +21,7 @@ async function main(): Promise<void> {
       void plugin.setSearchQuery(value)
     },
     onToggleControls: plugin.toggleControlsCollapsed,
+    onResetPanelSize: plugin.resetPanelSize,
     onRefresh: () => {
       void plugin.manualRefresh()
     },

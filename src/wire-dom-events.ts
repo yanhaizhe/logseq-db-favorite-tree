@@ -5,6 +5,7 @@ export type FavoriteTreeDOMHandlers = {
   onHeaderDoubleClick: () => void
   onSearchQueryChange: (value: string) => void
   onToggleControls: () => void
+  onResetPanelSize: () => void
   onRefresh: () => void
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
@@ -21,6 +22,9 @@ export type FavoriteTreeDOMHandlers = {
 export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
   root.addEventListener('pointerdown', (event) => {
     const source = event.target as HTMLElement | null
+    if (source?.closest<HTMLElement>('[data-no-drag="true"]')) {
+      return
+    }
     const handle = source?.closest<HTMLElement>('[data-drag-handle]')
     if (!handle) {
       return
@@ -39,6 +43,9 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
 
   root.addEventListener('dblclick', (event) => {
     const source = event.target as HTMLElement | null
+    if (source?.closest<HTMLElement>('[data-no-drag="true"]')) {
+      return
+    }
     const header = source?.closest<HTMLElement>('[data-drag-handle="panel"]')
     if (!header) {
       return
@@ -71,6 +78,10 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     const action = target.dataset.action
     if (action === 'toggle-controls') {
       handlers.onToggleControls()
+      return
+    }
+    if (action === 'reset-panel-size') {
+      handlers.onResetPanelSize()
       return
     }
     if (action === 'refresh') {

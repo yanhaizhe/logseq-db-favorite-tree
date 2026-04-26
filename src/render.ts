@@ -42,6 +42,7 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     : ''
 
   const breadcrumbMarkup = renderBreadcrumbs(state)
+  const infoTooltip = `拖动标题栏移动，双击收回为悬浮球；当前层级属性：${state.hierarchyProperty}`
   const searchMarkup = `
     <div class="favorite-tree__searchbar">
       <input
@@ -57,6 +58,7 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
   const toolbarMarkup = `
     <div class="favorite-tree__toolbar">
       <button class="favorite-tree__text-btn" data-action="locate-current" title="快速定位当前页">定位</button>
+      <button class="favorite-tree__text-btn" data-action="reset-panel-size" title="恢复面板默认宽高">默认尺寸</button>
       <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
       <button
         class="favorite-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
@@ -90,8 +92,13 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     <div class="favorite-tree">
       <div class="favorite-tree__header" data-drag-handle="panel" title="拖动可移动，双击可收回为悬浮球">
         <div class="favorite-tree__header-main">
-          <h1 class="favorite-tree__title">收藏夹树</h1>
-          <p class="favorite-tree__subtitle">拖动标题栏移动，双击收回 · 属性 <code>${escapeHtml(state.hierarchyProperty)}</code></p>
+          <div class="favorite-tree__title-row">
+            <h1 class="favorite-tree__title">收藏夹树</h1>
+            <span class="favorite-tree__info" data-no-drag="true" tabindex="0" role="button" aria-label="查看说明">
+              <span class="favorite-tree__info-icon">i</span>
+              <span class="favorite-tree__tooltip" role="tooltip">${escapeHtml(infoTooltip)}</span>
+            </span>
+          </div>
         </div>
         <div class="favorite-tree__actions">
           <button

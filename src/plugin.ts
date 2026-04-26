@@ -152,6 +152,11 @@ export class FavoriteTreePlugin {
     this.render()
   }
 
+  resetPanelSize = (): void => {
+    this.layout.resetPanelSize(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.persistInternalState()
+  }
+
   toggleControlsCollapsed = (): void => {
     this.controlsCollapsed = !this.controlsCollapsed
     this.persistInternalState()

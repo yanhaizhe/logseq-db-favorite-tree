@@ -64,6 +64,12 @@ export class FloatingLayoutManager {
     return { ...this.panelSize }
   }
 
+  resetPanelSize(defaultPanelWidth: number, sidebarPosition: SidebarPosition): void {
+    this.panelSize = this.getClampedPanelSize(defaultPanelWidth, 0)
+    this.ensureInViewport(sidebarPosition)
+    this.onFrameChange()
+  }
+
   getFrame(viewMode: ViewMode, sidebarPosition: SidebarPosition): FloatingFrame {
     this.ensureInViewport(sidebarPosition)
     return viewMode === 'bubble' ? this.getBubbleFrame() : this.getPanelFrame()
