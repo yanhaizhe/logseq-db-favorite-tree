@@ -9,6 +9,7 @@ import { applyTheme } from './theme'
 import { escapeSelectorValue, normalizeTitle } from './utils'
 
 export class FavoriteTreePlugin {
+  private currentGraphKey = 'default'
   private panelVisible = false
   private viewMode: ViewMode = 'panel'
   private refreshing = false
@@ -43,18 +44,7 @@ export class FavoriteTreePlugin {
   constructor(private readonly root: HTMLElement) {}
 
   async init(): Promise<void> {
-    const restored = this.settings.readInternalState()
-    this.panelVisible = restored.panelVisible
-    this.autoRefreshPaused = restored.autoRefreshPaused
-    this.bodyScrollTop = restored.bodyScrollTop
-    this.lastLocatedNodeKey = restored.lastLocatedNodeKey
-    this.viewMode = restored.viewMode
-
-    this.layout.restore(restored.layout, this.settings.getSidebarPosition(), this.settings.getPanelWidth())
-    for (const key of restored.expandedKeys) {
-      this.expandedKeys.add(key)
-      this.loadedKeys.add(key)
-    }
+    await this.initializeGraphContext()
 
     window.addEventListener('pointermove', this.handlePointerMove)
     window.addEventListener('pointerup', this.handlePointerUp)
@@ -317,7 +307,7 @@ export class FavoriteTreePlugin {
 
     this.offHooks.push(
       logseq.App.onCurrentGraphChanged(() => {
-        this.scheduleRefresh('graph-changed')
+        void this.handleGraphChanged()
       }),
     )
 
@@ -485,7 +475,7 @@ export class FavoriteTreePlugin {
   }
 
   private persistInternalState(): void {
-    this.settings.persistInternalState({
+    this.settings.persistInternalState(this.currentGraphKey, {
       panelVisible: this.panelVisible,
       expandedKeys: [...this.expandedKeys],
       autoRefreshPaused: this.autoRefreshPaused,
@@ -563,6 +553,71 @@ export class FavoriteTreePlugin {
 
     this.suppressBubbleClick = result.kind === 'bubble' && result.moved
     this.persistInternalState()
+  }
+
+  private async initializeGraphContext(): Promise<void> {
+    this.currentGraphKey = await this.resolveCurrentGraphKey()
+    this.restoreGraphState()
+  }
+
+  private restoreGraphState(): void {
+    const restored = this.settings.readInternalState(this.currentGraphKey)
+    this.panelVisible = restored.panelVisible
+    this.autoRefreshPaused = restored.autoRefreshPaused
+    this.bodyScrollTop = restored.bodyScrollTop
+    this.lastLocatedNodeKey = restored.lastLocatedNodeKey
+    this.viewMode = restored.viewMode
+    this.searchQuery = ''
+    this.searching = false
+    this.currentPagePath = []
+    this.flashLocatedNodeKey = null
+
+    this.expandedKeys.clear()
+    this.loadedKeys.clear()
+    this.loadStates.clear()
+    this.loadErrors.clear()
+
+    this.layout.restore(restored.layout, this.settings.getSidebarPosition(), this.settings.getPanelWidth())
+    for (const key of restored.expandedKeys) {
+      this.expandedKeys.add(key)
+      this.loadedKeys.add(key)
+    }
+  }
+
+  private async handleGraphChanged(): Promise<void> {
+    this.persistInternalState()
+    this.currentGraphKey = await this.resolveCurrentGraphKey()
+    this.restoreGraphState()
+    this.treeService.invalidateIndex()
+    this.layout.ensureInViewport(this.settings.getPanelWidth(), this.settings.getSidebarPosition())
+    this.applyMainUIState()
+    this.render()
+    await this.refresh('graph-changed')
+    await this.updateCurrentPage()
+  }
+
+  private async resolveCurrentGraphKey(): Promise<string> {
+    try {
+      const graph = await logseq.App.getCurrentGraph()
+      if (!graph) {
+        return 'default'
+      }
+
+      const path = typeof graph.path === 'string' ? graph.path.trim() : ''
+      if (path) {
+        return path
+      }
+
+      const url = typeof graph.url === 'string' ? graph.url.trim() : ''
+      if (url) {
+        return url
+      }
+
+      const name = typeof graph.name === 'string' ? graph.name.trim() : ''
+      return name || 'default'
+    } catch {
+      return 'default'
+    }
   }
 
   private async syncDerivedTreeState(): Promise<void> {

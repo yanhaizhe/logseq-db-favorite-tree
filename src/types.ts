@@ -31,6 +31,7 @@ export type PluginSettings = {
   __panelY?: number
   __bubbleX?: number
   __bubbleY?: number
+  __graphStates?: string
 } & Record<string, unknown>
 
 export type FloatingPositions = {
@@ -48,16 +49,21 @@ export type FloatingFrame = {
 }
 
 export type PersistedPluginState = {
-  panelVisible: boolean
   expandedKeys: string[]
-  autoRefreshPaused: boolean
   bodyScrollTop: number
   lastLocatedNodeKey: string | null
   viewMode: ViewMode
   layout: FloatingPositions
 }
 
-export type RestoredPluginState = PersistedPluginState
+export type RestoredPluginState = PersistedPluginState & {
+  panelVisible: boolean
+  autoRefreshPaused: boolean
+}
+
+export type GraphScopedPersistedState = PersistedPluginState
+
+export type GraphScopedStateMap = Record<string, GraphScopedPersistedState>
 
 export type TreeStateSnapshot = {
   rootFavorites: string[]

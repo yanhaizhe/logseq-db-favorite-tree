@@ -7,6 +7,9 @@
   --ft-accent: #2563eb;
   --ft-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   --ft-danger: #dc2626;
+  --ft-scrollbar-thumb: color-mix(in srgb, var(--ft-border) 68%, var(--ft-accent) 32%);
+  --ft-scrollbar-thumb-hover: color-mix(in srgb, var(--ft-border) 42%, var(--ft-accent) 58%);
+  --ft-scrollbar-track: color-mix(in srgb, var(--ft-bg-muted) 76%, transparent 24%);
 }
 
 html,
@@ -185,6 +188,8 @@ code {
   overflow-x: auto;
   white-space: nowrap;
   font-size: 11px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ft-scrollbar-thumb) transparent;
 }
 
 .favorite-tree__breadcrumbs.is-muted {
@@ -220,6 +225,8 @@ code {
   border-bottom: 1px solid var(--ft-border);
   background: color-mix(in srgb, var(--ft-bg) 88%, var(--ft-bg-muted) 12%);
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ft-scrollbar-thumb) transparent;
 }
 
 .favorite-tree__icon-btn {
@@ -286,6 +293,38 @@ body.is-dragging * {
   overflow: auto;
   padding: 6px 6px 8px;
   background: var(--ft-bg);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ft-scrollbar-thumb) transparent;
+}
+
+.favorite-tree__body::-webkit-scrollbar,
+.favorite-tree__toolbar::-webkit-scrollbar,
+.favorite-tree__breadcrumbs::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.favorite-tree__body::-webkit-scrollbar-track,
+.favorite-tree__toolbar::-webkit-scrollbar-track,
+.favorite-tree__breadcrumbs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.favorite-tree__body::-webkit-scrollbar-thumb,
+.favorite-tree__toolbar::-webkit-scrollbar-thumb,
+.favorite-tree__breadcrumbs::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--ft-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.favorite-tree__body::-webkit-scrollbar-thumb:hover,
+.favorite-tree__toolbar::-webkit-scrollbar-thumb:hover,
+.favorite-tree__breadcrumbs::-webkit-scrollbar-thumb:hover {
+  background: var(--ft-scrollbar-thumb-hover);
+  background-clip: padding-box;
 }
 
 .favorite-tree__status {

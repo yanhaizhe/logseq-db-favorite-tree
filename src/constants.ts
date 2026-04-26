@@ -43,6 +43,7 @@ export const INTERNAL_SETTINGS = {
   panelY: '__panelY',
   bubbleX: '__bubbleX',
   bubbleY: '__bubbleY',
+  graphStates: '__graphStates',
 } as const
 
 export const DEFAULT_POLL_INTERVAL_SECONDS = 5

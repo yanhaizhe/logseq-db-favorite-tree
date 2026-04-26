@@ -1,5 +1,13 @@
 import { DEFAULT_POLL_INTERVAL_SECONDS, INTERNAL_SETTINGS } from './constants'
-import type { PersistedPluginState, PluginSettings, RestoredPluginState, SidebarPosition, ViewMode } from './types'
+import type {
+  GraphScopedPersistedState,
+  GraphScopedStateMap,
+  PersistedPluginState,
+  PluginSettings,
+  RestoredPluginState,
+  SidebarPosition,
+  ViewMode,
+} from './types'
 
 export class FavoriteTreeSettingsStore {
   getHierarchyProperty(): string {
@@ -33,11 +41,83 @@ export class FavoriteTreeSettingsStore {
     return this.getString(INTERNAL_SETTINGS.viewMode) === 'bubble' ? 'bubble' : 'panel'
   }
 
-  readInternalState(): RestoredPluginState {
+  readInternalState(graphKey: string): RestoredPluginState {
+    const graphState = this.getGraphScopedState(graphKey) ?? this.readLegacyScopedState()
+
     return {
       panelVisible: this.getBoolean(INTERNAL_SETTINGS.panelVisible, true),
-      expandedKeys: this.getStringArray(INTERNAL_SETTINGS.expandedKeys),
+      expandedKeys: graphState.expandedKeys,
       autoRefreshPaused: this.getBoolean(INTERNAL_SETTINGS.autoRefreshPaused, false),
+      bodyScrollTop: graphState.bodyScrollTop,
+      lastLocatedNodeKey: graphState.lastLocatedNodeKey,
+      viewMode: graphState.viewMode,
+      layout: graphState.layout,
+    }
+  }
+
+  persistInternalState(graphKey: string, state: RestoredPluginState): void {
+    const graphStates = this.getAllGraphScopedStates()
+    graphStates[graphKey] = this.toGraphScopedState(state)
+
+    logseq.updateSettings({
+      [INTERNAL_SETTINGS.panelVisible]: state.panelVisible,
+      [INTERNAL_SETTINGS.autoRefreshPaused]: state.autoRefreshPaused,
+      [INTERNAL_SETTINGS.graphStates]: JSON.stringify(graphStates),
+    })
+  }
+
+  private getGraphScopedState(graphKey: string): GraphScopedPersistedState | null {
+    const value = this.getSettings()?.[INTERNAL_SETTINGS.graphStates]
+    if (typeof value !== 'string' || !value.trim()) {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (!parsed || typeof parsed !== 'object') {
+        return null
+      }
+
+      const record = parsed as Record<string, unknown>
+      const candidate = record[graphKey]
+      if (!candidate || typeof candidate !== 'object') {
+        return null
+      }
+
+      return this.normalizeGraphScopedState(candidate as Record<string, unknown>)
+    } catch {
+      return null
+    }
+  }
+
+  private getAllGraphScopedStates(): GraphScopedStateMap {
+    const value = this.getSettings()?.[INTERNAL_SETTINGS.graphStates]
+    if (typeof value !== 'string' || !value.trim()) {
+      return {}
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (!parsed || typeof parsed !== 'object') {
+        return {}
+      }
+
+      const result: GraphScopedStateMap = {}
+      for (const [key, candidate] of Object.entries(parsed as Record<string, unknown>)) {
+        if (!candidate || typeof candidate !== 'object') {
+          continue
+        }
+        result[key] = this.normalizeGraphScopedState(candidate as Record<string, unknown>)
+      }
+      return result
+    } catch {
+      return {}
+    }
+  }
+
+  private readLegacyScopedState(): GraphScopedPersistedState {
+    return {
+      expandedKeys: this.getStringArray(INTERNAL_SETTINGS.expandedKeys),
       bodyScrollTop: this.getNumber(INTERNAL_SETTINGS.bodyScrollTop, 0),
       lastLocatedNodeKey: this.getString(INTERNAL_SETTINGS.lastLocatedNodeKey),
       viewMode: this.getViewMode(),
@@ -50,19 +130,38 @@ export class FavoriteTreeSettingsStore {
     }
   }
 
-  persistInternalState(state: PersistedPluginState): void {
-    logseq.updateSettings({
-      [INTERNAL_SETTINGS.panelVisible]: state.panelVisible,
-      [INTERNAL_SETTINGS.expandedKeys]: state.expandedKeys,
-      [INTERNAL_SETTINGS.autoRefreshPaused]: state.autoRefreshPaused,
-      [INTERNAL_SETTINGS.bodyScrollTop]: Math.max(0, Math.round(state.bodyScrollTop)),
-      [INTERNAL_SETTINGS.lastLocatedNodeKey]: state.lastLocatedNodeKey,
-      [INTERNAL_SETTINGS.viewMode]: state.viewMode,
-      [INTERNAL_SETTINGS.panelX]: Math.round(state.layout.panelX),
-      [INTERNAL_SETTINGS.panelY]: Math.round(state.layout.panelY),
-      [INTERNAL_SETTINGS.bubbleX]: Math.round(state.layout.bubbleX),
-      [INTERNAL_SETTINGS.bubbleY]: Math.round(state.layout.bubbleY),
-    })
+  private normalizeGraphScopedState(value: Record<string, unknown>): GraphScopedPersistedState {
+    return {
+      expandedKeys: Array.isArray(value.expandedKeys)
+        ? value.expandedKeys.filter((item): item is string => typeof item === 'string')
+        : [],
+      bodyScrollTop: this.toFiniteNumber(value.bodyScrollTop, 0),
+      lastLocatedNodeKey: typeof value.lastLocatedNodeKey === 'string' && value.lastLocatedNodeKey.trim()
+        ? value.lastLocatedNodeKey
+        : null,
+      viewMode: value.viewMode === 'bubble' ? 'bubble' : 'panel',
+      layout: {
+        panelX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelX, 0),
+        panelY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelY, 0),
+        bubbleX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.bubbleX, 0),
+        bubbleY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.bubbleY, 0),
+      },
+    }
+  }
+
+  private toGraphScopedState(state: PersistedPluginState): GraphScopedPersistedState {
+    return {
+      expandedKeys: [...state.expandedKeys],
+      bodyScrollTop: Math.max(0, Math.round(state.bodyScrollTop)),
+      lastLocatedNodeKey: state.lastLocatedNodeKey,
+      viewMode: state.viewMode,
+      layout: {
+        panelX: Math.round(state.layout.panelX),
+        panelY: Math.round(state.layout.panelY),
+        bubbleX: Math.round(state.layout.bubbleX),
+        bubbleY: Math.round(state.layout.bubbleY),
+      },
+    }
   }
 
   private getSettings(): PluginSettings | undefined {
@@ -76,6 +175,11 @@ export class FavoriteTreeSettingsStore {
 
   private getNumber(key: string, fallback: number): number {
     const value = this.getSettings()?.[key]
+    const numeric = typeof value === 'number' ? value : Number(value)
+    return Number.isFinite(numeric) ? numeric : fallback
+  }
+
+  private toFiniteNumber(value: unknown, fallback: number): number {
     const numeric = typeof value === 'number' ? value : Number(value)
     return Number.isFinite(numeric) ? numeric : fallback
   }
