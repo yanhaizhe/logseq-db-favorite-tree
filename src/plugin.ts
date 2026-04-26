@@ -1,10 +1,21 @@
 import type { ThemeMode } from '@logseq/libs/dist/LSPlugin'
 import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
 import { FloatingLayoutManager } from './floating-layout'
+import { createFavoriteTreeI18n, getFavoriteTreeI18n, type FavoriteTreeI18n } from './i18n'
 import { renderFavoriteTree } from './render'
 import { FavoriteTreeSettingsStore } from './settings'
 import { FavoriteTreeTreeService } from './tree-service'
-import type { DragKind, LoadState, PluginSettings, SortDropTarget, SortOrderMap, SortableItem, TreeStateSnapshot, ViewMode } from './types'
+import type {
+  DragKind,
+  LoadState,
+  PluginSettings,
+  RefreshReason,
+  SortDropTarget,
+  SortOrderMap,
+  SortableItem,
+  TreeStateSnapshot,
+  ViewMode,
+} from './types'
 import { applyTheme } from './theme'
 import { escapeSelectorValue, normalizeTitle } from './utils'
 
@@ -35,8 +46,11 @@ export class FavoriteTreePlugin {
   private routeTimerId: number | null = null
   private pollTimerId: number | null = null
   private flashTimerId: number | null = null
-  private lastRefreshLabel = '尚未刷新'
+  private lastRefreshAt: number | null = null
+  private lastRefreshReason: RefreshReason | null = null
+  private lastRefreshError: string | null = null
   private offHooks: Array<() => void> = []
+  private i18n: FavoriteTreeI18n
 
   private readonly settings = new FavoriteTreeSettingsStore()
   private readonly treeService = new FavoriteTreeTreeService()
@@ -44,10 +58,13 @@ export class FavoriteTreePlugin {
     this.applyMainUIState()
   })
 
-  constructor(private readonly root: HTMLElement) {}
+  constructor(private readonly root: HTMLElement, initialI18n: FavoriteTreeI18n = createFavoriteTreeI18n('en')) {
+    this.i18n = initialI18n
+  }
 
   async init(): Promise<void> {
     await this.initializeGraphContext()
+    await this.syncLocale()
 
     window.addEventListener('pointermove', this.handlePointerMove)
     window.addEventListener('pointerup', this.handlePointerUp)
@@ -96,6 +113,10 @@ export class FavoriteTreePlugin {
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
     this.applyMainUIState()
+
+    if (this.panelVisible) {
+      await this.syncLocale()
+    }
     this.render()
 
     if (this.panelVisible) {
@@ -134,6 +155,7 @@ export class FavoriteTreePlugin {
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
     this.applyMainUIState()
+    await this.syncLocale()
     this.render()
     await this.refresh('bubble-expand')
     await this.updateCurrentPage()
@@ -219,14 +241,14 @@ export class FavoriteTreePlugin {
     await this.updateCurrentPage()
 
     if (!this.currentPageName) {
-      logseq.UI.showMsg('当前没有可定位的页面。', 'warning')
+      logseq.UI.showMsg(this.i18n.t('locateNoCurrentPage'), 'warning')
       return
     }
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
     const paths = this.treeService.findPathsToPage(this.rootFavorites, this.currentPageName)
     if (!paths.length) {
-      logseq.UI.showMsg('当前页不在收藏树中。', 'warning')
+      logseq.UI.showMsg(this.i18n.t('locatePageNotInTree'), 'warning')
       return
     }
 
@@ -274,7 +296,7 @@ export class FavoriteTreePlugin {
       this.loadStates.set(nodeKey, 'loaded')
     } catch (error) {
       this.loadStates.set(nodeKey, 'error')
-      this.loadErrors.set(nodeKey, error instanceof Error ? error.message : '子节点加载失败')
+      this.loadErrors.set(nodeKey, error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed'))
     }
 
     this.render()
@@ -415,7 +437,7 @@ export class FavoriteTreePlugin {
     }, pollIntervalMs)
   }
 
-  private scheduleRefresh(reason: string): void {
+  private scheduleRefresh(reason: RefreshReason): void {
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
     }
@@ -425,11 +447,12 @@ export class FavoriteTreePlugin {
     }, REFRESH_DEBOUNCE_MS)
   }
 
-  private async refresh(reason: string): Promise<void> {
+  private async refresh(reason: RefreshReason): Promise<void> {
     if (this.refreshing) {
       return
     }
 
+    await this.syncLocale()
     this.refreshing = true
     this.render()
 
@@ -438,11 +461,15 @@ export class FavoriteTreePlugin {
       this.treeService.invalidateIndex()
       await this.syncDerivedTreeState()
 
-      this.lastRefreshLabel = this.formatRefreshLabel(reason)
+      this.lastRefreshAt = Date.now()
+      this.lastRefreshReason = reason
+      this.lastRefreshError = null
     } catch (error) {
-      const message = error instanceof Error ? error.message : '刷新失败'
-      this.lastRefreshLabel = `刷新失败: ${message}`
-      logseq.UI.showMsg(`DB Favorite Tree 刷新失败: ${message}`, 'warning')
+      const message = error instanceof Error ? error.message : this.i18n.t('refreshReasonDefault')
+      this.lastRefreshAt = Date.now()
+      this.lastRefreshReason = reason
+      this.lastRefreshError = message
+      logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
     } finally {
       this.refreshing = false
       this.render()
@@ -469,9 +496,13 @@ export class FavoriteTreePlugin {
     const selectionStart = shouldRestoreSearchFocus ? activeElement.selectionStart ?? this.searchQuery.length : null
     const selectionEnd = shouldRestoreSearchFocus ? activeElement.selectionEnd ?? this.searchQuery.length : null
 
-    this.root.innerHTML = renderFavoriteTree(this.getRenderState(), {
-      getChildrenFor: (title) => this.getOrderedChildrenFor(title),
-    })
+    this.root.innerHTML = renderFavoriteTree(
+      this.getRenderState(),
+      {
+        getChildrenFor: (title) => this.getOrderedChildrenFor(title),
+      },
+      this.i18n,
+    )
 
     const body = this.getBodyElement()
     if (body) {
@@ -505,7 +536,7 @@ export class FavoriteTreePlugin {
       autoRefreshPaused: this.autoRefreshPaused,
       pollIntervalSeconds: this.settings.getPollIntervalSeconds(),
       hierarchyProperty: this.settings.getHierarchyProperty(),
-      lastRefreshLabel: this.lastRefreshLabel,
+      lastRefreshLabel: this.getLastRefreshLabel(),
       viewMode: this.viewMode,
       controlsCollapsed: this.controlsCollapsed,
     }
@@ -805,27 +836,35 @@ export class FavoriteTreePlugin {
     this.sortDragItem = null
   }
 
-  private formatRefreshLabel(reason: string): string {
-    const time = new Date().toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
+  private getLastRefreshLabel(): string {
+    if (this.lastRefreshError) {
+      return this.i18n.t('refreshFailed', { message: this.lastRefreshError })
+    }
+    if (this.lastRefreshAt !== null) {
+      const time = this.i18n.formatClock(new Date(this.lastRefreshAt))
+      return `${time} · ${this.translateRefreshReason(this.lastRefreshReason)}`
+    }
+    return this.i18n.t('notRefreshedYet')
+  }
 
-    const reasonMap: Record<string, string> = {
-      startup: '启动初始化',
-      'panel-open': '打开面板',
-      'bubble-open': '显示悬浮球',
-      'bubble-expand': '悬浮球展开',
-      manual: '手动刷新',
-      poll: '轮询刷新',
-      'db-changed': '数据库变更',
-      'graph-changed': '图谱切换',
-      'settings-property': '设置变更',
+  private translateRefreshReason(reason: RefreshReason | null): string {
+    const reasonMap: Record<RefreshReason, string> = {
+      startup: this.i18n.t('refreshReasonStartup'),
+      'panel-open': this.i18n.t('refreshReasonPanelOpen'),
+      'bubble-open': this.i18n.t('refreshReasonBubbleOpen'),
+      'bubble-expand': this.i18n.t('refreshReasonBubbleExpand'),
+      manual: this.i18n.t('refreshReasonManual'),
+      poll: this.i18n.t('refreshReasonPoll'),
+      'db-changed': this.i18n.t('refreshReasonDbChanged'),
+      'graph-changed': this.i18n.t('refreshReasonGraphChanged'),
+      'settings-property': this.i18n.t('refreshReasonSettingsProperty'),
     }
 
-    return `${time} · ${reasonMap[reason] ?? '刷新'}`
+    return reason ? reasonMap[reason] : this.i18n.t('refreshReasonDefault')
+  }
+
+  private async syncLocale(): Promise<void> {
+    this.i18n = await getFavoriteTreeI18n()
   }
 }
 

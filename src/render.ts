@@ -1,4 +1,5 @@
 import { ROOT_SORT_KEY } from './constants'
+import type { FavoriteTreeI18n } from './i18n'
 import type { LoadState, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
@@ -6,7 +7,11 @@ type TreeRenderAccessors = {
   getChildrenFor: (title: string) => string[]
 }
 
-export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRenderAccessors): string {
+export function renderFavoriteTree(
+  state: TreeStateSnapshot,
+  accessors: TreeRenderAccessors,
+  i18n: FavoriteTreeI18n,
+): string {
   if (state.viewMode === 'bubble') {
     const countLabel = state.rootFavorites.length > 99 ? '99+' : String(state.rootFavorites.length)
     return `
@@ -14,8 +19,8 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
         class="favorite-tree-bubble ${state.refreshing ? 'is-refreshing' : ''}"
         data-action="expand-panel"
         data-drag-handle="bubble"
-        title="点击展开收藏夹树，拖拽可移动位置"
-        aria-label="展开收藏夹树"
+        title="${escapeHtml(i18n.t('bubbleExpandTitle'))}"
+        aria-label="${escapeHtml(i18n.t('bubbleExpandAria'))}"
       >
         <span class="favorite-tree-bubble__icon">★</span>
         <span class="favorite-tree-bubble__count">${escapeHtml(countLabel)}</span>
@@ -23,14 +28,16 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     `
   }
 
-  const autoRefreshActionLabel = state.autoRefreshPaused ? '恢复自动刷新' : '暂停自动刷新'
+  const autoRefreshActionLabel = state.autoRefreshPaused ? i18n.t('resumeAutoRefresh') : i18n.t('pauseAutoRefresh')
   const autoRefreshActionIcon = state.autoRefreshPaused ? '▶' : '⏸'
-  const autoRefreshState = state.autoRefreshPaused ? '自动刷新已暂停' : `自动刷新 ${state.pollIntervalSeconds}s`
+  const autoRefreshState = state.autoRefreshPaused
+    ? i18n.t('autoRefreshPaused')
+    : i18n.t('autoRefreshEverySeconds', { seconds: state.pollIntervalSeconds })
   const hasExpandedNodes = state.expandedKeys.size > 0
-  const expandActionLabel = hasExpandedNodes ? '折叠' : '展开'
-  const expandActionTitle = hasExpandedNodes ? '折叠所有已展开目录' : '展开所有已匹配目录'
+  const expandActionLabel = hasExpandedNodes ? i18n.t('collapseLabel') : i18n.t('expandLabel')
+  const expandActionTitle = hasExpandedNodes ? i18n.t('collapseAllTitle') : i18n.t('expandAllTitle')
   const controlsToggleLabel = state.controlsCollapsed ? '▾' : '▴'
-  const controlsToggleTitle = state.controlsCollapsed ? '展开功能区' : '收起功能区'
+  const controlsToggleTitle = state.controlsCollapsed ? i18n.t('expandControlsTitle') : i18n.t('collapseControlsTitle')
   const normalizedQuery = normalizeTitle(state.searchQuery)
   const isSearching = normalizedQuery.length > 0
 
@@ -39,11 +46,11 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     : state.rootFavorites
 
   const rootMarkup = visibleRoots.length
-    ? visibleRoots.map((title) => renderNode(title, 0, [], null, state, accessors, normalizedQuery)).join('')
+    ? visibleRoots.map((title) => renderNode(title, 0, [], null, state, accessors, normalizedQuery, i18n)).join('')
     : ''
 
-  const breadcrumbMarkup = renderBreadcrumbs(state)
-  const infoTooltip = `拖动标题栏移动，双击收回为悬浮球；当前层级属性：${state.hierarchyProperty}`
+  const breadcrumbMarkup = renderBreadcrumbs(state, i18n)
+  const infoTooltip = i18n.t('infoTooltip', { property: state.hierarchyProperty })
   const searchMarkup = `
     <div class="favorite-tree__searchbar">
       <input
@@ -51,22 +58,22 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
         data-role="search-input"
         type="search"
         value="${escapeHtml(state.searchQuery)}"
-        placeholder="搜索页面标题"
+        placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"
         spellcheck="false"
       />
     </div>
   `
   const toolbarMarkup = `
     <div class="favorite-tree__toolbar">
-      <button class="favorite-tree__text-btn" data-action="locate-current" title="快速定位当前页">定位</button>
-      <button class="favorite-tree__text-btn" data-action="reset-panel-size" title="恢复面板默认宽高">默认尺寸</button>
+      <button class="favorite-tree__text-btn" data-action="locate-current" title="${escapeHtml(i18n.t('locateTitle'))}">${escapeHtml(i18n.t('locateLabel'))}</button>
+      <button class="favorite-tree__text-btn" data-action="reset-panel-size" title="${escapeHtml(i18n.t('resetPanelSizeTitle'))}">${escapeHtml(i18n.t('resetPanelSizeLabel'))}</button>
       <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
       <button
         class="favorite-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
         data-action="toggle-auto-refresh"
         title="${autoRefreshActionLabel}"
         aria-pressed="${state.autoRefreshPaused ? 'true' : 'false'}"
-      >${autoRefreshActionIcon} 自动刷新</button>
+      >${autoRefreshActionIcon} ${escapeHtml(i18n.t('autoRefreshLabel'))}</button>
     </div>
   `
   const controlsMarkup = state.controlsCollapsed
@@ -80,22 +87,22 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
     `
 
   const bodyMarkup = state.searching && isSearching
-    ? '<div class="favorite-tree__status">正在建立搜索索引...</div>'
+    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('searchIndexing'))}</div>`
     : state.refreshing && !state.rootFavorites.length
-    ? '<div class="favorite-tree__status">正在加载收藏树...</div>'
+    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('loadingFavorites'))}</div>`
     : isSearching && !visibleRoots.length
-    ? '<div class="favorite-tree__status">没有匹配的页面，试试更短的关键词。</div>'
+    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('noMatches'))}</div>`
     : state.rootFavorites.length
     ? rootMarkup
-    : '<div class="favorite-tree__status">当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。</div>'
+    : `<div class="favorite-tree__status">${escapeHtml(i18n.t('noFavorites'))}</div>`
 
   return `
     <div class="favorite-tree">
-      <div class="favorite-tree__header" data-drag-handle="panel" title="拖动可移动，双击可收回为悬浮球">
+      <div class="favorite-tree__header" data-drag-handle="panel" title="${escapeHtml(i18n.t('panelHeaderTitle'))}">
         <div class="favorite-tree__header-main">
           <div class="favorite-tree__title-row">
-            <h1 class="favorite-tree__title">收藏夹树</h1>
-            <span class="favorite-tree__info" data-no-drag="true" tabindex="0" role="button" aria-label="查看说明">
+            <h1 class="favorite-tree__title">${escapeHtml(i18n.t('panelTitle'))}</h1>
+            <span class="favorite-tree__info" data-no-drag="true" tabindex="0" role="button" aria-label="${escapeHtml(i18n.t('panelInfoAria'))}">
               <span class="favorite-tree__info-icon">i</span>
               <span class="favorite-tree__tooltip" role="tooltip">${escapeHtml(infoTooltip)}</span>
             </span>
@@ -109,19 +116,19 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
             aria-label="${controlsToggleTitle}"
             aria-expanded="${state.controlsCollapsed ? 'false' : 'true'}"
           >${controlsToggleLabel}</button>
-          <button class="favorite-tree__icon-btn" data-action="refresh" title="手动刷新">↻</button>
-          <button class="favorite-tree__icon-btn" data-action="collapse-to-bubble" title="收回为悬浮球">○</button>
-          <button class="favorite-tree__icon-btn" data-action="settings" title="打开设置">⚙</button>
-          <button class="favorite-tree__icon-btn" data-action="close" title="隐藏插件">×</button>
+          <button class="favorite-tree__icon-btn" data-action="refresh" title="${escapeHtml(i18n.t('manualRefresh'))}">↻</button>
+          <button class="favorite-tree__icon-btn" data-action="collapse-to-bubble" title="${escapeHtml(i18n.t('collapseToBubble'))}">○</button>
+          <button class="favorite-tree__icon-btn" data-action="settings" title="${escapeHtml(i18n.t('openSettings'))}">⚙</button>
+          <button class="favorite-tree__icon-btn" data-action="close" title="${escapeHtml(i18n.t('hidePlugin'))}">×</button>
         </div>
       </div>
       ${controlsMarkup}
       <div class="favorite-tree__body">${bodyMarkup}</div>
       <div class="favorite-tree__footer">
         <span>${escapeHtml(state.lastRefreshLabel)}</span>
-        <span>${state.refreshing ? '刷新中...' : `${autoRefreshState} · ${state.rootFavorites.length} 个根节点`}</span>
+        <span>${state.refreshing ? escapeHtml(i18n.t('refreshing')) : `${escapeHtml(autoRefreshState)} · ${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}`}</span>
       </div>
-      <div class="favorite-tree__resize-handle" data-drag-handle="panel-resize" title="拖动调整面板大小"></div>
+      <div class="favorite-tree__resize-handle" data-drag-handle="panel-resize" title="${escapeHtml(i18n.t('resizePanel'))}"></div>
     </div>
   `
 }
@@ -134,6 +141,7 @@ function renderNode(
   state: TreeStateSnapshot,
   accessors: TreeRenderAccessors,
   normalizedQuery: string,
+  i18n: FavoriteTreeI18n,
 ): string {
   const key = normalizeTitle(title)
   const isCurrent = key === normalizeTitle(state.currentPageName)
@@ -148,7 +156,7 @@ function renderNode(
     : children
   const hasKnownChildren = visibleChildren.length > 0
   const effectiveExpanded = isSearching ? hasKnownChildren : isExpanded
-  const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, hasKnownChildren, state)
+  const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, hasKnownChildren, state, i18n)
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
   const sortHandleMarkup = isSearching
@@ -162,8 +170,8 @@ function renderNode(
         data-sort-parent-key="${escapeHtml(sortParentKey)}"
         data-sort-title="${escapeHtml(title)}"
         draggable="true"
-        title="拖动自定义排序"
-        aria-label="拖动自定义排序"
+        title="${escapeHtml(i18n.t('dragSort'))}"
+        aria-label="${escapeHtml(i18n.t('dragSort'))}"
       >⋮⋮</button>
     `
 
@@ -174,9 +182,9 @@ function renderNode(
       .map((childTitle) => {
         const childKey = normalizeTitle(childTitle)
         if (nextAncestors.includes(childKey)) {
-          return renderCycleNode(childTitle, depth + 1)
+          return renderCycleNode(childTitle, depth + 1, i18n)
         }
-        return renderNode(childTitle, depth + 1, nextAncestors, key, state, accessors, normalizedQuery)
+        return renderNode(childTitle, depth + 1, nextAncestors, key, state, accessors, normalizedQuery, i18n)
       })
       .join('')}</div>`
   }
@@ -184,7 +192,7 @@ function renderNode(
   const chevron = effectiveExpanded ? '▾' : '▸'
   const toggleMarkup = isSearching
     ? `<span class="tree-node__toggle is-passive">${hasKnownChildren ? chevron : '•'}</span>`
-    : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="展开或折叠">${chevron}</button>`
+    : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
 
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
@@ -197,10 +205,10 @@ function renderNode(
       >
         ${toggleMarkup}
         ${sortHandleMarkup}
-        <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="打开页面 ${escapeHtml(title)}">
+        <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
         </button>
-        <span class="tree-node__meta">${isCurrent ? '<span class="tree-node__badge">当前页</span>' : ''}${isLocated ? '<span class="tree-node__badge">定位</span>' : ''}${isSearching && key.includes(normalizedQuery) ? '<span class="tree-node__badge">匹配</span>' : ''}</span>
+        <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSearching && key.includes(normalizedQuery) ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>
       </div>
       ${statusHint}
       ${childrenMarkup}
@@ -208,17 +216,17 @@ function renderNode(
   `
 }
 
-function renderCycleNode(title: string, depth: number): string {
+function renderCycleNode(title: string, depth: number, i18n: FavoriteTreeI18n): string {
   return `
     <div class="tree-node" data-node-key="${escapeHtml(normalizeTitle(title))}">
       <div class="tree-node__row is-cycle" style="--depth:${depth}">
         <span class="tree-node__toggle">•</span>
-        <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="打开页面 ${escapeHtml(title)}">
+        <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${escapeHtml(title)}</span>
         </button>
-        <span class="tree-node__meta"><span class="tree-node__badge">循环</span></span>
+        <span class="tree-node__meta"><span class="tree-node__badge">${escapeHtml(i18n.t('badgeCycle'))}</span></span>
       </div>
-      <div class="tree-node__hint" style="--depth:${depth}">检测到循环引用，已停止继续向下递归。</div>
+      <div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(i18n.t('cycleHint'))}</div>
     </div>
   `
 }
@@ -230,6 +238,7 @@ function renderNodeHint(
   loadState: LoadState,
   hasKnownChildren: boolean,
   state: TreeStateSnapshot,
+  i18n: FavoriteTreeI18n,
 ): string {
   if (state.searchQuery) {
     return ''
@@ -240,22 +249,22 @@ function renderNodeHint(
   }
 
   if (loadState === 'loading') {
-    return `<div class="tree-node__hint" style="--depth:${depth}">首次展开时正在按属性关系加载子节点...</div>`
+    return `<div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(i18n.t('loadingChildren'))}</div>`
   }
 
   if (loadState === 'error') {
-    const message = state.loadErrors.get(key) ?? '子节点加载失败'
+    const message = state.loadErrors.get(key) ?? i18n.t('loadChildrenFailed')
     return `<div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(message)}</div>`
   }
 
   if (state.loadedKeys.has(key) && !hasKnownChildren) {
-    return `<div class="tree-node__hint" style="--depth:${depth}">未发现直接子页面。</div>`
+    return `<div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(i18n.t('noDirectChildren'))}</div>`
   }
 
   return ''
 }
 
-function renderBreadcrumbs(state: TreeStateSnapshot): string {
+function renderBreadcrumbs(state: TreeStateSnapshot, i18n: FavoriteTreeI18n): string {
   if (state.currentPagePath.length > 0) {
     const items = state.currentPagePath
       .map((title, index) => {
@@ -265,7 +274,7 @@ function renderBreadcrumbs(state: TreeStateSnapshot): string {
             class="favorite-tree__breadcrumb ${isLast ? 'is-current' : ''}"
             data-action="open-page"
             data-page="${escapeHtml(title)}"
-            title="打开页面 ${escapeHtml(title)}"
+            title="${escapeHtml(i18n.t('openPage', { title }))}"
           >${escapeHtml(title)}</button>
         `
       })
@@ -275,7 +284,7 @@ function renderBreadcrumbs(state: TreeStateSnapshot): string {
   }
 
   if (state.currentPageName) {
-    return '<div class="favorite-tree__breadcrumbs is-muted">当前页不在收藏树中</div>'
+    return `<div class="favorite-tree__breadcrumbs is-muted">${escapeHtml(i18n.t('currentPageNotInTree'))}</div>`
   }
 
   return ''

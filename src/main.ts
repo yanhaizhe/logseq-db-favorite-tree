@@ -1,19 +1,21 @@
 import '@logseq/libs'
 import './style.css'
-import { SETTINGS_SCHEMA } from './constants'
+import { buildSettingsSchema } from './constants'
+import { getFavoriteTreeI18n } from './i18n'
 import { FavoriteTreePlugin } from './plugin'
 import { registerToolbar } from './toolbar'
 import { wireDOMEvents } from './wire-dom-events'
 
 async function main(): Promise<void> {
-  logseq.useSettingsSchema(SETTINGS_SCHEMA)
+  const i18n = await getFavoriteTreeI18n()
+  logseq.useSettingsSchema(buildSettingsSchema(i18n))
 
   const root = document.getElementById('app')
   if (!root) {
-    throw new Error('插件挂载点不存在')
+    throw new Error(i18n.t('mountPointMissing'))
   }
 
-  const plugin = new FavoriteTreePlugin(root)
+  const plugin = new FavoriteTreePlugin(root, i18n)
   wireDOMEvents(root, {
     onStartDrag: plugin.startDrag,
     onHeaderDoubleClick: plugin.collapseToBubble,
@@ -48,7 +50,7 @@ async function main(): Promise<void> {
     onEndSortDrag: plugin.endSortDrag,
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
-  registerToolbar(plugin.togglePanel)
+  registerToolbar(plugin.togglePanel, i18n)
 
   logseq.beforeunload(async () => {
     plugin.destroy()
@@ -57,7 +59,8 @@ async function main(): Promise<void> {
   await plugin.init()
 }
 
-logseq.ready(main).catch((error) => {
+logseq.ready(main).catch(async (error) => {
+  const i18n = await getFavoriteTreeI18n()
   console.error(error)
-  logseq.UI.showMsg(`DB Favorite Tree 启动失败: ${String(error)}`, 'error')
+  logseq.UI.showMsg(i18n.t('startupFailed', { message: String(error) }), 'error')
 })

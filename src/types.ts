@@ -5,6 +5,16 @@ export type ViewMode = 'panel' | 'bubble'
 export type DragKind = 'panel' | 'bubble' | 'panel-resize'
 export type SidebarPosition = 'left' | 'right'
 export type SortPlacement = 'before' | 'after'
+export type RefreshReason =
+  | 'startup'
+  | 'panel-open'
+  | 'bubble-open'
+  | 'bubble-expand'
+  | 'manual'
+  | 'poll'
+  | 'db-changed'
+  | 'graph-changed'
+  | 'settings-property'
 
 export type SortOrderMap = Record<string, string[]>
 
