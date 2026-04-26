@@ -1,0 +1,108 @@
+import type { DragKind } from './types'
+
+export type FavoriteTreeDOMHandlers = {
+  onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
+  onRefresh: () => void
+  onToggleAutoRefresh: () => void
+  onToggleExpandAll: () => void
+  onLocateCurrent: () => void
+  onOpenSettings: () => void
+  onCollapseToBubble: () => void
+  onExpandPanel: () => void
+  onClose: () => void
+  onToggleNode: (key: string) => void
+  onOpenPage: (page: string) => void
+  shouldIgnoreBubbleClick: () => boolean
+}
+
+export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
+  root.addEventListener('pointerdown', (event) => {
+    const source = event.target as HTMLElement | null
+    const handle = source?.closest<HTMLElement>('[data-drag-handle]')
+    if (!handle) {
+      return
+    }
+
+    const actionTarget = source?.closest<HTMLElement>('[data-action]')
+    if (actionTarget && actionTarget !== handle) {
+      return
+    }
+
+    const kind = handle.dataset.dragHandle
+    if (kind === 'panel' || kind === 'bubble') {
+      handlers.onStartDrag(kind, event, handle)
+    }
+  })
+
+  root.addEventListener('click', (event) => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')
+    if (!target) {
+      return
+    }
+
+    const action = target.dataset.action
+    if (action === 'refresh') {
+      handlers.onRefresh()
+      return
+    }
+    if (action === 'toggle-auto-refresh') {
+      handlers.onToggleAutoRefresh()
+      return
+    }
+    if (action === 'toggle-expand-all') {
+      handlers.onToggleExpandAll()
+      return
+    }
+    if (action === 'locate-current') {
+      handlers.onLocateCurrent()
+      return
+    }
+    if (action === 'settings') {
+      handlers.onOpenSettings()
+      return
+    }
+    if (action === 'collapse-to-bubble') {
+      handlers.onCollapseToBubble()
+      return
+    }
+    if (action === 'expand-panel') {
+      if (handlers.shouldIgnoreBubbleClick()) {
+        return
+      }
+      handlers.onExpandPanel()
+      return
+    }
+    if (action === 'close') {
+      handlers.onClose()
+      return
+    }
+    if (action === 'toggle-node') {
+      const key = target.dataset.key
+      if (key) {
+        handlers.onToggleNode(key)
+      }
+      return
+    }
+    if (action === 'open-page') {
+      const page = target.dataset.page
+      if (page) {
+        handlers.onOpenPage(page)
+      }
+    }
+  })
+
+  root.addEventListener('keydown', (event) => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action="expand-panel"]')
+    if (!target) {
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      if (handlers.shouldIgnoreBubbleClick()) {
+        return
+      }
+      handlers.onExpandPanel()
+    }
+  })
+}

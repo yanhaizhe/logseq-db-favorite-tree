@@ -29,6 +29,18 @@ npm run build
 
 然后在 Logseq 开启开发者模式后，通过 `Load unpacked plugin` 加载当前目录。
 
+## 代码结构
+
+- `src/main.ts`：插件启动入口，负责组装依赖与初始化
+- `src/plugin.ts`：主协调层，负责编排刷新、状态切换、生命周期
+- `src/tree-service.ts`：收藏根节点解析与属性树索引构建
+- `src/floating-layout.ts`：悬浮面板 / 悬浮球布局与拖拽管理
+- `src/render.ts`：纯渲染层，负责生成面板与树节点 HTML
+- `src/settings.ts`：插件设置与内部状态读写
+- `src/wire-dom-events.ts`：DOM 事件分发
+- `src/toolbar.ts`：Logseq 工具栏入口注册
+- `src/utils.ts` / `src/theme.ts` / `src/constants.ts` / `src/types.ts`：通用工具、主题同步、常量与类型定义
+
 ## 说明
 
 - 当前实现面向 DB graph，已在 `package.json` 中声明不支持 file graph。
