@@ -151,6 +151,9 @@ export class FloatingLayoutManager {
     }
 
     this.ensureInViewport(panelWidth, sidebarPosition)
+    if (this.dragState.kind === 'bubble') {
+      this.snapBubbleToClosestEdge()
+    }
     this.onFrameChange()
 
     const result = {
@@ -162,6 +165,15 @@ export class FloatingLayoutManager {
     this.dragState = null
     document.body.classList.remove('is-dragging')
     return result
+  }
+
+  private snapBubbleToClosestEdge(): void {
+    const viewport = this.getViewportSize()
+    const maxX = Math.max(MAIN_UI_MARGIN, viewport.width - BUBBLE_SIZE - MAIN_UI_MARGIN)
+    const bubbleCenterX = this.positions.bubbleX + BUBBLE_SIZE / 2
+    const viewportCenterX = viewport.width / 2
+
+    this.positions.bubbleX = bubbleCenterX < viewportCenterX ? MAIN_UI_MARGIN : maxX
   }
 
   private getViewportSize(): { width: number; height: number } {

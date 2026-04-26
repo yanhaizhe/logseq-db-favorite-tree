@@ -2,6 +2,7 @@ import type { DragKind } from './types'
 
 export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
+  onHeaderDoubleClick: () => void
   onRefresh: () => void
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
@@ -32,6 +33,22 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     if (kind === 'panel' || kind === 'bubble') {
       handlers.onStartDrag(kind, event, handle)
     }
+  })
+
+  root.addEventListener('dblclick', (event) => {
+    const source = event.target as HTMLElement | null
+    const header = source?.closest<HTMLElement>('[data-drag-handle="panel"]')
+    if (!header) {
+      return
+    }
+
+    const actionTarget = source?.closest<HTMLElement>('[data-action]')
+    if (actionTarget && actionTarget !== header) {
+      return
+    }
+
+    event.preventDefault()
+    handlers.onHeaderDoubleClick()
   })
 
   root.addEventListener('click', (event) => {

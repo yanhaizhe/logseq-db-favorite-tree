@@ -16,6 +16,7 @@ async function main(): Promise<void> {
   const plugin = new FavoriteTreePlugin(root)
   wireDOMEvents(root, {
     onStartDrag: plugin.startDrag,
+    onHeaderDoubleClick: plugin.collapseToBubble,
     onRefresh: () => {
       void plugin.manualRefresh()
     },

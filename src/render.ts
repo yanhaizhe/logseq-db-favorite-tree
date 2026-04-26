@@ -39,10 +39,10 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
 
   return `
     <div class="favorite-tree">
-      <div class="favorite-tree__header" data-drag-handle="panel">
+      <div class="favorite-tree__header" data-drag-handle="panel" title="拖动可移动，双击可收回为悬浮球">
         <div class="favorite-tree__header-main">
           <h1 class="favorite-tree__title">收藏夹树</h1>
-          <p class="favorite-tree__subtitle">拖动标题栏移动 · 属性 <code>${escapeHtml(state.hierarchyProperty)}</code></p>
+          <p class="favorite-tree__subtitle">拖动标题栏移动，双击收回 · 属性 <code>${escapeHtml(state.hierarchyProperty)}</code></p>
         </div>
         <div class="favorite-tree__actions">
           <button class="favorite-tree__icon-btn" data-action="refresh" title="手动刷新">↻</button>
