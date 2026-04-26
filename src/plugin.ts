@@ -30,7 +30,7 @@ export class FavoriteTreePlugin {
   private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
-  private autoRefreshPaused = false
+  private autoRefreshPaused = true
   private controlsCollapsed = false
   private sortOrders: SortOrderMap = {}
   private bodyScrollTop = 0
@@ -46,6 +46,7 @@ export class FavoriteTreePlugin {
   private routeTimerId: number | null = null
   private pollTimerId: number | null = null
   private flashTimerId: number | null = null
+  private localeWatchTimerId: number | null = null
   private lastRefreshAt: number | null = null
   private lastRefreshReason: RefreshReason | null = null
   private lastRefreshError: string | null = null
@@ -70,6 +71,8 @@ export class FavoriteTreePlugin {
     window.addEventListener('pointerup', this.handlePointerUp)
     window.addEventListener('pointercancel', this.handlePointerUp)
     window.addEventListener('resize', this.handleWindowResize)
+    window.addEventListener('focus', this.handleWindowFocus)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
 
     this.render()
     this.applyMainUIState()
@@ -78,6 +81,7 @@ export class FavoriteTreePlugin {
     await this.updateCurrentPage()
     this.registerHooks()
     this.startPolling()
+    this.startLocaleWatcher()
 
     if (this.panelVisible) {
       logseq.showMainUI({ autoFocus: false })
@@ -99,10 +103,15 @@ export class FavoriteTreePlugin {
     if (this.flashTimerId !== null) {
       window.clearTimeout(this.flashTimerId)
     }
+    if (this.localeWatchTimerId !== null) {
+      window.clearInterval(this.localeWatchTimerId)
+    }
     window.removeEventListener('pointermove', this.handlePointerMove)
     window.removeEventListener('pointerup', this.handlePointerUp)
     window.removeEventListener('pointercancel', this.handlePointerUp)
     window.removeEventListener('resize', this.handleWindowResize)
+    window.removeEventListener('focus', this.handleWindowFocus)
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     for (const off of this.offHooks) {
       off()
     }
@@ -437,6 +446,16 @@ export class FavoriteTreePlugin {
     }, pollIntervalMs)
   }
 
+  private startLocaleWatcher(): void {
+    if (this.localeWatchTimerId !== null) {
+      window.clearInterval(this.localeWatchTimerId)
+    }
+
+    this.localeWatchTimerId = window.setInterval(() => {
+      void this.refreshLocaleIfNeeded()
+    }, 1500)
+  }
+
   private scheduleRefresh(reason: RefreshReason): void {
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
@@ -641,6 +660,16 @@ export class FavoriteTreePlugin {
   private readonly handleWindowResize = (): void => {
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.applyMainUIState()
+  }
+
+  private readonly handleWindowFocus = (): void => {
+    void this.refreshLocaleIfNeeded()
+  }
+
+  private readonly handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      void this.refreshLocaleIfNeeded()
+    }
   }
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
@@ -865,6 +894,16 @@ export class FavoriteTreePlugin {
 
   private async syncLocale(): Promise<void> {
     this.i18n = await getFavoriteTreeI18n()
+  }
+
+  private async refreshLocaleIfNeeded(): Promise<void> {
+    const nextI18n = await getFavoriteTreeI18n()
+    if (nextI18n.language === this.i18n.language) {
+      return
+    }
+
+    this.i18n = nextI18n
+    this.render()
   }
 }
 

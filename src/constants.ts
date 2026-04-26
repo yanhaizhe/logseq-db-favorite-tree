@@ -20,7 +20,7 @@ export function buildSettingsSchema(i18n: FavoriteTreeI18n): SettingSchemaDesc[]
     {
       key: 'pollIntervalSeconds',
       type: 'number',
-      default: 5,
+      default: 60,
       title: i18n.t('settingsPollIntervalTitle'),
       description: i18n.t('settingsPollIntervalDescription'),
     },
@@ -49,7 +49,7 @@ export const INTERNAL_SETTINGS = {
   graphStates: '__graphStates',
 } as const
 
-export const DEFAULT_POLL_INTERVAL_SECONDS = 5
+export const DEFAULT_POLL_INTERVAL_SECONDS = 60
 export const REFRESH_DEBOUNCE_MS = 250
 export const MAIN_UI_MARGIN = 12
 export const PANEL_TOP_OFFSET = 56

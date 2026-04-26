@@ -49,7 +49,7 @@ export class FavoriteTreeSettingsStore {
     return {
       panelVisible: this.getBoolean(INTERNAL_SETTINGS.panelVisible, true),
       expandedKeys: graphState.expandedKeys,
-      autoRefreshPaused: this.getBoolean(INTERNAL_SETTINGS.autoRefreshPaused, false),
+      autoRefreshPaused: this.getBoolean(INTERNAL_SETTINGS.autoRefreshPaused, true),
       bodyScrollTop: graphState.bodyScrollTop,
       lastLocatedNodeKey: graphState.lastLocatedNodeKey,
       viewMode: graphState.viewMode,
