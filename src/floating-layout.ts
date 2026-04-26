@@ -81,6 +81,8 @@ export class FloatingLayoutManager {
       this.positions.panelY,
       this.panelSize.width,
       this.panelSize.height,
+      MAIN_UI_MARGIN,
+      PANEL_TOP_OFFSET,
     )
     const bubble = this.getClampedPosition(this.positions.bubbleX, this.positions.bubbleY, BUBBLE_SIZE, BUBBLE_SIZE)
 
@@ -144,7 +146,14 @@ export class FloatingLayoutManager {
     }
 
     if (this.dragState.kind === 'panel') {
-      const panel = this.getClampedPosition(nextX, nextY, this.panelSize.width, this.panelSize.height)
+      const panel = this.getClampedPosition(
+        nextX,
+        nextY,
+        this.panelSize.width,
+        this.panelSize.height,
+        MAIN_UI_MARGIN,
+        PANEL_TOP_OFFSET,
+      )
       this.positions.panelX = panel.x
       this.positions.panelY = panel.y
     } else if (this.dragState.kind === 'panel-resize') {
@@ -262,14 +271,21 @@ export class FloatingLayoutManager {
     return this.getClampedPosition(x, y, BUBBLE_SIZE, BUBBLE_SIZE)
   }
 
-  private getClampedPosition(x: number, y: number, width: number, height: number): { x: number; y: number } {
+  private getClampedPosition(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    minX = MAIN_UI_MARGIN,
+    minY = MAIN_UI_MARGIN,
+  ): { x: number; y: number } {
     const viewport = this.getViewportSize()
-    const maxX = Math.max(MAIN_UI_MARGIN, viewport.width - width - MAIN_UI_MARGIN)
-    const maxY = Math.max(MAIN_UI_MARGIN, viewport.height - height - MAIN_UI_MARGIN)
+    const maxX = Math.max(minX, viewport.width - width - MAIN_UI_MARGIN)
+    const maxY = Math.max(minY, viewport.height - height - MAIN_UI_MARGIN)
 
     return {
-      x: Math.round(Math.min(maxX, Math.max(MAIN_UI_MARGIN, x))),
-      y: Math.round(Math.min(maxY, Math.max(MAIN_UI_MARGIN, y))),
+      x: Math.round(Math.min(maxX, Math.max(minX, x))),
+      y: Math.round(Math.min(maxY, Math.max(minY, y))),
     }
   }
 
