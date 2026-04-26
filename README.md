@@ -1,99 +1,93 @@
 # Logseq DB Favorite Tree
 
-基于 Logseq DB 图谱与页面属性关系构建的“收藏夹树”插件。
-
-## English Summary
+[中文说明](./README.zh-CN.md)
 
 `Logseq DB Favorite Tree` is a Logseq plugin for `DB graph` that renders favorite pages as root nodes in a property-driven tree.
 
+## Overview
+
 - Uses favorite pages as tree roots
-- Uses page property `parent` to build hierarchy
-- Supports search, breadcrumbs, current-page location, drag sort, floating panel, and bubble mode
+- Uses the page property `parent` to build hierarchy
+- Provides a floating panel and collapsible bubble entry
+- Designed for `DB graph` only and does not support `file graph`
+
+## Features
+
+- Loads favorite pages as root nodes automatically
+- Resolves page hierarchy and supports lazy loading
+- Highlights the current page and expands matching paths
+- Supports in-tree search, breadcrumb navigation, and locate-current-page actions
+- Supports panel dragging, resizing, bubble mode, and persisted layout state
+- Supports manual refresh, auto-refresh control, and graph-scoped UI state
+- Supports default title sorting and custom sibling drag sorting
 - Follows the current Logseq UI language with English fallback
-- Supports `DB graph` only and does not support `file graph`
 
-For Marketplace review:
+## Documentation
 
-- GitHub repo: `https://github.com/yanhaizhe/logseq-db-favorite-tree`
-- Release page should include a custom build zip asset
-- README should include screenshots or GIF before submission
+- [Chinese README](./README.zh-CN.md)
+- [Feature List](./docs/feature-list.md)
+- [Technical Design](./docs/technical-design.md)
+- [User Guide](./docs/user-guide.en.md)
+- [Chinese User Guide](./docs/user-guide.md)
+- [Publish Guide](./docs/publish-guide.md)
+- [Marketplace Manifest Example](./docs/marketplace-manifest.example.json)
+- [Marketplace PR Template](./docs/marketplace-pr-template.md)
 
-## 项目定位
+## Quick Start
 
-- 以 Logseq 收藏页作为树根入口
-- 以页面属性关系构建层级，默认属性名为 `parent`
-- 以悬浮面板 / 悬浮球形式提供常驻导航能力
-- 面向 `DB graph` 设计，不支持 `file graph`
-
-## 功能概览
-
-- 收藏页自动作为根节点加载
-- 页面层级自动解析并支持懒加载展开
-- 当前页高亮、当前页定位、多路径展开
-- 树内搜索、祖先路径保留、面包屑跳转
-- 面板拖动、缩放、收回悬浮球、位置与尺寸记忆
-- 功能区收起 / 展开、自动刷新控制、手动刷新
-- 默认标题排序与同级拖拽自定义排序
-- 面板文案跟随 Logseq 语言切换自动刷新，未覆盖文案回退英文
-- 不同 graph 独立记忆展开状态、布局、排序与视图模式
-
-## 文档导航
-
-- [详细功能清单](./docs/feature-list.md)
-- [技术方案文档](./docs/technical-design.md)
-- [使用指南](./docs/user-guide.md)
-- [发布指南](./docs/publish-guide.md)
-- [Marketplace Manifest 示例](./docs/marketplace-manifest.example.json)
-- [Marketplace PR 模板](./docs/marketplace-pr-template.md)
-
-## 快速开始
-
-### 1. 安装依赖
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. 构建插件
+### 2. Build the plugin
 
 ```bash
 npm run build
 ```
 
-### 3. 加载到 Logseq
+### 3. Load into Logseq
 
-1. 在 Logseq 中开启开发者模式
-2. 选择 `Load unpacked plugin`
-3. 指向当前项目目录
-4. 在工具栏点击插件图标打开收藏树
+1. Enable developer mode in Logseq
+2. Choose `Load unpacked plugin`
+3. Select this project directory
+4. Click the toolbar icon to open the favorite tree
 
-## 插件设置
+## Settings
 
-- `层级属性名`：用于声明父页面关系，默认 `parent`
-- `面板宽度`：悬浮面板默认宽度，单位像素
-- `自动刷新间隔（秒）`：轮询刷新间隔，默认 `60`
-- `初始侧向偏好`：首次展示时默认靠左或靠右
+- `Hierarchy property`: the property used to describe parent page relations, default is `parent`
+- `Panel width`: default floating panel width in pixels
+- `Auto-refresh interval (seconds)`: polling interval, default is `60`
+- `Initial side preference`: first-open side placement preference
 
-说明：
+Notes:
 
-- 自动刷新默认关闭
-- 开启后按 `60` 秒间隔轮询，可在设置中修改
+- Auto-refresh is disabled by default
+- When enabled, the default polling interval is `60` seconds and can be changed in settings
 
-## 代码结构
+## Marketplace Notes
 
-- `src/main.ts`：插件启动入口，负责初始化与装配
-- `src/plugin.ts`：主协调层，负责编排刷新、状态切换与生命周期
-- `src/tree-service.ts`：收藏根解析、属性归一化与树路径能力
-- `src/floating-layout.ts`：面板 / 悬浮球布局、拖拽、缩放与吸附
-- `src/render.ts`：纯渲染层，负责生成面板与树节点 HTML
-- `src/settings.ts`：插件设置与 graph 级内部状态持久化
-- `src/wire-dom-events.ts`：DOM 事件分发与拖拽排序接线
-- `src/toolbar.ts`：Logseq 工具栏入口注册
-- `src/utils.ts` / `src/theme.ts` / `src/constants.ts` / `src/types.ts`：工具、主题、常量与类型
+- GitHub repo: `https://github.com/yanhaizhe/logseq-db-favorite-tree`
+- The release page should include a custom build zip asset
+- The repository should include at least one screenshot or GIF before submission
+- The plugin should be submitted as `supportsDB: true` and `supportsDBOnly: true`
 
-## 开发说明
+## Code Structure
 
-- 当前实现面向 `DB graph`，已在 `package.json` 中声明不支持 `file graph`
-- 属性解析采用“直接属性 + 引用对象 + 数组值”归一化策略，以兼容不同 DB 返回结构
-- 属性键除支持字面 `parent` 外，也兼容 DB 内部属性键格式
-- 若收藏夹 API 返回结构存在差异，插件会尽量归一化为页面标题列表
+- `src/main.ts`: startup entry and plugin bootstrapping
+- `src/plugin.ts`: orchestration layer for refresh, lifecycle, and UI state
+- `src/tree-service.ts`: favorite roots, property normalization, and tree/path logic
+- `src/floating-layout.ts`: panel and bubble layout, dragging, resizing, and snapping
+- `src/render.ts`: pure HTML rendering for the panel and tree nodes
+- `src/settings.ts`: plugin settings and graph-scoped internal state persistence
+- `src/wire-dom-events.ts`: DOM event wiring and drag-sort binding
+- `src/toolbar.ts`: Logseq toolbar registration
+- `src/utils.ts`, `src/theme.ts`, `src/constants.ts`, `src/types.ts`: utilities, theme, constants, and types
+
+## Development Notes
+
+- The current implementation targets `DB graph` and explicitly marks `file graph` as unsupported in `package.json`
+- Property parsing normalizes direct values, referenced page objects, and arrays to tolerate DB response differences
+- The hierarchy property supports both literal `parent` and DB-internal property key shapes
+- If the favorites API response varies, the plugin attempts to normalize it into page title lists
