@@ -26,6 +26,9 @@
 - [详细功能清单](./docs/feature-list.md)
 - [技术方案文档](./docs/technical-design.md)
 - [使用指南](./docs/user-guide.md)
+- [发布指南](./docs/publish-guide.md)
+- [Marketplace Manifest 示例](./docs/marketplace-manifest.example.json)
+- [Marketplace PR 模板](./docs/marketplace-pr-template.md)
 
 ## 快速开始
 
