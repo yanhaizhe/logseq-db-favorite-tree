@@ -151,12 +151,13 @@ function renderNode(
   const loadState = state.loadStates.get(key) ?? 'idle'
   const children = accessors.getChildrenFor(title)
   const isSearching = normalizedQuery.length > 0
+  const hasLoadedLeaf = state.loadedKeys.has(key) && children.length === 0
   const visibleChildren = isSearching
     ? children.filter((childTitle) => isNodeVisible(childTitle, normalizedQuery, accessors, [...ancestors, key]))
     : children
   const hasKnownChildren = visibleChildren.length > 0
   const effectiveExpanded = isSearching ? hasKnownChildren : isExpanded
-  const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, hasKnownChildren, state, i18n)
+  const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, state, i18n)
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
   const sortHandleMarkup = isSearching
@@ -190,7 +191,7 @@ function renderNode(
   }
 
   const chevron = effectiveExpanded ? '▾' : '▸'
-  const toggleMarkup = isSearching
+  const toggleMarkup = isSearching || hasLoadedLeaf
     ? `<span class="tree-node__toggle is-passive">${hasKnownChildren ? chevron : '•'}</span>`
     : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
 
@@ -236,7 +237,6 @@ function renderNodeHint(
   depth: number,
   isExpanded: boolean,
   loadState: LoadState,
-  hasKnownChildren: boolean,
   state: TreeStateSnapshot,
   i18n: FavoriteTreeI18n,
 ): string {
@@ -255,10 +255,6 @@ function renderNodeHint(
   if (loadState === 'error') {
     const message = state.loadErrors.get(key) ?? i18n.t('loadChildrenFailed')
     return `<div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(message)}</div>`
-  }
-
-  if (state.loadedKeys.has(key) && !hasKnownChildren) {
-    return `<div class="tree-node__hint" style="--depth:${depth}">${escapeHtml(i18n.t('noDirectChildren'))}</div>`
   }
 
   return ''

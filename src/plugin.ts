@@ -303,6 +303,10 @@ export class FavoriteTreePlugin {
       await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
       this.loadedKeys.add(nodeKey)
       this.loadStates.set(nodeKey, 'loaded')
+      if (this.treeService.getChildrenFor(nodeKey).length === 0) {
+        this.expandedKeys.delete(nodeKey)
+        this.persistInternalState()
+      }
     } catch (error) {
       this.loadStates.set(nodeKey, 'error')
       this.loadErrors.set(nodeKey, error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed'))
