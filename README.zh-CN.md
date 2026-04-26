@@ -23,18 +23,15 @@
 - 面板文案跟随 Logseq 语言切换自动刷新，未覆盖文案回退英文
 - 不同 graph 独立记忆展开状态、布局、排序与视图模式
 
-## 文档导航
+## 从 Marketplace 安装
 
-- [英文 README](./README.md)
-- [英文使用指南](./docs/user-guide.en.md)
-- [详细功能清单](./docs/feature-list.md)
-- [技术方案文档](./docs/technical-design.md)
-- [使用指南](./docs/user-guide.md)
-- [发布指南](./docs/publish-guide.md)
-- [Marketplace Manifest 示例](./docs/marketplace-manifest.example.json)
-- [Marketplace PR 模板](./docs/marketplace-pr-template.md)
+1. 在 Logseq 中打开 `Marketplace`
+2. 搜索 `DB Favorite Tree`
+3. 安装并启用插件
+4. 至少收藏一个页面作为根节点
+5. 给需要纳入树的子页面添加 `parent` 属性
 
-## 快速开始
+## 从源码安装
 
 ### 1. 安装依赖
 
@@ -55,6 +52,40 @@ npm run build
 3. 指向当前项目目录
 4. 在工具栏点击插件图标打开收藏树
 
+## 首次配置
+
+### 1. 准备根节点页面
+
+- 把一个或多个页面加入 Logseq 收藏
+- 被收藏的页面会作为树的根节点
+
+### 2. 配置层级属性
+
+- 默认层级属性名是 `parent`
+- 在子页面中添加 `parent` 属性，并把值设置为另一个页面
+- 设置后，子页面就会展示在对应父页面下面
+
+示例：
+
+```text
+页面：周计划
+属性名：parent
+属性值：[[项目管理]]
+```
+
+### 3. 配置多个父页面
+
+- `parent` 属性可以包含多个页面引用
+- 一个页面有多个父页面时，会同时出现在多条路径中
+
+## 日常使用
+
+- 从工具栏图标打开悬浮面板
+- 展开节点以懒加载子页面
+- 用搜索框筛选结果并保留祖先路径
+- 使用“定位当前页”展开当前页所在的所有匹配路径
+- 拖动同级节点以保存自定义顺序
+
 ## 插件设置
 
 - `层级属性名`：用于声明父页面关系，默认 `parent`
@@ -66,6 +97,30 @@ npm run build
 
 - 自动刷新默认关闭
 - 开启后按 `60` 秒间隔轮询，可在设置中修改
+
+## 限制说明
+
+- 仅支持 `DB graph`
+- 不支持 `file graph`
+- 根节点来自收藏页面
+- 拖拽排序仅支持同级节点之间重排
+- 搜索状态下禁用拖拽排序
+
+## 截图与演示
+
+- 提交 Marketplace 前，请至少补充 1 张截图或 1 个 GIF
+- 建议展示：面板展开态、悬浮球态、搜索结果、`parent` 层级配置效果
+
+## 文档导航
+
+- [英文 README](./README.md)
+- [英文使用指南](./docs/user-guide.en.md)
+- [使用指南](./docs/user-guide.md)
+- [发布指南](./docs/publish-guide.md)
+- [详细功能清单](./docs/feature-list.md)
+- [技术方案文档](./docs/technical-design.md)
+- [Marketplace Manifest 示例](./docs/marketplace-manifest.example.json)
+- [Marketplace PR 模板](./docs/marketplace-pr-template.md)
 
 ## 代码结构
 

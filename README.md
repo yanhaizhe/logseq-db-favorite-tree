@@ -22,18 +22,15 @@
 - Supports default title sorting and custom sibling drag sorting
 - Follows the current Logseq UI language with English fallback
 
-## Documentation
+## Install from Marketplace
 
-- [Chinese README](./README.zh-CN.md)
-- [Feature List](./docs/feature-list.md)
-- [Technical Design](./docs/technical-design.md)
-- [User Guide](./docs/user-guide.en.md)
-- [Chinese User Guide](./docs/user-guide.md)
-- [Publish Guide](./docs/publish-guide.md)
-- [Marketplace Manifest Example](./docs/marketplace-manifest.example.json)
-- [Marketplace PR Template](./docs/marketplace-pr-template.md)
+1. Open `Marketplace` in Logseq
+2. Search for `DB Favorite Tree`
+3. Install and enable the plugin
+4. Favorite at least one page to create root nodes
+5. Add the `parent` property to child pages you want to organize in the tree
 
-## Quick Start
+## Install from Source
 
 ### 1. Install dependencies
 
@@ -54,6 +51,40 @@ npm run build
 3. Select this project directory
 4. Click the toolbar icon to open the favorite tree
 
+## First-Time Setup
+
+### 1. Prepare root pages
+
+- Add one or more pages to Logseq favorites
+- Favorited pages become the root nodes of the tree
+
+### 2. Configure the hierarchy property
+
+- The default hierarchy property is `parent`
+- Add `parent` to a child page and set its value to another page
+- The child page will then appear under that parent page
+
+Example:
+
+```text
+Page: Weekly Plan
+Property: parent
+Value: [[Project Management]]
+```
+
+### 3. Multiple parents
+
+- The `parent` property can contain multiple page references
+- A page with multiple parents appears in multiple paths
+
+## Everyday Workflow
+
+- Open the floating panel from the toolbar icon
+- Expand nodes to lazy-load child pages
+- Use search to filter the tree and keep ancestor paths visible
+- Use `Locate current page` to reveal the current page in all matching paths
+- Drag sibling nodes to save a custom order
+
 ## Settings
 
 - `Hierarchy property`: the property used to describe parent page relations, default is `parent`
@@ -65,6 +96,30 @@ Notes:
 
 - Auto-refresh is disabled by default
 - When enabled, the default polling interval is `60` seconds and can be changed in settings
+
+## Limitations
+
+- Supports `DB graph` only
+- Does not support `file graph`
+- Root nodes come from favorite pages
+- Drag sorting works only between sibling nodes
+- Drag sorting is disabled while searching
+
+## Screenshots
+
+- Add at least one screenshot or GIF here before Marketplace submission
+- Recommended examples: floating panel, bubble mode, search result, and `parent` hierarchy setup
+
+## Documentation
+
+- [User Guide](./docs/user-guide.en.md)
+- [Publish Guide](./docs/publish-guide.md)
+- [Feature List](./docs/feature-list.md)
+- [Technical Design](./docs/technical-design.md)
+- [Marketplace Manifest Example](./docs/marketplace-manifest.example.json)
+- [Marketplace PR Template](./docs/marketplace-pr-template.md)
+- [Chinese README](./README.zh-CN.md)
+- [Chinese User Guide](./docs/user-guide.md)
 
 ## Marketplace Notes
 
