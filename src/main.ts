@@ -20,6 +20,7 @@ async function main(): Promise<void> {
     onSearchQueryChange: (value) => {
       void plugin.setSearchQuery(value)
     },
+    onToggleControls: plugin.toggleControlsCollapsed,
     onRefresh: () => {
       void plugin.manualRefresh()
     },

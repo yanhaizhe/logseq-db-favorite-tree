@@ -60,6 +60,7 @@ export type PersistedPluginState = {
   bodyScrollTop: number
   lastLocatedNodeKey: string | null
   viewMode: ViewMode
+  controlsCollapsed: boolean
   layout: FloatingPositions
   panelSize: PanelSize
 }
@@ -91,6 +92,7 @@ export type TreeStateSnapshot = {
   hierarchyProperty: string
   lastRefreshLabel: string
   viewMode: ViewMode
+  controlsCollapsed: boolean
 }
 
 export type PageLookup = Pick<PageEntity, 'name' | 'originalName' | 'properties' | 'uuid'>

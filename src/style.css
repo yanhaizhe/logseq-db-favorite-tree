@@ -179,6 +179,12 @@ code {
   cursor: default;
 }
 
+.favorite-tree__controls {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .favorite-tree__searchbar {
   padding: 8px 10px 6px;
   border-bottom: 1px solid var(--ft-border);

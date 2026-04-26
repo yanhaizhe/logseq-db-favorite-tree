@@ -52,6 +52,7 @@ export class FavoriteTreeSettingsStore {
       bodyScrollTop: graphState.bodyScrollTop,
       lastLocatedNodeKey: graphState.lastLocatedNodeKey,
       viewMode: graphState.viewMode,
+      controlsCollapsed: graphState.controlsCollapsed,
       layout: graphState.layout,
       panelSize: graphState.panelSize,
     }
@@ -123,6 +124,7 @@ export class FavoriteTreeSettingsStore {
       bodyScrollTop: this.getNumber(INTERNAL_SETTINGS.bodyScrollTop, 0),
       lastLocatedNodeKey: this.getString(INTERNAL_SETTINGS.lastLocatedNodeKey),
       viewMode: this.getViewMode(),
+      controlsCollapsed: false,
       layout: {
         panelX: this.getNumber(INTERNAL_SETTINGS.panelX, 0),
         panelY: this.getNumber(INTERNAL_SETTINGS.panelY, 0),
@@ -146,6 +148,7 @@ export class FavoriteTreeSettingsStore {
         ? value.lastLocatedNodeKey
         : null,
       viewMode: value.viewMode === 'bubble' ? 'bubble' : 'panel',
+      controlsCollapsed: Boolean(value.controlsCollapsed),
       layout: {
         panelX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelX, 0),
         panelY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelY, 0),
@@ -162,6 +165,7 @@ export class FavoriteTreeSettingsStore {
       bodyScrollTop: Math.max(0, Math.round(state.bodyScrollTop)),
       lastLocatedNodeKey: state.lastLocatedNodeKey,
       viewMode: state.viewMode,
+      controlsCollapsed: state.controlsCollapsed,
       layout: {
         panelX: Math.round(state.layout.panelX),
         panelY: Math.round(state.layout.panelY),

@@ -4,6 +4,7 @@ export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
   onHeaderDoubleClick: () => void
   onSearchQueryChange: (value: string) => void
+  onToggleControls: () => void
   onRefresh: () => void
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
@@ -68,6 +69,10 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
 
     const action = target.dataset.action
+    if (action === 'toggle-controls') {
+      handlers.onToggleControls()
+      return
+    }
     if (action === 'refresh') {
       handlers.onRefresh()
       return

@@ -20,6 +20,7 @@ export class FavoriteTreePlugin {
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
   private autoRefreshPaused = false
+  private controlsCollapsed = false
   private bodyScrollTop = 0
   private lastLocatedNodeKey: string | null = null
   private flashLocatedNodeKey: string | null = null
@@ -148,6 +149,12 @@ export class FavoriteTreePlugin {
     this.autoRefreshPaused = !this.autoRefreshPaused
     this.persistInternalState()
     this.startPolling()
+    this.render()
+  }
+
+  toggleControlsCollapsed = (): void => {
+    this.controlsCollapsed = !this.controlsCollapsed
+    this.persistInternalState()
     this.render()
   }
 
@@ -440,6 +447,7 @@ export class FavoriteTreePlugin {
       hierarchyProperty: this.settings.getHierarchyProperty(),
       lastRefreshLabel: this.lastRefreshLabel,
       viewMode: this.viewMode,
+      controlsCollapsed: this.controlsCollapsed,
     }
   }
 
@@ -482,6 +490,7 @@ export class FavoriteTreePlugin {
       bodyScrollTop: this.bodyScrollTop,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
       viewMode: this.viewMode,
+      controlsCollapsed: this.controlsCollapsed,
       layout: this.layout.getPositions(),
       panelSize: this.layout.getPanelSize(),
     })
@@ -568,6 +577,7 @@ export class FavoriteTreePlugin {
     this.bodyScrollTop = restored.bodyScrollTop
     this.lastLocatedNodeKey = restored.lastLocatedNodeKey
     this.viewMode = restored.viewMode
+    this.controlsCollapsed = restored.controlsCollapsed
     this.searchQuery = ''
     this.searching = false
     this.currentPagePath = []

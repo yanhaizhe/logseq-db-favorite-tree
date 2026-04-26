@@ -28,6 +28,8 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
   const hasExpandedNodes = state.expandedKeys.size > 0
   const expandActionLabel = hasExpandedNodes ? '折叠' : '展开'
   const expandActionTitle = hasExpandedNodes ? '折叠所有已展开目录' : '展开所有已匹配目录'
+  const controlsToggleLabel = state.controlsCollapsed ? '▾' : '▴'
+  const controlsToggleTitle = state.controlsCollapsed ? '展开功能区' : '收起功能区'
   const normalizedQuery = normalizeTitle(state.searchQuery)
   const isSearching = normalizedQuery.length > 0
 
@@ -52,6 +54,27 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
       />
     </div>
   `
+  const toolbarMarkup = `
+    <div class="favorite-tree__toolbar">
+      <button class="favorite-tree__text-btn" data-action="locate-current" title="快速定位当前页">定位</button>
+      <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
+      <button
+        class="favorite-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
+        data-action="toggle-auto-refresh"
+        title="${autoRefreshActionLabel}"
+        aria-pressed="${state.autoRefreshPaused ? 'true' : 'false'}"
+      >${autoRefreshActionIcon} 自动刷新</button>
+    </div>
+  `
+  const controlsMarkup = state.controlsCollapsed
+    ? ''
+    : `
+      <div class="favorite-tree__controls">
+        ${searchMarkup}
+        ${breadcrumbMarkup}
+        ${toolbarMarkup}
+      </div>
+    `
 
   const bodyMarkup = state.searching && isSearching
     ? '<div class="favorite-tree__status">正在建立搜索索引...</div>'
@@ -71,24 +94,20 @@ export function renderFavoriteTree(state: TreeStateSnapshot, accessors: TreeRend
           <p class="favorite-tree__subtitle">拖动标题栏移动，双击收回 · 属性 <code>${escapeHtml(state.hierarchyProperty)}</code></p>
         </div>
         <div class="favorite-tree__actions">
+          <button
+            class="favorite-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
+            data-action="toggle-controls"
+            title="${controlsToggleTitle}"
+            aria-label="${controlsToggleTitle}"
+            aria-expanded="${state.controlsCollapsed ? 'false' : 'true'}"
+          >${controlsToggleLabel}</button>
           <button class="favorite-tree__icon-btn" data-action="refresh" title="手动刷新">↻</button>
           <button class="favorite-tree__icon-btn" data-action="collapse-to-bubble" title="收回为悬浮球">○</button>
           <button class="favorite-tree__icon-btn" data-action="settings" title="打开设置">⚙</button>
           <button class="favorite-tree__icon-btn" data-action="close" title="隐藏插件">×</button>
         </div>
       </div>
-      ${searchMarkup}
-      ${breadcrumbMarkup}
-      <div class="favorite-tree__toolbar">
-        <button class="favorite-tree__text-btn" data-action="locate-current" title="快速定位当前页">定位</button>
-        <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
-        <button
-          class="favorite-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
-          data-action="toggle-auto-refresh"
-          title="${autoRefreshActionLabel}"
-          aria-pressed="${state.autoRefreshPaused ? 'true' : 'false'}"
-        >${autoRefreshActionIcon} 自动刷新</button>
-      </div>
+      ${controlsMarkup}
       <div class="favorite-tree__body">${bodyMarkup}</div>
       <div class="favorite-tree__footer">
         <span>${escapeHtml(state.lastRefreshLabel)}</span>
