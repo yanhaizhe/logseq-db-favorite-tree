@@ -9,11 +9,12 @@ type DragKind = 'panel' | 'bubble'
 type DragState = {
   kind: DragKind
   pointerId: number
-  startClientX: number
-  startClientY: number
+  startScreenX: number
+  startScreenY: number
   originX: number
   originY: number
   moved: boolean
+  handleElement: HTMLElement | null
 }
 
 type PluginSettings = {
@@ -104,6 +105,7 @@ class FavoriteTreePlugin {
   private bubbleY = 120
   private dragState: DragState | null = null
   private suppressBubbleClick = false
+  private dragFrameId: number | null = null
   private readonly expandedKeys = new Set<string>()
   private readonly loadedKeys = new Set<string>()
   private readonly loadStates = new Map<string, LoadState>()
@@ -156,6 +158,10 @@ class FavoriteTreePlugin {
     this.persistInternalState()
     this.dragState = null
     document.body.classList.remove('is-dragging')
+    if (this.dragFrameId !== null) {
+      window.cancelAnimationFrame(this.dragFrameId)
+      this.dragFrameId = null
+    }
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
     }
@@ -332,20 +338,22 @@ class FavoriteTreePlugin {
     logseq.App.pushState('page', { name: pageName })
   }
 
-  startDrag(kind: DragKind, event: PointerEvent): void {
+  startDrag(kind: DragKind, event: PointerEvent, handleElement?: HTMLElement | null): void {
     if (event.button !== 0) {
       return
     }
 
     const origin = kind === 'panel' ? { x: this.panelX, y: this.panelY } : { x: this.bubbleX, y: this.bubbleY }
+    handleElement?.setPointerCapture?.(event.pointerId)
     this.dragState = {
       kind,
       pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
+      startScreenX: event.screenX,
+      startScreenY: event.screenY,
       originX: origin.x,
       originY: origin.y,
       moved: false,
+      handleElement: handleElement ?? null,
     }
 
     document.body.classList.add('is-dragging')
@@ -1027,13 +1035,13 @@ class FavoriteTreePlugin {
       return
     }
 
-    const nextX = this.dragState.originX + event.clientX - this.dragState.startClientX
-    const nextY = this.dragState.originY + event.clientY - this.dragState.startClientY
+    const nextX = this.dragState.originX + event.screenX - this.dragState.startScreenX
+    const nextY = this.dragState.originY + event.screenY - this.dragState.startScreenY
 
     if (
       !this.dragState.moved &&
-      (Math.abs(event.clientX - this.dragState.startClientX) >= DRAG_THRESHOLD_PX ||
-        Math.abs(event.clientY - this.dragState.startClientY) >= DRAG_THRESHOLD_PX)
+      (Math.abs(event.screenX - this.dragState.startScreenX) >= DRAG_THRESHOLD_PX ||
+        Math.abs(event.screenY - this.dragState.startScreenY) >= DRAG_THRESHOLD_PX)
     ) {
       this.dragState.moved = true
     }
@@ -1048,7 +1056,14 @@ class FavoriteTreePlugin {
       this.bubbleY = bubble.y
     }
 
-    this.applyMainUIState()
+    if (this.dragFrameId !== null) {
+      return
+    }
+
+    this.dragFrameId = window.requestAnimationFrame(() => {
+      this.dragFrameId = null
+      this.applyMainUIState()
+    })
   }
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
@@ -1056,7 +1071,13 @@ class FavoriteTreePlugin {
       return
     }
 
+    if (this.dragFrameId !== null) {
+      window.cancelAnimationFrame(this.dragFrameId)
+      this.dragFrameId = null
+    }
+    this.applyMainUIState()
     this.suppressBubbleClick = this.dragState.kind === 'bubble' && this.dragState.moved
+    this.dragState.handleElement?.releasePointerCapture?.(event.pointerId)
     this.dragState = null
     document.body.classList.remove('is-dragging')
     this.persistInternalState()
@@ -1471,7 +1492,7 @@ function wireDOMEvents(model: FavoriteTreePlugin, root: HTMLElement): void {
 
     const kind = handle.dataset.dragHandle
     if (kind === 'panel' || kind === 'bubble') {
-      model.startDrag(kind, event)
+      model.startDrag(kind, event, handle)
     }
   })
 

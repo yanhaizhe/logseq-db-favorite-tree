@@ -66,6 +66,7 @@ code {
   align-items: center;
   justify-content: center;
   cursor: grab;
+  touch-action: none;
 }
 
 .favorite-tree-bubble:active {
@@ -114,6 +115,7 @@ code {
   background: color-mix(in srgb, var(--ft-bg) 82%, var(--ft-bg-muted) 18%);
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 
 .favorite-tree__header:active {
