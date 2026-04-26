@@ -74,19 +74,22 @@ export class FavoriteTreeTreeService {
   }
 
   findPathToPage(rootFavorites: string[], targetTitle: string): string[] | null {
+    const paths = this.findPathsToPage(rootFavorites, targetTitle)
+    return paths[0] ?? null
+  }
+
+  findPathsToPage(rootFavorites: string[], targetTitle: string): string[][] {
     const targetKey = normalizeTitle(targetTitle)
     if (!targetKey) {
-      return null
+      return []
     }
 
+    const matches: string[][] = []
     for (const root of rootFavorites) {
-      const path = this.findPathFromNode(root, targetKey, [])
-      if (path) {
-        return path
-      }
+      this.collectPathsFromNode(root, targetKey, [], matches)
     }
 
-    return null
+    return matches
   }
 
   private async loadFavoritesFromConfigs(): Promise<unknown> {
@@ -201,24 +204,19 @@ export class FavoriteTreeTreeService {
     }
   }
 
-  private findPathFromNode(title: string, targetKey: string, ancestors: string[]): string[] | null {
+  private collectPathsFromNode(title: string, targetKey: string, ancestors: string[], matches: string[][]): void {
     const key = normalizeTitle(title)
     if (!key || ancestors.includes(key)) {
-      return null
+      return
     }
 
     const nextPath = [...ancestors, title]
     if (key === targetKey) {
-      return nextPath
+      matches.push(nextPath)
     }
 
     for (const child of this.getChildrenFor(title)) {
-      const path = this.findPathFromNode(child, targetKey, nextPath)
-      if (path) {
-        return path
-      }
+      this.collectPathsFromNode(child, targetKey, nextPath, matches)
     }
-
-    return null
   }
 }

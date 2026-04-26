@@ -222,21 +222,23 @@ export class FavoriteTreePlugin {
     }
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-    const path = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName)
-    if (!path) {
+    const paths = this.treeService.findPathsToPage(this.rootFavorites, this.currentPageName)
+    if (!paths.length) {
       logseq.UI.showMsg('当前页不在收藏树中。', 'warning')
       return
     }
 
-    for (const title of path.slice(0, -1)) {
-      const key = normalizeTitle(title)
-      if (!key) {
-        continue
+    for (const path of paths) {
+      for (const title of path.slice(0, -1)) {
+        const key = normalizeTitle(title)
+        if (!key) {
+          continue
+        }
+        this.expandedKeys.add(key)
+        this.loadedKeys.add(key)
+        this.loadStates.set(key, 'loaded')
+        this.loadErrors.delete(key)
       }
-      this.expandedKeys.add(key)
-      this.loadedKeys.add(key)
-      this.loadStates.set(key, 'loaded')
-      this.loadErrors.delete(key)
     }
 
     this.persistInternalState()
@@ -402,6 +404,11 @@ export class FavoriteTreePlugin {
   private async updateCurrentPage(): Promise<void> {
     const current = await logseq.Editor.getCurrentPage()
     this.currentPageName = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    const currentPageKey = normalizeTitle(this.currentPageName)
+    if (this.lastLocatedNodeKey && this.lastLocatedNodeKey !== currentPageKey) {
+      this.lastLocatedNodeKey = null
+      this.persistInternalState()
+    }
     await this.syncCurrentPagePath()
     this.render()
   }
