@@ -3,7 +3,7 @@
   "description": "Render favorite pages as a property-driven tree for Logseq DB graph.",
   "author": "yanhaizhe",
   "repo": "yanhaizhe/logseq-db-favorite-tree",
-  "icon": "https://raw.githubusercontent.com/yanhaizhe/logseq-db-favorite-tree/main/icon.svg",
+  "icon": "icon.svg",
   "theme": false,
   "web": false,
   "effect": false,

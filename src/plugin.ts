@@ -759,7 +759,8 @@ export class FavoriteTreePlugin {
   }
 
   private async syncDerivedTreeState(): Promise<void> {
-    const shouldBuildIndex = this.hasExpandedNodes() || Boolean(this.currentPageName) || Boolean(this.searchQuery)
+    const shouldBuildIndex =
+      this.rootFavorites.length > 0 || this.hasExpandedNodes() || Boolean(this.currentPageName) || Boolean(this.searchQuery)
     if (!shouldBuildIndex) {
       this.currentPagePath = []
       this.searching = false

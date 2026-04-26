@@ -328,9 +328,13 @@ function renderNode(
   }
 
   const chevron = effectiveExpanded ? renderIcon('chevron-down', 'ft-icon ft-icon--xs') : renderIcon('chevron-right', 'ft-icon ft-icon--xs')
-  const toggleMarkup = isSearching || hasLoadedLeaf
-    ? `<span class="tree-node__toggle is-passive">${hasKnownChildren ? chevron : renderIcon('dot', 'ft-icon ft-icon--xs')}</span>`
-    : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
+  const toggleMarkup = hasKnownChildren
+    ? (
+      isSearching || hasLoadedLeaf
+        ? `<span class="tree-node__toggle is-passive">${chevron}</span>`
+        : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
+    )
+    : '<span class="tree-node__toggle is-passive"></span>'
 
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
@@ -358,7 +362,7 @@ function renderCycleNode(title: string, depth: number, i18n: FavoriteTreeI18n): 
   return `
     <div class="tree-node" data-node-key="${escapeHtml(normalizeTitle(title))}">
       <div class="tree-node__row is-cycle" style="--depth:${depth}">
-        <span class="tree-node__toggle">${renderIcon('dot', 'ft-icon ft-icon--xs')}</span>
+        <span class="tree-node__toggle is-passive"></span>
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${escapeHtml(title)}</span>
         </button>
