@@ -36,11 +36,21 @@ jobs:
 
       - name: Package release zip
         run: |
-          mkdir -p release/${PLUGIN_NAME}
-          cp package.json README.md icon.svg release/${PLUGIN_NAME}/
-          cp -R dist release/${PLUGIN_NAME}/dist
+          # Create a staging directory for the clean release
+          STAGING="release/${PLUGIN_NAME}"
+          mkdir -p "${STAGING}"
+          
+          # Copy only necessary assets to the root of the staging folder
+          cp README.md icon.svg package.json "${STAGING}/"
+          cp -R dist/* "${STAGING}/"
+          
+          # Update package.json to point to index.html at the root (flattened)
+          # We use sed to remove "dist/" prefix from the "main" and "logseq.main" fields
+          sed -i 's/"dist\/index.html"/"index.html"/g' "${STAGING}/package.json"
+          
+          # Zip the plugin folder
           cd release
-          zip -r ${PLUGIN_NAME}.zip ${PLUGIN_NAME}
+          zip -r "${PLUGIN_NAME}.zip" "${PLUGIN_NAME}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
