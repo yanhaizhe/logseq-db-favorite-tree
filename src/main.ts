@@ -7,8 +7,10 @@ type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 type PluginSettings = {
   hierarchyProperty?: string
   panelWidth?: number
+  pollIntervalSeconds?: number
   __panelVisible?: boolean
   __expandedKeys?: string[]
+  __autoRefreshPaused?: boolean
 } & Record<string, unknown>
 
 const SETTINGS_SCHEMA: SettingSchemaDesc[] = [
@@ -26,14 +28,22 @@ const SETTINGS_SCHEMA: SettingSchemaDesc[] = [
     title: '面板宽度',
     description: '右侧收藏树面板宽度，单位为像素。',
   },
+  {
+    key: 'pollIntervalSeconds',
+    type: 'number',
+    default: 5,
+    title: '自动刷新间隔（秒）',
+    description: '轮询自动刷新的时间间隔，单位为秒。',
+  },
 ]
 
 const INTERNAL_SETTINGS = {
   panelVisible: '__panelVisible',
   expandedKeys: '__expandedKeys',
+  autoRefreshPaused: '__autoRefreshPaused',
 } as const
 
-const POLL_INTERVAL_MS = 5000
+const DEFAULT_POLL_INTERVAL_SECONDS = 5
 const REFRESH_DEBOUNCE_MS = 250
 
 class FavoriteTreePlugin {
@@ -43,12 +53,12 @@ class FavoriteTreePlugin {
   private currentPageName: string | null = null
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
+  private autoRefreshPaused = false
   private readonly expandedKeys = new Set<string>()
   private readonly loadedKeys = new Set<string>()
   private readonly loadStates = new Map<string, LoadState>()
   private readonly loadErrors = new Map<string, string>()
   private readonly pageByKey = new Map<string, PageEntity>()
-  private debugSamples: Array<Record<string, unknown>> = []
   private childIndex: Map<string, string[]> | null = null
   private childIndexPromise: Promise<void> | null = null
   private refreshTimerId: number | null = null
@@ -63,6 +73,7 @@ class FavoriteTreePlugin {
 
   async init(): Promise<void> {
     this.panelVisible = this.getBooleanSetting(INTERNAL_SETTINGS.panelVisible, false)
+    this.autoRefreshPaused = this.getBooleanSetting(INTERNAL_SETTINGS.autoRefreshPaused, false)
     for (const key of this.getStringArraySetting(INTERNAL_SETTINGS.expandedKeys)) {
       this.expandedKeys.add(key)
       this.loadedKeys.add(key)
@@ -124,6 +135,13 @@ class FavoriteTreePlugin {
 
   manualRefresh = async (): Promise<void> => {
     await this.refresh('manual')
+  }
+
+  toggleAutoRefresh = (): void => {
+    this.autoRefreshPaused = !this.autoRefreshPaused
+    this.persistInternalState()
+    this.startPolling()
+    this.render()
   }
 
   onNodeToggle = async (nodeKey: string): Promise<void> => {
@@ -196,6 +214,7 @@ class FavoriteTreePlugin {
       logseq.onSettingsChanged<PluginSettings>((newSettings, oldSettings) => {
         const propertyChanged = newSettings.hierarchyProperty !== oldSettings?.hierarchyProperty
         const widthChanged = newSettings.panelWidth !== oldSettings?.panelWidth
+        const pollIntervalChanged = newSettings.pollIntervalSeconds !== oldSettings?.pollIntervalSeconds
 
         if (propertyChanged) {
           this.invalidateIndex()
@@ -206,15 +225,29 @@ class FavoriteTreePlugin {
           this.applyMainUIState()
         }
 
+        if (pollIntervalChanged) {
+          this.startPolling()
+        }
+
         this.render()
       }),
     )
   }
 
   private startPolling(): void {
+    if (this.pollTimerId !== null) {
+      window.clearInterval(this.pollTimerId)
+      this.pollTimerId = null
+    }
+
+    if (this.autoRefreshPaused) {
+      return
+    }
+
+    const pollIntervalMs = this.getPollIntervalSeconds() * 1000
     this.pollTimerId = window.setInterval(() => {
       void this.refresh('poll')
-    }, POLL_INTERVAL_MS)
+    }, pollIntervalMs)
   }
 
   private scheduleRefresh(reason: string): void {
@@ -324,7 +357,6 @@ class FavoriteTreePlugin {
     this.childIndex = null
     this.childIndexPromise = null
     this.pageByKey.clear()
-    this.debugSamples = []
   }
 
   private async ensureChildIndex(): Promise<void> {
@@ -345,7 +377,6 @@ class FavoriteTreePlugin {
     const allPages = (await logseq.Editor.getAllPages()) ?? []
     const propertyName = this.getHierarchyProperty()
     const index = new Map<string, string[]>()
-    const debugSamples: Array<Record<string, unknown>> = []
 
     this.pageByKey.clear()
     for (const page of allPages) {
@@ -362,22 +393,7 @@ class FavoriteTreePlugin {
         continue
       }
 
-      const resolution = await this.resolveParentTitles(page, propertyName)
-      const parentTitles = resolution.titles
-      if (resolution.shouldLog && debugSamples.length < 30) {
-        debugSamples.push({
-          pageTitle: title,
-          propertyName,
-          propertyKeys: resolution.propertyKeys,
-          rawFromPage: resolution.rawFromPage,
-          rawFromTopLevel: resolution.rawFromTopLevel,
-          rawFromApi: resolution.rawFromApi,
-          rawFromAllProps: resolution.rawFromAllProps,
-          resolvedParents: resolution.titles,
-        })
-      }
-
-      for (const parentTitle of parentTitles) {
+      for (const parentTitle of await this.resolveParentTitles(page, propertyName)) {
         const parentKey = normalizeTitle(parentTitle)
         if (!parentKey) {
           continue
@@ -398,22 +414,9 @@ class FavoriteTreePlugin {
     }
 
     this.childIndex = index
-    this.debugSamples = debugSamples
-    this.logChildIndexDebug(index, allPages.length, propertyName)
-    if (debugSamples.length === 0) {
-      await this.logNoMatchDiagnostics(allPages, propertyName)
-    }
   }
 
-  private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<{
-    titles: string[]
-    propertyKeys: string[]
-    rawFromPage: unknown
-    rawFromTopLevel: unknown
-    rawFromApi: unknown
-    rawFromAllProps: unknown
-    shouldLog: boolean
-  }> {
+  private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<string[]> {
     const properties =
       page.properties && typeof page.properties === 'object'
         ? (page.properties as Record<string, unknown>)
@@ -442,118 +445,7 @@ class FavoriteTreePlugin {
       }
     }
 
-    const titles = uniqueTitlesFromValues([rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps])
-    const propertyKeys = properties ? Object.keys(properties).slice(0, 20) : []
-    const shouldLog =
-      titles.length > 0 ||
-      rawFromPage != null ||
-      rawFromTopLevel != null ||
-      rawFromApi != null ||
-      rawFromAllProps != null
-
-    return {
-      titles,
-      propertyKeys,
-      rawFromPage: shrinkForDebug(rawFromPage),
-      rawFromTopLevel: shrinkForDebug(rawFromTopLevel),
-      rawFromApi: shrinkForDebug(rawFromApi),
-      rawFromAllProps: shrinkForDebug(rawFromAllProps),
-      shouldLog,
-    }
-  }
-
-  private logChildIndexDebug(index: Map<string, string[]>, allPageCount: number, propertyName: string): void {
-    const favoriteSummary = this.rootFavorites.map((root) => {
-      const children = index.get(normalizeTitle(root)) ?? []
-      return {
-        root,
-        childCount: children.length,
-        children,
-      }
-    })
-
-    const allRootsEmpty = favoriteSummary.every((item) => item.childCount === 0)
-    if (!allRootsEmpty) {
-      return
-    }
-
-    console.groupCollapsed('[DB Favorite Tree] Child lookup debug')
-    console.info('hierarchyProperty:', propertyName)
-    console.info('favoriteSummary:', favoriteSummary)
-    console.info('allPageCount:', allPageCount)
-    console.info('matchedSamples:', this.debugSamples)
-    console.groupEnd()
-  }
-
-  private async logNoMatchDiagnostics(allPages: PageEntity[], propertyName: string): Promise<void> {
-    const currentPage = await logseq.Editor.getCurrentPage()
-    const currentTitle = currentPage && typeof currentPage === 'object' ? pageTitle(currentPage as PageEntity) : null
-    const interestingTitles = [...new Set([...this.rootFavorites, ...(currentTitle ? [currentTitle] : [])])]
-
-    const pageDiagnostics = await Promise.all(
-      interestingTitles.map(async (title) => {
-        const page = await logseq.Editor.getPage(title)
-        const pageRecord = page && typeof page === 'object' ? (page as Record<string, unknown>) : null
-
-        let blockPropertyValue: unknown = undefined
-        let allPropsValue: unknown = undefined
-        let allPropsKeys: string[] = []
-
-        if (page?.uuid) {
-          try {
-            blockPropertyValue = await logseq.Editor.getBlockProperty(page.uuid, propertyName)
-          } catch {
-            blockPropertyValue = undefined
-          }
-
-          try {
-            const allProps = await logseq.Editor.getBlockProperties(page.uuid)
-            if (allProps && typeof allProps === 'object') {
-              allPropsKeys = Object.keys(allProps as Record<string, unknown>).slice(0, 20)
-              allPropsValue = findPropertyValue(allProps as Record<string, unknown>, propertyName)
-            }
-          } catch {
-            allPropsValue = undefined
-          }
-        }
-
-        const pageProperties =
-          pageRecord?.properties && typeof pageRecord.properties === 'object'
-            ? (pageRecord.properties as Record<string, unknown>)
-            : null
-
-        return {
-          title,
-          pageKeys: pageRecord ? Object.keys(pageRecord).slice(0, 30) : [],
-          pagePropertyKeys: pageProperties ? Object.keys(pageProperties).slice(0, 20) : [],
-          rawFromPageProperties: shrinkForDebug(pageProperties ? findPropertyValue(pageProperties, propertyName) : undefined),
-          rawFromTopLevel: shrinkForDebug(pageRecord?.[propertyName]),
-          rawFromGetBlockProperty: shrinkForDebug(blockPropertyValue),
-          allPropsKeys,
-          rawFromGetBlockProperties: shrinkForDebug(allPropsValue),
-        }
-      }),
-    )
-
-    const allPagesShape = allPages.slice(0, 10).map((page) => {
-      const record = page as Record<string, unknown>
-      const properties =
-        record.properties && typeof record.properties === 'object'
-          ? (record.properties as Record<string, unknown>)
-          : null
-
-      return {
-        title: pageTitle(page),
-        keys: Object.keys(record).slice(0, 20),
-        propertyKeys: properties ? Object.keys(properties).slice(0, 20) : [],
-      }
-    })
-
-    console.groupCollapsed('[DB Favorite Tree] No match diagnostics')
-    console.info('hierarchyProperty:', propertyName)
-    console.info('interestingPageDiagnostics:', pageDiagnostics)
-    console.info('allPagesShapeSample:', allPagesShape)
-    console.groupEnd()
+    return uniqueTitlesFromValues([rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps])
   }
 
   private async updateCurrentPage(): Promise<void> {
@@ -564,6 +456,12 @@ class FavoriteTreePlugin {
   }
 
   private render(): void {
+    const autoRefreshActionLabel = this.autoRefreshPaused ? '恢复自动刷新' : '暂停自动刷新'
+    const autoRefreshActionIcon = this.autoRefreshPaused ? '▶' : '⏸'
+    const autoRefreshState = this.autoRefreshPaused
+      ? '自动刷新已暂停'
+      : `自动刷新 ${this.getPollIntervalSeconds()}s`
+
     const rootMarkup = this.rootFavorites.length
       ? this.rootFavorites.map((title) => this.renderNode(title, 0, [])).join('')
       : '<div class="favorite-tree__status">当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。</div>'
@@ -582,6 +480,12 @@ class FavoriteTreePlugin {
             )}</code></p>
           </div>
           <div class="favorite-tree__actions">
+            <button
+              class="favorite-tree__icon-btn ${this.autoRefreshPaused ? 'is-active' : ''}"
+              data-action="toggle-auto-refresh"
+              title="${autoRefreshActionLabel}"
+              aria-pressed="${this.autoRefreshPaused ? 'true' : 'false'}"
+            >${autoRefreshActionIcon}</button>
             <button class="favorite-tree__icon-btn" data-action="refresh" title="手动刷新">↻</button>
             <button class="favorite-tree__icon-btn" data-action="settings" title="打开设置">⚙</button>
             <button class="favorite-tree__icon-btn" data-action="close" title="关闭面板">×</button>
@@ -590,7 +494,7 @@ class FavoriteTreePlugin {
         <div class="favorite-tree__body">${bodyMarkup}</div>
         <div class="favorite-tree__footer">
           <span>${escapeHtml(this.lastRefreshLabel)}</span>
-          <span>${this.refreshing ? '刷新中...' : `${this.rootFavorites.length} 个根节点`}</span>
+          <span>${this.refreshing ? '刷新中...' : `${autoRefreshState} · ${this.rootFavorites.length} 个根节点`}</span>
         </div>
       </div>
     `
@@ -703,6 +607,16 @@ class FavoriteTreePlugin {
     return Math.min(640, Math.max(240, numeric))
   }
 
+  private getPollIntervalSeconds(): number {
+    const settings = logseq.settings as PluginSettings | undefined
+    const raw = settings?.pollIntervalSeconds
+    const numeric = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(numeric)) {
+      return DEFAULT_POLL_INTERVAL_SECONDS
+    }
+    return Math.min(3600, Math.max(1, Math.round(numeric)))
+  }
+
   private getBooleanSetting(key: string, fallback: boolean): boolean {
     const settings = logseq.settings as PluginSettings | undefined
     const value = settings?.[key]
@@ -719,6 +633,7 @@ class FavoriteTreePlugin {
     logseq.updateSettings({
       [INTERNAL_SETTINGS.panelVisible]: this.panelVisible,
       [INTERNAL_SETTINGS.expandedKeys]: [...this.expandedKeys],
+      [INTERNAL_SETTINGS.autoRefreshPaused]: this.autoRefreshPaused,
     })
   }
 
@@ -934,44 +849,6 @@ function uniqueTitlesFromValues(values: unknown[]): string[] {
   return result
 }
 
-function shrinkForDebug(value: unknown): unknown {
-  if (value == null) {
-    return value
-  }
-
-  try {
-    return JSON.parse(JSON.stringify(value))
-  } catch {
-    if (typeof value === 'object') {
-      return String(value)
-    }
-    return value
-  }
-}
-
-function extractParentTitles(page: PageEntity, propertyName: string): string[] {
-  const properties = page.properties
-  if (!properties || typeof properties !== 'object') {
-    return []
-  }
-
-  const rawValue = findPropertyValue(properties as Record<string, unknown>, propertyName)
-  const titles = normalizePropertyReferences(rawValue)
-  const unique = new Set<string>()
-  const result: string[] = []
-
-  for (const title of titles) {
-    const normalized = normalizeTitle(title)
-    if (!normalized || unique.has(normalized)) {
-      continue
-    }
-    unique.add(normalized)
-    result.push(title)
-  }
-
-  return result
-}
-
 function findPropertyValue(properties: Record<string, unknown>, propertyName: string): unknown {
   if (propertyName in properties) {
     return properties[propertyName]
@@ -1086,6 +963,10 @@ function wireDOMEvents(model: FavoriteTreePlugin, root: HTMLElement): void {
     const action = target.dataset.action
     if (action === 'refresh') {
       void model.manualRefresh()
+      return
+    }
+    if (action === 'toggle-auto-refresh') {
+      model.toggleAutoRefresh()
       return
     }
     if (action === 'settings') {

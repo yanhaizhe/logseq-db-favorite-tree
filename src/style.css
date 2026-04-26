@@ -103,6 +103,12 @@ code {
   background: var(--ft-bg-muted);
 }
 
+.favorite-tree__icon-btn.is-active {
+  color: var(--ft-accent);
+  border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
+  background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
+}
+
 .favorite-tree__body {
   flex: 1;
   min-height: 0;
