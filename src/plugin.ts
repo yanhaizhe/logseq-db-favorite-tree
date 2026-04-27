@@ -594,12 +594,8 @@ export class FavoriteTreePlugin {
     )
 
     this.offHooks.push(
-      logseq.App.onSidebarVisibleChanged(({ visible }) => {
-        if (visible) {
-          void this.renderSidebarTreeUI()
-        } else {
-          this.clearSidebarTreeUI()
-        }
+      logseq.App.onSidebarVisibleChanged(() => {
+        void this.syncSidebarTreeVisibility()
       }),
     )
 
@@ -1057,6 +1053,21 @@ export class FavoriteTreePlugin {
         }
       })
     }
+  }
+
+  private async syncSidebarTreeVisibility(): Promise<void> {
+    if (this.displayMode !== 'sidebar') {
+      this.clearSidebarTreeUI()
+      return
+    }
+
+    const path = await this.resolveSidebarTreePath()
+    if (path) {
+      await this.renderSidebarTreeUI()
+      return
+    }
+
+    this.clearSidebarTreeUI()
   }
 
   private clearSidebarTreeUI(targetPath?: string): void {
