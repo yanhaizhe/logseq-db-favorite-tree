@@ -22,7 +22,7 @@ import type {
   ViewMode,
 } from './types'
 import { applyTheme } from './theme'
-import { escapeSelectorValue, normalizeTitle, unwrapPageRef } from './utils'
+import { escapeSelectorValue, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -51,6 +51,7 @@ export class FavoriteTreePlugin {
   private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
+  private activePageKeysCache: { at: number; keys: Set<string> } | null = null
   private autoRefreshPaused = true
   private controlsCollapsed = false
   private sortOrders: SortOrderMap = {}
@@ -255,6 +256,10 @@ export class FavoriteTreePlugin {
   }
 
   manualRefresh = async (): Promise<void> => {
+    if (this.refreshing) {
+      logseq.UI.showMsg(this.i18n.t('refreshing'), 'info')
+      return
+    }
     await this.refresh('manual')
   }
 
@@ -547,7 +552,7 @@ export class FavoriteTreePlugin {
     }
 
     const existing = await logseq.Editor.getPage(childTitle)
-    if (existing) {
+    if (existing && (await this.isPageActive(childTitle))) {
       logseq.UI.showMsg(this.i18n.t('createChildDuplicate', { title: childTitle }), 'warning')
       this.shouldFocusCreateChildInput = true
       this.render()
@@ -810,9 +815,13 @@ export class FavoriteTreePlugin {
       return
     }
 
-    await this.syncLocale()
     this.refreshing = true
     this.render()
+    try {
+      await this.syncLocale()
+    } catch {
+      // Ignore locale refresh failures during manual refresh cycles.
+    }
 
     try {
       this.rootFavorites = await this.treeService.loadFavoriteRoots()
@@ -1599,12 +1608,87 @@ export class FavoriteTreePlugin {
       return null
     }
 
-    try {
-      const existingPage = await logseq.Editor.getPage(currentTitle)
-      return existingPage ? currentTitle : null
-    } catch {
-      return null
+    return (await this.isPageActive(currentTitle)) ? currentTitle : null
+  }
+
+  private async isPageActive(title: string): Promise<boolean> {
+    const key = normalizeTitle(title)
+    if (!key) {
+      return false
     }
+
+    try {
+      const keys = await this.getActivePageKeys()
+      return keys.has(key)
+    } catch {
+      try {
+        return Boolean(await logseq.Editor.getPage(title))
+      } catch {
+        return false
+      }
+    }
+  }
+
+  private async getActivePageKeys(): Promise<Set<string>> {
+    const now = Date.now()
+    const cached = this.activePageKeysCache
+    if (cached && now - cached.at < 1500) {
+      return cached.keys
+    }
+
+    const pages = (await logseq.Editor.getAllPages()) ?? []
+    const keys = new Set<string>()
+    for (const page of pages) {
+      if (this.isPageDeletedLike(page as Record<string, unknown>)) {
+        continue
+      }
+      const title = pageTitle(page)
+      const normalized = normalizeTitle(title)
+      if (normalized) {
+        keys.add(normalized)
+      }
+    }
+
+    this.activePageKeysCache = { at: now, keys }
+    return keys
+  }
+
+  private isPageDeletedLike(page: Record<string, unknown>): boolean {
+    const flags = [
+      'deleted',
+      'deleted?',
+      'isDeleted',
+      'is-deleted',
+      'trashed',
+      'trash',
+      'inTrash',
+      'in-trash',
+      'archived',
+      'archived?',
+      'isArchived',
+      'is-archived',
+    ]
+
+    for (const key of flags) {
+      if (page[key] === true) {
+        return true
+      }
+    }
+
+    const properties = page.properties
+    if (properties && typeof properties === 'object') {
+      const record = properties as Record<string, unknown>
+      for (const key of flags) {
+        if (record[key] === true) {
+          return true
+        }
+        if (record[`:${key}`] === true) {
+          return true
+        }
+      }
+    }
+
+    return false
   }
 
   private async resolveCurrentPagePathOrWarn(): Promise<string[] | null> {

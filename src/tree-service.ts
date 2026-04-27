@@ -1,9 +1,10 @@
 import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
-import { findPropertyValue, normalizeFavoriteSeed, normalizeFavoriteSeeds, normalizeTitle, pageTitle, uniqueTitlesFromValues, unwrapPageRef } from './utils'
+import { findPropertyValue, normalizeFavoriteSeed, normalizeFavoriteSeeds, normalizeTitle, pageTitle, uniqueTitlesFromValues } from './utils'
 
 export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
   private childIndexPromise: Promise<void> | null = null
+  private allPageCache: { at: number; pages: PageEntity[] } | null = null
 
   hasChildIndex(): boolean {
     return this.childIndex !== null
@@ -12,12 +13,25 @@ export class FavoriteTreeTreeService {
   invalidateIndex(): void {
     this.childIndex = null
     this.childIndexPromise = null
+    this.allPageCache = null
   }
 
   async loadFavoriteRoots(): Promise<string[]> {
     const directFavorites = await logseq.App.getCurrentGraphFavorites()
     const configFavorites = await this.loadFavoritesFromConfigs()
     const favorites = [...normalizeFavoriteSeeds(directFavorites), ...normalizeFavoriteSeeds(configFavorites)]
+    const allPages = await this.getAllPagesCached()
+    const activePageTitleByKey = new Map<string, string>()
+    for (const page of allPages) {
+      if (isPageDeletedLike(page)) {
+        continue
+      }
+      const title = pageTitle(page)
+      const key = normalizeTitle(title)
+      if (title && key) {
+        activePageTitleByKey.set(key, title)
+      }
+    }
     const seen = new Set<string>()
     const resolved: string[] = []
 
@@ -28,17 +42,12 @@ export class FavoriteTreeTreeService {
         continue
       }
 
-      const page = await this.resolveFavoritePage(normalizedSeed)
-      const title = pageTitle(page)
+      const title = activePageTitleByKey.get(normalized)
       if (!title) {
         continue
       }
-      const titleKey = normalizeTitle(title)
-      if (!titleKey || seen.has(titleKey)) {
-        continue
-      }
 
-      seen.add(titleKey)
+      seen.add(normalized)
       resolved.push(title)
     }
 
@@ -105,36 +114,37 @@ export class FavoriteTreeTreeService {
     }
   }
 
-  private async resolveFavoritePage(seed: string): Promise<PageEntity | null> {
-    const direct = await logseq.Editor.getPage(seed)
-    if (direct) {
-      return direct
-    }
-
-    const unwrapped = unwrapPageRef(seed)
-    if (unwrapped !== seed) {
-      const fromRef = await logseq.Editor.getPage(unwrapped)
-      if (fromRef) {
-        return fromRef
+  private async buildChildIndex(propertyName: string): Promise<void> {
+    const allPages = await this.getAllPagesCached()
+    const index = new Map<string, string[]>()
+    const existingPageKeys = new Set<string>()
+    for (const page of allPages) {
+      if (isPageDeletedLike(page)) {
+        continue
+      }
+      const key = normalizeTitle(pageTitle(page))
+      if (key) {
+        existingPageKeys.add(key)
       }
     }
 
-    return null
-  }
-
-  private async buildChildIndex(propertyName: string): Promise<void> {
-    const allPages = (await logseq.Editor.getAllPages()) ?? []
-    const index = new Map<string, string[]>()
-
     for (const page of allPages) {
+      if (isPageDeletedLike(page)) {
+        continue
+      }
       const title = pageTitle(page)
       if (!title) {
         continue
       }
 
       for (const parentTitle of await this.resolveParentTitles(page, propertyName)) {
-        const parentKey = normalizeTitle(parentTitle)
-        if (!parentKey) {
+        const normalizedParentTitle = parentTitle.trim()
+        if (!normalizedParentTitle) {
+          continue
+        }
+
+        const parentKey = normalizeTitle(normalizedParentTitle)
+        if (!parentKey || !existingPageKeys.has(parentKey)) {
           continue
         }
 
@@ -151,6 +161,18 @@ export class FavoriteTreeTreeService {
     }
 
     this.childIndex = index
+  }
+
+  private async getAllPagesCached(): Promise<PageEntity[]> {
+    const now = Date.now()
+    const cached = this.allPageCache
+    if (cached && now - cached.at < 1500) {
+      return cached.pages
+    }
+
+    const pages = (await logseq.Editor.getAllPages()) ?? []
+    this.allPageCache = { at: now, pages }
+    return pages
   }
 
   private sortTitles(titles: string[]): string[] {
@@ -222,4 +244,42 @@ export class FavoriteTreeTreeService {
       this.collectPathsFromNode(child, targetKey, nextPath, matches)
     }
   }
+}
+
+function isPageDeletedLike(page: Record<string, unknown>): boolean {
+  const flags = [
+    'deleted',
+    'deleted?',
+    'isDeleted',
+    'is-deleted',
+    'trashed',
+    'trash',
+    'inTrash',
+    'in-trash',
+    'archived',
+    'archived?',
+    'isArchived',
+    'is-archived',
+  ]
+
+  for (const key of flags) {
+    if (page[key] === true) {
+      return true
+    }
+  }
+
+  const properties = page.properties
+  if (properties && typeof properties === 'object') {
+    const record = properties as Record<string, unknown>
+    for (const key of flags) {
+      if (record[key] === true) {
+        return true
+      }
+      if (record[`:${key}`] === true) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
