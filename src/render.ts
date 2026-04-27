@@ -22,6 +22,12 @@ type IconName =
   | 'dot'
   | 'grip'
   | 'info'
+  | 'search'
+  | 'locate'
+  | 'sidebar'
+  | 'floating'
+  | 'expand-tree'
+  | 'collapse-tree'
 
 export function renderIcon(name: IconName, className = 'ft-icon'): string {
   const attrs = `class="${className}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"`
@@ -139,7 +145,62 @@ export function renderIcon(name: IconName, className = 'ft-icon'): string {
           <path d="M12 11v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
         </svg>
       `
+    case 'search':
+      return `
+        <svg ${attrs}>
+          <circle cx="10.5" cy="10.5" r="5.75" stroke="currentColor" stroke-width="1.8"/>
+          <path d="m15 15 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'locate':
+      return `
+        <svg ${attrs}>
+          <circle cx="12" cy="12" r="4.25" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M12 4.5v2.25M12 17.25v2.25M19.5 12h-2.25M6.75 12H4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="1.15" fill="currentColor"/>
+        </svg>
+      `
+    case 'sidebar':
+      return `
+        <svg ${attrs}>
+          <rect x="4.75" y="5.25" width="14.5" height="13.5" rx="2.4" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M9 5.75v12.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 9.25h4.25M12 12h3.25M12 14.75h4.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'floating':
+      return `
+        <svg ${attrs}>
+          <rect x="5" y="6" width="11.5" height="8.75" rx="2.2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M14.5 14.5 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="18.25" cy="18.25" r="2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M7.75 8.75h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M7.75 11.25h4.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'expand-tree':
+      return `
+        <svg ${attrs}>
+          <path d="M7 6.75h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7 11.75h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7 16.75h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M16.25 7.5v4.5M14 9.75h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'collapse-tree':
+      return `
+        <svg ${attrs}>
+          <path d="M7 6.75h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7 11.75h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7 16.75h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M14 9.75h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      `
   }
+}
+
+export function renderTooltip(label: string, className = 'ft-ui-tooltip'): string {
+  return `<span class="${className}" role="tooltip">${escapeHtml(label)}</span>`
 }
 
 export function renderFavoriteTree(
@@ -171,6 +232,7 @@ export function renderFavoriteTree(
   const hasExpandedNodes = state.expandedKeys.size > 0
   const expandActionLabel = hasExpandedNodes ? i18n.t('collapseLabel') : i18n.t('expandLabel')
   const expandActionTitle = hasExpandedNodes ? i18n.t('collapseAllTitle') : i18n.t('expandAllTitle')
+  const expandActionIcon = hasExpandedNodes ? renderIcon('collapse-tree', 'ft-icon ft-icon--sm') : renderIcon('expand-tree', 'ft-icon ft-icon--sm')
   const controlsToggleLabel = state.controlsCollapsed
     ? renderIcon('panel-controls-open', 'ft-icon ft-icon--sm')
     : renderIcon('panel-controls-close', 'ft-icon ft-icon--sm')
@@ -190,27 +252,38 @@ export function renderFavoriteTree(
   const infoTooltip = i18n.t('infoTooltip', { property: state.hierarchyProperty })
   const searchMarkup = `
     <div class="favorite-tree__searchbar">
-      <input
-        class="favorite-tree__search-input"
-        data-role="search-input"
-        type="search"
-        value="${escapeHtml(state.searchQuery)}"
-        placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"
-        spellcheck="false"
-      />
+      <div class="favorite-tree__search-shell">
+        <span class="favorite-tree__search-icon">${renderIcon('search', 'ft-icon ft-icon--sm')}</span>
+        <input
+          class="favorite-tree__search-input"
+          data-role="search-input"
+          type="search"
+          value="${escapeHtml(state.searchQuery)}"
+          placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"
+          spellcheck="false"
+        />
+      </div>
     </div>
   `
   const toolbarMarkup = `
     <div class="favorite-tree__toolbar">
-      <button class="favorite-tree__text-btn" data-action="locate-current" title="${escapeHtml(i18n.t('locateTitle'))}">${escapeHtml(i18n.t('locateLabel'))}</button>
+      <button class="favorite-tree__text-btn has-tooltip" data-action="locate-current" aria-label="${escapeHtml(i18n.t('locateTitle'))}">
+        ${renderIcon('locate', 'ft-icon ft-icon--sm')}
+        ${escapeHtml(i18n.t('locateLabel'))}
+        ${renderTooltip(i18n.t('locateTitle'))}
+      </button>
       <button class="favorite-tree__text-btn" data-action="reset-panel-size" title="${escapeHtml(i18n.t('resetPanelSizeTitle'))}">${escapeHtml(i18n.t('resetPanelSizeLabel'))}</button>
-      <button class="favorite-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" title="${expandActionTitle}">${expandActionLabel}</button>
+      <button class="favorite-tree__text-btn has-tooltip ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" aria-label="${escapeHtml(expandActionTitle)}">
+        ${expandActionIcon}
+        ${escapeHtml(expandActionLabel)}
+        ${renderTooltip(expandActionTitle)}
+      </button>
       <button
-        class="favorite-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
+        class="favorite-tree__text-btn has-tooltip ${state.autoRefreshPaused ? 'is-active' : ''}"
         data-action="toggle-auto-refresh"
-        title="${autoRefreshActionLabel}"
+        aria-label="${escapeHtml(autoRefreshActionLabel)}"
         aria-pressed="${state.autoRefreshPaused ? 'true' : 'false'}"
-      >${autoRefreshActionIcon} ${escapeHtml(i18n.t('autoRefreshLabel'))}</button>
+      >${autoRefreshActionIcon} ${escapeHtml(i18n.t('autoRefreshLabel'))}${renderTooltip(autoRefreshActionLabel)}</button>
     </div>
   `
   const controlsMarkup = state.controlsCollapsed
@@ -239,25 +312,27 @@ export function renderFavoriteTree(
         <div class="favorite-tree__header-main">
           <div class="favorite-tree__title-row">
             <h1 class="favorite-tree__title">${escapeHtml(i18n.t('panelTitle'))}</h1>
+            <span class="favorite-tree__title-count">${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}</span>
             <span class="favorite-tree__info" data-no-drag="true" tabindex="0" role="button" aria-label="${escapeHtml(i18n.t('panelInfoAria'))}">
               <span class="favorite-tree__info-icon">${renderIcon('info', 'ft-icon ft-icon--sm')}</span>
-              <span class="favorite-tree__tooltip" role="tooltip">${escapeHtml(infoTooltip)}</span>
+              ${renderTooltip(infoTooltip)}
             </span>
           </div>
         </div>
         <div class="favorite-tree__actions">
-          ${state.canSwitchDisplayMode ? `<button class="favorite-tree__icon-btn" data-action="switch-display-mode" title="${escapeHtml(i18n.t('switchToSidebar'))}">${renderIcon('panel-controls-open')}</button>` : ''}
+          ${state.canSwitchDisplayMode
+            ? `<button class="favorite-tree__icon-btn has-tooltip" data-action="switch-display-mode" aria-label="${escapeHtml(i18n.t('switchToSidebar'))}">${renderIcon('sidebar')}${renderTooltip(i18n.t('switchToSidebar'))}</button>`
+            : ''}
           <button
-            class="favorite-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
+            class="favorite-tree__icon-btn has-tooltip ${state.controlsCollapsed ? 'is-active' : ''}"
             data-action="toggle-controls"
-            title="${controlsToggleTitle}"
             aria-label="${controlsToggleTitle}"
             aria-expanded="${state.controlsCollapsed ? 'false' : 'true'}"
-          >${controlsToggleLabel}</button>
-          <button class="favorite-tree__icon-btn" data-action="refresh" title="${escapeHtml(i18n.t('manualRefresh'))}">${renderIcon('refresh')}</button>
-          <button class="favorite-tree__icon-btn" data-action="collapse-to-bubble" title="${escapeHtml(i18n.t('collapseToBubble'))}">${renderIcon('panel-to-bubble')}</button>
-          <button class="favorite-tree__icon-btn" data-action="settings" title="${escapeHtml(i18n.t('openSettings'))}">${renderIcon('sliders')}</button>
-          <button class="favorite-tree__icon-btn" data-action="close" title="${escapeHtml(i18n.t('hidePlugin'))}">${renderIcon('close')}</button>
+          >${controlsToggleLabel}${renderTooltip(controlsToggleTitle)}</button>
+          <button class="favorite-tree__icon-btn has-tooltip" data-action="refresh" aria-label="${escapeHtml(i18n.t('manualRefresh'))}">${renderIcon('refresh')}${renderTooltip(i18n.t('manualRefresh'))}</button>
+          <button class="favorite-tree__icon-btn has-tooltip" data-action="collapse-to-bubble" aria-label="${escapeHtml(i18n.t('collapseToBubble'))}">${renderIcon('panel-to-bubble')}${renderTooltip(i18n.t('collapseToBubble'))}</button>
+          <button class="favorite-tree__icon-btn has-tooltip" data-action="settings" aria-label="${escapeHtml(i18n.t('openSettings'))}">${renderIcon('sliders')}${renderTooltip(i18n.t('openSettings'))}</button>
+          <button class="favorite-tree__icon-btn has-tooltip" data-action="close" aria-label="${escapeHtml(i18n.t('hidePlugin'))}">${renderIcon('close')}${renderTooltip(i18n.t('hidePlugin'))}</button>
         </div>
       </div>
       ${controlsMarkup}

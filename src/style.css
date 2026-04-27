@@ -54,6 +54,7 @@ code {
   border: 1px solid var(--ft-border);
   border-radius: 14px;
   overflow: hidden;
+  isolation: isolate;
   box-shadow: var(--ft-shadow);
 }
 
@@ -159,6 +160,8 @@ code {
 }
 
 .favorite-tree__header {
+  position: relative;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -193,6 +196,20 @@ code {
   pointer-events: none;
 }
 
+.favorite-tree__title-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
+  color: var(--ft-accent);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .favorite-tree__info {
   position: relative;
   display: inline-flex;
@@ -225,32 +242,35 @@ code {
   border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
 }
 
-.favorite-tree__tooltip {
+.ft-ui-tooltip {
   position: absolute;
-  left: 0;
+  left: 50%;
   top: calc(100% + 8px);
-  z-index: 3;
-  width: 220px;
-  padding: 8px 10px;
+  z-index: 8;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 24px));
+  padding: 7px 9px;
   border: 1px solid var(--ft-border);
-  border-radius: 10px;
+  border-radius: 9px;
   background: color-mix(in srgb, var(--ft-bg) 96%, var(--ft-bg-muted) 4%);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
-  color: var(--ft-text-muted);
+  color: var(--ft-text);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: normal;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity 120ms ease, transform 120ms ease;
+  transform: translate(-50%, -4px);
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.favorite-tree__info:hover .favorite-tree__tooltip,
-.favorite-tree__info:focus-within .favorite-tree__tooltip,
-.favorite-tree__info:focus .favorite-tree__tooltip {
+.favorite-tree__info:hover .ft-ui-tooltip,
+.favorite-tree__info:focus-within .ft-ui-tooltip,
+.favorite-tree__info:focus .ft-ui-tooltip,
+.has-tooltip:hover .ft-ui-tooltip,
+.has-tooltip:focus-visible .ft-ui-tooltip {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 
 .favorite-tree__subtitle {
@@ -271,29 +291,53 @@ code {
   align-items: center;
   gap: 6px;
   cursor: default;
+  overflow: visible;
 }
 
 .favorite-tree__controls {
+  position: relative;
+  z-index: 30;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
 .favorite-tree__searchbar {
+  position: relative;
+  z-index: 33;
   padding: 8px 10px 6px;
   border-bottom: 1px solid var(--ft-border);
   background: color-mix(in srgb, var(--ft-bg) 90%, var(--ft-bg-muted) 10%);
 }
 
+.favorite-tree__search-shell {
+  position: relative;
+}
+
+.favorite-tree__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--ft-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 .favorite-tree__search-input {
   width: 100%;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 10px 0 31px;
   border: 1px solid var(--ft-border);
   border-radius: 9px;
   outline: none;
   background: var(--ft-bg);
   color: var(--ft-text);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .favorite-tree__search-input:focus {
@@ -302,6 +346,8 @@ code {
 }
 
 .favorite-tree__breadcrumbs {
+  position: relative;
+  z-index: 32;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -341,6 +387,8 @@ code {
 }
 
 .favorite-tree__toolbar {
+  position: relative;
+  z-index: 31;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -353,6 +401,7 @@ code {
 }
 
 .favorite-tree__icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -363,6 +412,16 @@ code {
   background: var(--ft-bg);
   color: var(--ft-text);
   cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.favorite-tree__icon-btn.has-tooltip:hover,
+.favorite-tree__icon-btn.has-tooltip:focus-visible,
+.favorite-tree__text-btn.has-tooltip:hover,
+.favorite-tree__text-btn.has-tooltip:focus-visible,
+.favorite-tree__info:hover,
+.favorite-tree__info:focus-within {
+  z-index: 60;
 }
 
 .favorite-tree__icon-btn svg,
@@ -375,6 +434,7 @@ code {
 
 .favorite-tree__icon-btn:hover {
   background: var(--ft-bg-muted);
+  transform: translateY(-1px);
 }
 
 .favorite-tree__icon-btn.is-active {
@@ -383,7 +443,19 @@ code {
   background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
 }
 
+.favorite-tree__actions .favorite-tree__icon-btn .ft-ui-tooltip {
+  left: auto;
+  right: 0;
+  transform: translateY(-4px);
+}
+
+.favorite-tree__actions .favorite-tree__icon-btn.has-tooltip:hover .ft-ui-tooltip,
+.favorite-tree__actions .favorite-tree__icon-btn.has-tooltip:focus-visible .ft-ui-tooltip {
+  transform: translateY(0);
+}
+
 .favorite-tree__text-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -397,10 +469,12 @@ code {
   white-space: nowrap;
   cursor: pointer;
   font-size: 11px;
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .favorite-tree__text-btn:hover {
   background: var(--ft-bg-muted);
+  transform: translateY(-1px);
 }
 
 .favorite-tree__text-btn.is-active {
@@ -419,6 +493,8 @@ body.is-dragging * {
 }
 
 .favorite-tree__body {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -529,6 +605,7 @@ body.is-dragging * {
   color: var(--ft-text-muted);
   cursor: pointer;
   flex: 0 0 18px;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .tree-node__toggle:hover {
@@ -557,6 +634,7 @@ body.is-dragging * {
   cursor: grab;
   font-size: 10px;
   line-height: 1;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .tree-node__sort-handle:hover {
@@ -576,6 +654,11 @@ body.is-dragging * {
   text-align: left;
   color: inherit;
   cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.tree-node__row:hover .tree-node__title {
+  color: var(--ft-accent);
 }
 
 .tree-node__title-text {
@@ -629,6 +712,8 @@ body.is-dragging * {
 }
 
 .favorite-tree__footer {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;

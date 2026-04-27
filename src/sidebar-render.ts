@@ -1,5 +1,5 @@
 import type { FavoriteTreeI18n } from './i18n'
-import { renderIcon } from './render'
+import { renderIcon, renderTooltip } from './render'
 import type { TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
@@ -15,6 +15,9 @@ export function renderSidebarTree(
   const hasExpandedNodes = state.expandedKeys.size > 0
   const expandActionLabel = hasExpandedNodes ? i18n.t('collapseLabel') : i18n.t('expandLabel')
   const expandActionTitle = hasExpandedNodes ? i18n.t('collapseAllTitle') : i18n.t('expandAllTitle')
+  const expandActionIcon = hasExpandedNodes
+    ? renderIcon('collapse-tree', 'favorite-sidebar-tree__button-icon')
+    : renderIcon('expand-tree', 'favorite-sidebar-tree__button-icon')
   const controlsToggleTitle = state.controlsCollapsed ? i18n.t('expandControlsTitle') : i18n.t('collapseControlsTitle')
   const controlsToggleLabel = state.controlsCollapsed
     ? renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')
@@ -38,26 +41,29 @@ export function renderSidebarTree(
     : `
       <div class="favorite-sidebar-tree__controls">
         <div class="favorite-sidebar-tree__searchbar">
-          <input
-            class="favorite-sidebar-tree__search-input"
-            data-role="sidebar-search-input"
-            type="search"
-            value="${escapeHtml(state.searchQuery)}"
-            placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"
-            spellcheck="false"
-          />
+          <div class="favorite-sidebar-tree__search-shell">
+            <span class="favorite-sidebar-tree__search-icon">${renderIcon('search', 'favorite-sidebar-tree__icon')}</span>
+            <input
+              class="favorite-sidebar-tree__search-input"
+              data-role="sidebar-search-input"
+              type="search"
+              value="${escapeHtml(state.searchQuery)}"
+              placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"
+              spellcheck="false"
+            />
+          </div>
         </div>
         <div class="favorite-sidebar-tree__toolbar">
           <button
-            class="favorite-sidebar-tree__text-btn"
+            class="favorite-sidebar-tree__text-btn has-tooltip"
             data-on-click="sidebarTreeLocateCurrent"
-            title="${escapeHtml(i18n.t('locateTitle'))}"
-          >${escapeHtml(i18n.t('locateLabel'))}</button>
+            aria-label="${escapeHtml(i18n.t('locateTitle'))}"
+          >${renderIcon('locate', 'favorite-sidebar-tree__button-icon')}${escapeHtml(i18n.t('locateLabel'))}${renderTooltip(i18n.t('locateTitle'), 'favorite-sidebar-tree__tooltip')}</button>
           <button
-            class="favorite-sidebar-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}"
+            class="favorite-sidebar-tree__text-btn has-tooltip ${hasExpandedNodes ? 'is-active' : ''}"
             data-on-click="sidebarTreeToggleExpandAll"
-            title="${escapeHtml(expandActionTitle)}"
-          >${escapeHtml(expandActionLabel)}</button>
+            aria-label="${escapeHtml(expandActionTitle)}"
+          >${expandActionIcon}${escapeHtml(expandActionLabel)}${renderTooltip(expandActionTitle, 'favorite-sidebar-tree__tooltip')}</button>
         </div>
       </div>
     `
@@ -66,37 +72,36 @@ export function renderSidebarTree(
     <section class="favorite-sidebar-tree" data-favorite-sidebar-tree="true">
       <div class="favorite-sidebar-tree__header">
         <div class="favorite-sidebar-tree__header-main">
-          <span class="favorite-sidebar-tree__heading">${escapeHtml(i18n.t('panelTitle'))}</span>
+          <span class="favorite-sidebar-tree__heading-wrap">
+            <span class="favorite-sidebar-tree__heading-icon">${renderIcon('sidebar', 'favorite-sidebar-tree__icon')}</span>
+            <span class="favorite-sidebar-tree__heading">${escapeHtml(i18n.t('panelTitle'))}</span>
+          </span>
           <span class="favorite-sidebar-tree__count">${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}</span>
         </div>
         <div class="favorite-sidebar-tree__actions">
           <button
-            class="favorite-sidebar-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
+            class="favorite-sidebar-tree__icon-btn has-tooltip ${state.controlsCollapsed ? 'is-active' : ''}"
             data-on-click="sidebarTreeToggleControls"
-            title="${escapeHtml(controlsToggleTitle)}"
             aria-label="${escapeHtml(controlsToggleTitle)}"
             aria-expanded="${state.controlsCollapsed ? 'false' : 'true'}"
-          >${controlsToggleLabel}</button>
+          >${controlsToggleLabel}${renderTooltip(controlsToggleTitle, 'favorite-sidebar-tree__tooltip')}</button>
           <button
-            class="favorite-sidebar-tree__icon-btn"
+            class="favorite-sidebar-tree__icon-btn has-tooltip"
             data-on-click="sidebarTreeRefresh"
-            title="${escapeHtml(i18n.t('manualRefresh'))}"
             aria-label="${escapeHtml(i18n.t('manualRefresh'))}"
-          >${renderIcon('refresh', 'favorite-sidebar-tree__icon')}</button>
+          >${renderIcon('refresh', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('manualRefresh'), 'favorite-sidebar-tree__tooltip')}</button>
           <button
-            class="favorite-sidebar-tree__icon-btn"
+            class="favorite-sidebar-tree__icon-btn has-tooltip"
             data-on-click="sidebarTreeOpenSettings"
-            title="${escapeHtml(i18n.t('openSettings'))}"
             aria-label="${escapeHtml(i18n.t('openSettings'))}"
-          >${renderIcon('sliders', 'favorite-sidebar-tree__icon')}</button>
+          >${renderIcon('sliders', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('openSettings'), 'favorite-sidebar-tree__tooltip')}</button>
           ${state.canSwitchDisplayMode
             ? `
               <button
-                class="favorite-sidebar-tree__icon-btn"
+                class="favorite-sidebar-tree__icon-btn has-tooltip"
                 data-on-click="sidebarTreeShowFloating"
-                title="${escapeHtml(i18n.t('switchToFloating'))}"
                 aria-label="${escapeHtml(i18n.t('switchToFloating'))}"
-              >${renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')}</button>
+              >${renderIcon('floating', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('switchToFloating'), 'favorite-sidebar-tree__tooltip')}</button>
             `
             : ''}
         </div>
@@ -111,26 +116,49 @@ export function renderSidebarTree(
 
 export const SIDEBAR_TREE_HOST_STYLE = `
 .favorite-sidebar-tree {
-  margin: 8px 0 10px;
-  padding: 0 0 2px;
+  margin: 8px 0 12px;
+  padding: 0 0 4px;
+  position: relative;
+  isolation: isolate;
   color: var(--ls-primary-text-color, #1f2937);
 }
 
 .favorite-sidebar-tree__header {
+  position: relative;
+  z-index: 40;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 12px 6px;
+  padding: 4px 12px 8px;
   font-size: 12px;
   line-height: 1.35;
 }
 
 .favorite-sidebar-tree__header-main {
-  display: inline-flex;
-  align-items: baseline;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+}
+
+.favorite-sidebar-tree__heading-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.favorite-sidebar-tree__heading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 10%, transparent 90%);
+  color: var(--ls-link-text-color, #2563eb);
 }
 
 .favorite-sidebar-tree__heading {
@@ -138,7 +166,14 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 .favorite-sidebar-tree__count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ls-tertiary-background-color, #f5f7fb);
   color: var(--ls-secondary-text-color, #6b7280);
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -148,50 +183,85 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 4px;
+  overflow: visible;
 }
 
 .favorite-sidebar-tree__icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: 0;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
   color: var(--ls-secondary-text-color, #6b7280);
   cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.favorite-sidebar-tree__icon-btn.has-tooltip:hover,
+.favorite-sidebar-tree__icon-btn.has-tooltip:focus-visible,
+.favorite-sidebar-tree__text-btn.has-tooltip:hover,
+.favorite-sidebar-tree__text-btn.has-tooltip:focus-visible {
+  z-index: 60;
 }
 
 .favorite-sidebar-tree__icon-btn:hover {
   background: var(--ls-tertiary-background-color, #f5f7fb);
   color: var(--ls-primary-text-color, #1f2937);
+  transform: translateY(-1px);
 }
 
 .favorite-sidebar-tree__icon-btn.is-active {
   background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 10%, transparent 90%);
   color: var(--ls-link-text-color, #2563eb);
+  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 24%, transparent 76%);
 }
 
 .favorite-sidebar-tree__controls {
+  position: relative;
+  z-index: 30;
   padding: 0 12px 8px;
 }
 
 .favorite-sidebar-tree__searchbar {
+  position: relative;
+  z-index: 33;
   margin-bottom: 8px;
+}
+
+.favorite-sidebar-tree__search-shell {
+  position: relative;
+}
+
+.favorite-sidebar-tree__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--ls-secondary-text-color, #6b7280);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .favorite-sidebar-tree__search-input {
   width: 100%;
   min-height: 28px;
-  padding: 0 10px;
+  padding: 0 10px 0 31px;
   border: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 72%, transparent 28%);
   border-radius: 8px;
   background: var(--ls-primary-background-color, #ffffff);
   color: var(--ls-primary-text-color, #1f2937);
   font-size: 12px;
   line-height: 1.4;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .favorite-sidebar-tree__search-input::placeholder {
@@ -205,6 +275,8 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 .favorite-sidebar-tree__toolbar {
+  position: relative;
+  z-index: 32;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -212,6 +284,7 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 .favorite-sidebar-tree__text-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -224,10 +297,12 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   font-size: 12px;
   line-height: 1.2;
   cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 
 .favorite-sidebar-tree__text-btn:hover {
   color: var(--ls-primary-text-color, #1f2937);
+  transform: translateY(-1px);
 }
 
 .favorite-sidebar-tree__text-btn.is-active {
@@ -239,7 +314,56 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   height: 14px;
 }
 
+.favorite-sidebar-tree__button-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.favorite-sidebar-tree__tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  z-index: 12;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 80%, transparent 20%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ls-primary-background-color, #ffffff) 96%, var(--ls-tertiary-background-color, #f5f7fb) 4%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  color: var(--ls-primary-text-color, #1f2937);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.favorite-sidebar-tree__icon-btn.has-tooltip:hover .favorite-sidebar-tree__tooltip,
+.favorite-sidebar-tree__icon-btn.has-tooltip:focus-visible .favorite-sidebar-tree__tooltip,
+.favorite-sidebar-tree__text-btn.has-tooltip:hover .favorite-sidebar-tree__tooltip,
+.favorite-sidebar-tree__text-btn.has-tooltip:focus-visible .favorite-sidebar-tree__tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.favorite-sidebar-tree__actions .favorite-sidebar-tree__icon-btn .favorite-sidebar-tree__tooltip {
+  left: auto;
+  right: 0;
+  transform: translateY(-4px);
+}
+
+.favorite-sidebar-tree__actions .favorite-sidebar-tree__icon-btn.has-tooltip:hover .favorite-sidebar-tree__tooltip,
+.favorite-sidebar-tree__actions .favorite-sidebar-tree__icon-btn.has-tooltip:focus-visible .favorite-sidebar-tree__tooltip {
+  transform: translateY(0);
+}
+
 .favorite-sidebar-tree__body {
+  position: relative;
+  z-index: 1;
   font-size: 13px;
 }
 
@@ -265,6 +389,7 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   min-height: 28px;
   padding: 2px 12px 2px 4px;
   border-radius: 6px;
+  transition: background-color 120ms ease;
 }
 
 .favorite-sidebar-tree__row:hover {
@@ -288,6 +413,7 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   background: transparent;
   color: var(--ls-secondary-text-color, #6b7280);
   cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .favorite-sidebar-tree__toggle:hover {
@@ -323,6 +449,7 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   color: inherit;
   cursor: pointer;
   text-align: left;
+  transition: color 120ms ease;
 }
 
 .favorite-sidebar-tree__title-text {
