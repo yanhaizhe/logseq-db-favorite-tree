@@ -346,6 +346,27 @@ code {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ft-accent) 12%, transparent 88%);
 }
 
+.favorite-tree__search-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.favorite-tree__search-nav-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--ft-border);
+  border-radius: 999px;
+  background: var(--ft-bg);
+  color: var(--ft-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .favorite-tree__breadcrumbs {
   position: relative;
   z-index: 32;
@@ -581,6 +602,12 @@ body.is-dragging * {
   background: color-mix(in srgb, var(--ft-accent) 12%, var(--ft-bg) 88%);
 }
 
+.tree-node__row.is-search-match-current {
+  border-left-color: color-mix(in srgb, var(--ft-accent) 78%, var(--ft-border) 22%);
+  background: color-mix(in srgb, var(--ft-accent) 15%, var(--ft-bg) 85%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ft-accent) 34%, var(--ft-border) 66%);
+}
+
 .tree-node__row.is-located:not(.is-current) {
   border-left-color: color-mix(in srgb, var(--ft-accent) 60%, var(--ft-border) 40%);
   background: color-mix(in srgb, var(--ft-accent) 7%, var(--ft-bg) 93%);
@@ -752,6 +779,12 @@ body.is-dragging * {
 .tree-node__badge.tree-node__badge--sort {
   color: var(--ft-accent);
   border-color: color-mix(in srgb, var(--ft-accent) 35%, var(--ft-border) 65%);
+}
+
+.tree-node__badge.tree-node__badge--active-match {
+  color: var(--ft-accent);
+  border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
+  background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
 }
 
 .tree-node__children {

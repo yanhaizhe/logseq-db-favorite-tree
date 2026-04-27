@@ -279,6 +279,26 @@ export function renderFavoriteTree(
           spellcheck="false"
         />
       </div>
+      ${isSearching && state.searchMatchCount > 0
+        ? `
+          <div class="favorite-tree__search-nav">
+            <button class="favorite-tree__text-btn has-tooltip" data-action="search-prev-match" aria-label="${escapeHtml(i18n.t('searchPrevMatch'))}">
+              ${escapeHtml(i18n.t('searchPrevMatch'))}
+              ${renderTooltip(i18n.t('searchPrevMatch'))}
+            </button>
+            <span class="favorite-tree__search-nav-count">${escapeHtml(
+              i18n.t('searchMatchPosition', {
+                current: state.currentSearchMatchNumber,
+                total: state.searchMatchCount,
+              }),
+            )}</span>
+            <button class="favorite-tree__text-btn has-tooltip" data-action="search-next-match" aria-label="${escapeHtml(i18n.t('searchNextMatch'))}">
+              ${escapeHtml(i18n.t('searchNextMatch'))}
+              ${renderTooltip(i18n.t('searchNextMatch'))}
+            </button>
+          </div>
+        `
+        : ''}
     </div>
   `
   const toolbarMarkup = `
@@ -450,6 +470,7 @@ function renderNode(
   const isCurrent = key === normalizeTitle(state.currentPageName)
   const isLocated = key === state.lastLocatedNodeKey
   const isFlashing = key === state.flashLocatedNodeKey
+  const isActiveSearchMatch = key === state.currentSearchMatchKey
   const isExpanded = state.expandedKeys.has(key)
   const loadState = state.loadStates.get(key) ?? 'idle'
   const children = accessors.getChildrenFor(title)
@@ -464,6 +485,7 @@ function renderNode(
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
   const childSortControls = renderSortModeControlsForParent(state, key, i18n)
+  const isSelfSearchMatch = isSearching && key.includes(normalizedQuery)
   const sortHandleMarkup = isSearching
     ? '<span class="tree-node__sort-placeholder"></span>'
     : `
@@ -502,7 +524,7 @@ function renderNode(
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
       <div
-        class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''}"
+        class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}"
         style="--depth:${depth}"
         data-sort-item-id="${escapeHtml(sortItemId)}"
         data-sort-parent-key="${escapeHtml(sortParentKey)}"
@@ -524,7 +546,7 @@ function renderNode(
           ${renderTooltip(i18n.t('openInRightSidebar', { title }))}
         </button>
         ${childSortControls}
-        <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSearching && key.includes(normalizedQuery) ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>
+        <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSelfSearchMatch ? `<span class="tree-node__badge ${isActiveSearchMatch ? 'tree-node__badge--active-match' : ''}">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>
       </div>
       ${statusHint}
       ${childrenMarkup}

@@ -45,6 +45,8 @@ async function main(): Promise<void> {
     onCollapseOtherBranches: () => {
       void plugin.collapseOtherBranches()
     },
+    onFocusPreviousSearchMatch: plugin.focusPreviousSearchMatch,
+    onFocusNextSearchMatch: plugin.focusNextSearchMatch,
     onOpenSettings: plugin.openSettings,
     onCollapseToBubble: () => {
       void plugin.collapseToBubble()

@@ -13,6 +13,8 @@ export type FavoriteTreeDOMHandlers = {
   onLocateCurrent: () => void
   onFocusCurrentPath: () => void
   onCollapseOtherBranches: () => void
+  onFocusPreviousSearchMatch: () => void
+  onFocusNextSearchMatch: () => void
   onOpenSettings: () => void
   onCollapseToBubble: () => void
   onExpandPanel: () => void
@@ -162,6 +164,14 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
     if (action === 'collapse-other-branches') {
       handlers.onCollapseOtherBranches()
+      return
+    }
+    if (action === 'search-prev-match') {
+      handlers.onFocusPreviousSearchMatch()
+      return
+    }
+    if (action === 'search-next-match') {
+      handlers.onFocusNextSearchMatch()
       return
     }
     if (action === 'settings') {

@@ -61,6 +61,9 @@ type Messages = {
   resetPanelSizeTitle: TranslationValue
   autoRefreshLabel: TranslationValue
   searchIndexing: TranslationValue
+  searchPrevMatch: TranslationValue
+  searchNextMatch: TranslationValue
+  searchMatchPosition: TranslationValue
   loadingFavorites: TranslationValue
   noMatches: TranslationValue
   noMatchesTitle: TranslationValue
@@ -178,6 +181,9 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     resetPanelSizeTitle: 'Restore the default panel size',
     autoRefreshLabel: 'Auto refresh',
     searchIndexing: 'Building search index...',
+    searchPrevMatch: 'Previous match',
+    searchNextMatch: 'Next match',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: 'Loading favorite tree...',
     noMatches: 'No matching pages. Try a shorter keyword.',
     noMatchesTitle: 'No search results',
@@ -793,6 +799,9 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     resetPanelSizeTitle: '恢复面板默认宽高',
     autoRefreshLabel: '自动刷新',
     searchIndexing: '正在建立搜索索引...',
+    searchPrevMatch: '上一条命中',
+    searchNextMatch: '下一条命中',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: '正在加载收藏树...',
     noMatches: '没有匹配的页面，试试更短的关键词。',
     noMatchesTitle: '没有搜索结果',
@@ -896,6 +905,9 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     resetPanelSizeTitle: '恢復面板預設寬高',
     autoRefreshLabel: '自動重新整理',
     searchIndexing: '正在建立搜尋索引...',
+    searchPrevMatch: '上一筆命中',
+    searchNextMatch: '下一筆命中',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: '正在載入收藏樹...',
     noMatches: '找不到匹配頁面，試試更短的關鍵字。',
     noMatchesTitle: '沒有搜尋結果',

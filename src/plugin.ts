@@ -42,6 +42,8 @@ export class FavoriteTreePlugin {
   private searching = false
   private searchQuery = ''
   private searchError: string | null = null
+  private activeSearchMatchKey: string | null = null
+  private searchMatchKeys: string[] = []
   private currentPageName: string | null = null
   private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
@@ -297,6 +299,7 @@ export class FavoriteTreePlugin {
     if (!nextQuery) {
       this.searching = false
       this.searchError = null
+      this.clearSearchMatchState()
       this.render()
       return
     }
@@ -313,7 +316,9 @@ export class FavoriteTreePlugin {
 
       this.searching = false
       this.searchError = null
+      this.syncSearchMatchState(true)
       this.render()
+      this.scrollActiveSearchMatchIntoView()
     } catch (error) {
       if (this.searchQuery !== nextQuery) {
         return
@@ -321,6 +326,7 @@ export class FavoriteTreePlugin {
 
       this.searching = false
       this.searchError = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      this.clearSearchMatchState()
       this.render()
     }
   }
@@ -340,6 +346,7 @@ export class FavoriteTreePlugin {
           this.searchCollapsedKeys.add(key)
         }
       }
+      this.syncSearchMatchState()
       this.render()
       return
     }
@@ -402,6 +409,14 @@ export class FavoriteTreePlugin {
     this.render()
   }
 
+  focusPreviousSearchMatch = (): void => {
+    this.moveActiveSearchMatch(-1)
+  }
+
+  focusNextSearchMatch = (): void => {
+    this.moveActiveSearchMatch(1)
+  }
+
   onNodeToggle = async (nodeKey: string): Promise<void> => {
     if (this.searchQuery) {
       if (this.searchCollapsedKeys.has(nodeKey)) {
@@ -409,6 +424,7 @@ export class FavoriteTreePlugin {
       } else {
         this.searchCollapsedKeys.add(nodeKey)
       }
+      this.syncSearchMatchState()
       this.render()
       return
     }
@@ -478,6 +494,9 @@ export class FavoriteTreePlugin {
       ...this.sortModes,
       [key]: nextMode,
     }
+    if (this.searchQuery) {
+      this.syncSearchMatchState()
+    }
     this.persistInternalState()
     this.render()
   }
@@ -497,6 +516,9 @@ export class FavoriteTreePlugin {
     const { [key]: _removedMode, ...remainingModes } = this.sortModes
     this.sortOrders = remainingOrders
     this.sortModes = remainingModes
+    if (this.searchQuery) {
+      this.syncSearchMatchState()
+    }
     this.persistInternalState()
     this.render()
   }
@@ -750,6 +772,9 @@ export class FavoriteTreePlugin {
       loadStates: this.loadStates,
       loadErrors: this.loadErrors,
       searchError: this.searchError,
+      currentSearchMatchKey: this.activeSearchMatchKey,
+      currentSearchMatchNumber: this.getCurrentSearchMatchNumber(),
+      searchMatchCount: this.searchMatchKeys.length,
       currentPageName: this.currentPageName,
       currentPagePath: this.currentPagePath,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
@@ -851,9 +876,7 @@ export class FavoriteTreePlugin {
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        const selector = `[data-node-key="${escapeSelectorValue(nodeKey)}"]`
-        const element = this.root.querySelector<HTMLElement>(selector)
-        element?.scrollIntoView({
+        this.findRenderedNodeElement(nodeKey)?.scrollIntoView({
           block: 'center',
           behavior: 'smooth',
         })
@@ -986,6 +1009,12 @@ export class FavoriteTreePlugin {
       },
       sidebarTreeCollapseOtherBranches: () => {
         void this.collapseOtherBranches()
+      },
+      sidebarTreeFocusPreviousSearchMatch: () => {
+        this.focusPreviousSearchMatch()
+      },
+      sidebarTreeFocusNextSearchMatch: () => {
+        this.focusNextSearchMatch()
       },
       sidebarTreeResetPanelSize: () => {
         this.resetPanelSize()
@@ -1215,6 +1244,7 @@ export class FavoriteTreePlugin {
     this.searchQuery = ''
     this.searching = false
     this.searchError = null
+    this.clearSearchMatchState()
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
     this.sortDragItem = null
@@ -1310,6 +1340,7 @@ export class FavoriteTreePlugin {
       this.currentPagePath = []
       this.searching = false
       this.searchError = null
+      this.clearSearchMatchState()
       return
     }
 
@@ -1322,6 +1353,7 @@ export class FavoriteTreePlugin {
     this.syncExpandedLoadState()
     await this.syncCurrentPagePath()
     this.searching = false
+    this.syncSearchMatchState()
   }
 
   private syncExpandedLoadState(): void {
@@ -1380,6 +1412,124 @@ export class FavoriteTreePlugin {
     }
 
     this.persistInternalState()
+  }
+
+  private clearSearchMatchState(): void {
+    this.activeSearchMatchKey = null
+    this.searchMatchKeys = []
+  }
+
+  private syncSearchMatchState(preferFirstMatch = false): void {
+    const nextMatchKeys = this.collectVisibleSearchMatchKeys()
+    this.searchMatchKeys = nextMatchKeys
+
+    if (!nextMatchKeys.length) {
+      this.activeSearchMatchKey = null
+      return
+    }
+
+    if (this.activeSearchMatchKey && nextMatchKeys.includes(this.activeSearchMatchKey) && !preferFirstMatch) {
+      return
+    }
+
+    this.activeSearchMatchKey = nextMatchKeys[0]
+  }
+
+  private collectVisibleSearchMatchKeys(): string[] {
+    const normalizedQuery = normalizeTitle(this.searchQuery)
+    if (!normalizedQuery) {
+      return []
+    }
+
+    const matchKeys: string[] = []
+    for (const title of this.rootFavorites) {
+      this.collectVisibleSearchMatchKeysForNode(title, normalizedQuery, [], false, matchKeys)
+    }
+    return matchKeys
+  }
+
+  private collectVisibleSearchMatchKeysForNode(
+    title: string,
+    normalizedQuery: string,
+    ancestors: string[],
+    hiddenByCollapsedAncestor: boolean,
+    matchKeys: string[],
+  ): boolean {
+    const key = normalizeTitle(title)
+    if (!key || ancestors.includes(key)) {
+      return false
+    }
+
+    const selfMatches = key.includes(normalizedQuery)
+    if (selfMatches && !hiddenByCollapsedAncestor) {
+      matchKeys.push(key)
+    }
+
+    const nextAncestors = [...ancestors, key]
+    const hideChildren = hiddenByCollapsedAncestor || this.searchCollapsedKeys.has(key)
+    let descendantMatches = false
+    for (const childTitle of this.getOrderedChildrenFor(title)) {
+      descendantMatches =
+        this.collectVisibleSearchMatchKeysForNode(childTitle, normalizedQuery, nextAncestors, hideChildren, matchKeys) ||
+        descendantMatches
+    }
+
+    return selfMatches || descendantMatches
+  }
+
+  private getCurrentSearchMatchNumber(): number {
+    if (!this.activeSearchMatchKey) {
+      return 0
+    }
+
+    const index = this.searchMatchKeys.indexOf(this.activeSearchMatchKey)
+    return index >= 0 ? index + 1 : 0
+  }
+
+  private moveActiveSearchMatch(step: -1 | 1): void {
+    if (!this.searchQuery) {
+      return
+    }
+
+    this.syncSearchMatchState()
+    if (!this.searchMatchKeys.length) {
+      return
+    }
+
+    const currentIndex = this.activeSearchMatchKey ? this.searchMatchKeys.indexOf(this.activeSearchMatchKey) : -1
+    const baseIndex = currentIndex >= 0 ? currentIndex : 0
+    const nextIndex = (baseIndex + step + this.searchMatchKeys.length) % this.searchMatchKeys.length
+    this.activeSearchMatchKey = this.searchMatchKeys[nextIndex]
+    this.render()
+    this.scrollActiveSearchMatchIntoView()
+  }
+
+  private scrollActiveSearchMatchIntoView(): void {
+    const nodeKey = this.activeSearchMatchKey
+    if (!nodeKey) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        this.findRenderedNodeElement(nodeKey)?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        })
+      })
+    })
+  }
+
+  private findRenderedNodeElement(nodeKey: string): HTMLElement | null {
+    const selector = `[data-node-key="${escapeSelectorValue(nodeKey)}"]`
+    if (this.displayMode === 'sidebar') {
+      return this.getHostDocument().querySelector<HTMLElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+    }
+
+    return (
+      this.root.querySelector<HTMLElement>(selector) ??
+      this.getHostDocument().querySelector<HTMLElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+    )
   }
 
   private getOrderedChildrenFor(parentTitle: string): string[] {

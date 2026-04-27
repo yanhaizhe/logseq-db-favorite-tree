@@ -116,6 +116,9 @@ export type TreeStateSnapshot = {
   loadStates: Map<string, LoadState>
   loadErrors: Map<string, string>
   searchError: string | null
+  currentSearchMatchKey: string | null
+  currentSearchMatchNumber: number
+  searchMatchCount: number
   currentPageName: string | null
   currentPagePath: string[]
   lastLocatedNodeKey: string | null

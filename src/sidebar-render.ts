@@ -94,6 +94,28 @@ export function renderSidebarTree(
               spellcheck="false"
             />
           </div>
+          ${isSearching && state.searchMatchCount > 0
+            ? `
+              <div class="favorite-sidebar-tree__search-nav">
+                <button
+                  class="favorite-sidebar-tree__text-btn has-tooltip"
+                  data-on-click="sidebarTreeFocusPreviousSearchMatch"
+                  aria-label="${escapeHtml(i18n.t('searchPrevMatch'))}"
+                >${escapeHtml(i18n.t('searchPrevMatch'))}${renderTooltip(i18n.t('searchPrevMatch'), 'favorite-sidebar-tree__tooltip')}</button>
+                <span class="favorite-sidebar-tree__search-nav-count">${escapeHtml(
+                  i18n.t('searchMatchPosition', {
+                    current: state.currentSearchMatchNumber,
+                    total: state.searchMatchCount,
+                  }),
+                )}</span>
+                <button
+                  class="favorite-sidebar-tree__text-btn has-tooltip"
+                  data-on-click="sidebarTreeFocusNextSearchMatch"
+                  aria-label="${escapeHtml(i18n.t('searchNextMatch'))}"
+                >${escapeHtml(i18n.t('searchNextMatch'))}${renderTooltip(i18n.t('searchNextMatch'), 'favorite-sidebar-tree__tooltip')}</button>
+              </div>
+            `
+            : ''}
         </div>
         <div class="favorite-sidebar-tree__toolbar">
           <button
@@ -342,6 +364,26 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ls-link-text-color, #2563eb) 12%, transparent 88%);
 }
 
+.favorite-sidebar-tree__search-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.favorite-sidebar-tree__search-nav-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ls-tertiary-background-color, #f5f7fb);
+  color: var(--ls-secondary-text-color, #6b7280);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .favorite-sidebar-tree__toolbar {
   position: relative;
   z-index: 32;
@@ -466,6 +508,11 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 
 .favorite-sidebar-tree__row.is-current {
   background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 9%, transparent 91%);
+}
+
+.favorite-sidebar-tree__row.is-search-match-current {
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 14%, transparent 86%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ls-link-text-color, #2563eb) 34%, transparent 66%);
 }
 
 .favorite-sidebar-tree__toggle {
@@ -717,6 +764,7 @@ function renderSidebarNode(
 ): string {
   const key = normalizeTitle(title)
   const isCurrent = key === normalizeTitle(state.currentPageName)
+  const isActiveSearchMatch = key === state.currentSearchMatchKey
   const children = accessors.getChildrenFor(title)
   const isSearching = normalizedQuery.length > 0
   const visibleChildren = isSearching
@@ -769,7 +817,7 @@ function renderSidebarNode(
 
   return `
     <div class="favorite-sidebar-tree__node ${depth > 0 ? 'favorite-sidebar-tree__node--child' : ''}" data-node-key="${escapeHtml(key)}" data-is-last="${isLast ? 'true' : 'false'}">
-      <div class="favorite-sidebar-tree__row ${isCurrent ? 'is-current' : ''}">
+      <div class="favorite-sidebar-tree__row ${isCurrent ? 'is-current' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}">
         ${toggleMarkup}
         <button
           class="favorite-sidebar-tree__title"
@@ -779,6 +827,9 @@ function renderSidebarNode(
         >
           <span class="favorite-sidebar-tree__title-text">${renderSidebarHighlightedTitle(title, normalizedQuery)}</span>
           ${isCurrent ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}
+          ${isSearching && key.includes(normalizedQuery)
+            ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeMatch'))}</span>`
+            : ''}
         </button>
         <button
           class="favorite-sidebar-tree__inline-action has-tooltip"
