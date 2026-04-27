@@ -506,36 +506,6 @@ body.is-dragging * {
   scrollbar-color: var(--ft-scrollbar-thumb) transparent;
 }
 
-.favorite-tree__body.is-sort-dragging {
-  background:
-    linear-gradient(to bottom, color-mix(in srgb, var(--ft-accent) 3%, transparent 97%), transparent 56px),
-    var(--ft-bg);
-}
-
-.favorite-tree__drag-feedback {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  min-height: 26px;
-  margin: 0 2px 6px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--ft-accent) 24%, var(--ft-border) 76%);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--ft-accent) 8%, var(--ft-bg) 92%);
-  color: var(--ft-accent);
-  font-size: 11px;
-  line-height: 1.4;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-}
-
-.favorite-tree__drag-feedback.is-invalid {
-  border-color: color-mix(in srgb, var(--ft-danger) 25%, var(--ft-border) 75%);
-  background: color-mix(in srgb, var(--ft-danger) 8%, var(--ft-bg) 92%);
-  color: var(--ft-danger);
-}
-
 .favorite-tree__body::-webkit-scrollbar,
 .favorite-tree__toolbar::-webkit-scrollbar,
 .favorite-tree__breadcrumbs::-webkit-scrollbar {
@@ -600,21 +570,6 @@ body.is-dragging * {
 
 .tree-node__row.is-sort-after {
   box-shadow: inset 0 -2px 0 var(--ft-accent);
-}
-
-.tree-node__row.is-sort-source,
-.tree-node__row.is-sort-dragging {
-  background: color-mix(in srgb, var(--ft-accent) 8%, var(--ft-bg) 92%);
-  opacity: 0.78;
-}
-
-.tree-node__row.is-sort-target {
-  background: color-mix(in srgb, var(--ft-accent) 6%, var(--ft-bg) 94%);
-}
-
-.tree-node__row.is-sort-invalid {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ft-danger) 38%, transparent 62%);
-  background: color-mix(in srgb, var(--ft-danger) 6%, var(--ft-bg) 94%);
 }
 
 .tree-node__row:hover {
@@ -685,12 +640,6 @@ body.is-dragging * {
 
 .tree-node__sort-handle:hover {
   background: color-mix(in srgb, var(--ft-border) 35%, transparent 65%);
-}
-
-.tree-node__row.is-sort-source .tree-node__sort-handle,
-.tree-node__row.is-sort-dragging .tree-node__sort-handle {
-  color: var(--ft-accent);
-  background: color-mix(in srgb, var(--ft-accent) 10%, transparent 90%);
 }
 
 .tree-node__sort-handle:active {

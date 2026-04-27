@@ -14,7 +14,6 @@ import type {
   PluginSettings,
   RefreshReason,
   SortDropTarget,
-  SortFeedbackState,
   SortMode,
   SortModeMap,
   SortOrderMap,
@@ -55,7 +54,6 @@ export class FavoriteTreePlugin {
   private flashLocatedNodeKey: string | null = null
   private suppressBubbleClick = false
   private sortDragItem: SortableItem | null = null
-  private sortFeedback: SortFeedbackState | null = null
   private readonly expandedKeys = new Set<string>()
   private readonly searchCollapsedKeys = new Set<string>()
   private readonly loadedKeys = new Set<string>()
@@ -481,75 +479,16 @@ export class FavoriteTreePlugin {
       return
     }
     this.sortDragItem = item
-    this.sortFeedback = {
-      itemId: item.itemId,
-      parentKey: item.parentKey,
-      targetItemId: null,
-      targetParentKey: null,
-      placement: null,
-      kind: 'idle',
-    }
-    this.render()
   }
 
   moveSortDropTarget = (target: SortDropTarget): boolean => {
     if (!this.sortDragItem || this.searchQuery) {
-      this.sortFeedback = null
       return false
     }
-
     if (target.parentKey !== this.sortDragItem.parentKey) {
-      this.sortFeedback = {
-        itemId: this.sortDragItem.itemId,
-        parentKey: this.sortDragItem.parentKey,
-        targetItemId: target.itemId,
-        targetParentKey: target.parentKey,
-        placement: target.placement,
-        kind: 'invalid-level',
-      }
-      this.render()
       return false
     }
-
-    if (target.itemId === this.sortDragItem.itemId) {
-      this.sortFeedback = {
-        itemId: this.sortDragItem.itemId,
-        parentKey: this.sortDragItem.parentKey,
-        targetItemId: target.itemId,
-        targetParentKey: target.parentKey,
-        placement: target.placement,
-        kind: 'invalid-self',
-      }
-      this.render()
-      return false
-    }
-
-    this.sortFeedback = {
-      itemId: this.sortDragItem.itemId,
-      parentKey: this.sortDragItem.parentKey,
-      targetItemId: target.itemId,
-      targetParentKey: target.parentKey,
-      placement: target.placement,
-      kind: target.placement === 'after' ? 'after' : 'before',
-    }
-    this.render()
-    return true
-  }
-
-  clearSortDropTarget = (): void => {
-    if (!this.sortDragItem) {
-      return
-    }
-
-    this.sortFeedback = {
-      itemId: this.sortDragItem.itemId,
-      parentKey: this.sortDragItem.parentKey,
-      targetItemId: null,
-      targetParentKey: null,
-      placement: null,
-      kind: 'idle',
-    }
-    this.render()
+    return target.itemId !== this.sortDragItem.itemId
   }
 
   finishSortDrop = (target: SortDropTarget): boolean => {
@@ -782,8 +721,6 @@ export class FavoriteTreePlugin {
       rootFavorites: this.getOrderedTitlesForParent(ROOT_SORT_KEY),
       sortOrders: this.sortOrders,
       sortModes: this.sortModes,
-      sortDragItem: this.sortDragItem,
-      sortFeedback: this.sortFeedback,
       expandedKeys: this.expandedKeys,
       searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,
@@ -1227,7 +1164,6 @@ export class FavoriteTreePlugin {
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
     this.sortDragItem = null
-    this.sortFeedback = null
 
     this.expandedKeys.clear()
     this.loadedKeys.clear()
@@ -1438,8 +1374,6 @@ export class FavoriteTreePlugin {
 
   private clearSortDrag(): void {
     this.sortDragItem = null
-    this.sortFeedback = null
-    this.render()
   }
 
   private getLastRefreshLabel(): string {
