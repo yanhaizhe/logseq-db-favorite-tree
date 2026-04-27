@@ -90,6 +90,8 @@ type Messages = {
   sortStateCustomSaved: TranslationValue
   toggleNode: TranslationValue
   openPage: TranslationValue
+  openInRightSidebar: TranslationValue
+  openInRightSidebarFailed: TranslationValue
   badgeCurrent: TranslationValue
   badgeLocated: TranslationValue
   badgeMatch: TranslationValue
@@ -203,6 +205,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: 'Custom order saved',
     toggleNode: 'Expand or collapse',
     openPage: ({ title }) => `Open page ${title}`,
+    openInRightSidebar: ({ title }) => `Open ${title} in the right sidebar`,
+    openInRightSidebarFailed: ({ title }) => `Failed to open ${title} in the right sidebar.`,
     badgeCurrent: 'Current',
     badgeLocated: 'Located',
     badgeMatch: 'Match',
@@ -810,6 +814,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: '已保存自定义排序',
     toggleNode: '展开或折叠',
     openPage: ({ title }) => `打开页面 ${title}`,
+    openInRightSidebar: ({ title }) => `在右侧边栏打开 ${title}`,
+    openInRightSidebarFailed: ({ title }) => `无法在右侧边栏打开 ${title}。`,
     badgeCurrent: '当前页',
     badgeLocated: '定位',
     badgeMatch: '匹配',
@@ -907,6 +913,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: '已儲存自訂排序',
     toggleNode: '展開或摺疊',
     openPage: ({ title }) => `開啟頁面 ${title}`,
+    openInRightSidebar: ({ title }) => `在右側邊欄開啟 ${title}`,
+    openInRightSidebarFailed: ({ title }) => `無法在右側邊欄開啟 ${title}。`,
     badgeCurrent: '目前頁',
     badgeLocated: '定位',
     badgeMatch: '匹配',

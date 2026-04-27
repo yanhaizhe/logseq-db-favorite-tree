@@ -521,6 +521,30 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   color: var(--ls-link-text-color, #2563eb);
 }
 
+.favorite-sidebar-tree__inline-action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ls-secondary-text-color, #6b7280);
+  cursor: pointer;
+  flex: 0 0 22px;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.favorite-sidebar-tree__inline-action:hover,
+.favorite-sidebar-tree__inline-action:focus-visible {
+  color: var(--ls-link-text-color, #2563eb);
+  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 24%, transparent 76%);
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 8%, transparent 92%);
+}
+
 .favorite-sidebar-tree__highlight {
   background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 16%, transparent 84%);
   color: inherit;
@@ -746,6 +770,12 @@ function renderSidebarNode(
           <span class="favorite-sidebar-tree__title-text">${renderSidebarHighlightedTitle(title, normalizedQuery)}</span>
           ${isCurrent ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}
         </button>
+        <button
+          class="favorite-sidebar-tree__inline-action has-tooltip"
+          data-on-click="sidebarTreeOpenPageInSidebar"
+          data-page="${escapeHtml(title)}"
+          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
+        >${renderIcon('right-sidebar', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('openInRightSidebar', { title }), 'favorite-sidebar-tree__tooltip')}</button>
         ${renderSidebarSortModeControls(state, key, i18n)}
       </div>
       ${childrenMarkup}
@@ -797,6 +827,12 @@ function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI1
           <span class="favorite-sidebar-tree__title-text">${renderSidebarHighlightedTitle(title, normalizedQuery)}</span>
           ${isCycle ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCycle'))}</span>` : ''}
         </button>
+        <button
+          class="favorite-sidebar-tree__inline-action has-tooltip"
+          data-on-click="sidebarTreeOpenPageInSidebar"
+          data-page="${escapeHtml(title)}"
+          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
+        >${renderIcon('right-sidebar', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('openInRightSidebar', { title }), 'favorite-sidebar-tree__tooltip')}</button>
       </div>
     </div>
   `

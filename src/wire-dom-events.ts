@@ -17,6 +17,7 @@ export type FavoriteTreeDOMHandlers = {
   onClose: () => void
   onToggleNode: (key: string) => void
   onOpenPage: (page: string) => void
+  onOpenPageInSidebar: (page: string) => void
   onToggleSortMode: (parentKey: string) => void
   onClearCustomSort: (parentKey: string) => void
   onStartSortDrag: (item: SortableItem) => void
@@ -183,6 +184,13 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       const page = target.dataset.page
       if (page) {
         handlers.onOpenPage(page)
+      }
+      return
+    }
+    if (action === 'open-page-in-sidebar') {
+      const page = target.dataset.page
+      if (page) {
+        handlers.onOpenPageInSidebar(page)
       }
       return
     }

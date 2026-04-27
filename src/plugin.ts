@@ -454,6 +454,21 @@ export class FavoriteTreePlugin {
     logseq.App.pushState('page', { name: pageName })
   }
 
+  openPageInRightSidebar = async (pageName: string): Promise<void> => {
+    try {
+      const page = await logseq.Editor.getPage(pageName)
+      const pageId = page?.uuid ?? page?.id
+      if (!pageId) {
+        logseq.UI.showMsg(this.i18n.t('openInRightSidebarFailed', { title: pageName }), 'warning')
+        return
+      }
+
+      logseq.Editor.openInRightSidebar(pageId)
+    } catch {
+      logseq.UI.showMsg(this.i18n.t('openInRightSidebarFailed', { title: pageName }), 'warning')
+    }
+  }
+
   toggleSortModeForParent = (parentKey: string): void => {
     const key = this.normalizeSortParentKey(parentKey)
     if (!key || !this.hasCustomSortOrder(key)) {
@@ -931,6 +946,12 @@ export class FavoriteTreePlugin {
         const page = event.dataset?.page
         if (page) {
           this.openPage(page)
+        }
+      },
+      sidebarTreeOpenPageInSidebar: (event: { dataset?: Record<string, string> }) => {
+        const page = event.dataset?.page
+        if (page) {
+          void this.openPageInRightSidebar(page)
         }
       },
       sidebarTreeToggleSortMode: (event: { dataset?: Record<string, string> }) => {

@@ -32,6 +32,7 @@ type IconName =
   | 'search'
   | 'locate'
   | 'sidebar'
+  | 'right-sidebar'
   | 'floating'
   | 'expand-tree'
   | 'collapse-tree'
@@ -173,6 +174,14 @@ export function renderIcon(name: IconName, className = 'ft-icon'): string {
           <rect x="4.75" y="5.25" width="14.5" height="13.5" rx="2.4" stroke="currentColor" stroke-width="1.6"/>
           <path d="M9 5.75v12.5" stroke="currentColor" stroke-width="1.6"/>
           <path d="M12 9.25h4.25M12 12h3.25M12 14.75h4.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'right-sidebar':
+      return `
+        <svg ${attrs}>
+          <rect x="4.75" y="5.25" width="14.5" height="13.5" rx="2.4" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M15 5.75v12.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M7.75 9.25H12M7.75 12h3.25M7.75 14.75H12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
       `
     case 'floating':
@@ -487,6 +496,16 @@ function renderNode(
         ${sortHandleMarkup}
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
+        </button>
+        <button
+          class="tree-node__inline-action has-tooltip"
+          data-action="open-page-in-sidebar"
+          data-page="${escapeHtml(title)}"
+          data-no-drag="true"
+          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
+        >
+          ${renderIcon('right-sidebar', 'ft-icon ft-icon--xs')}
+          ${renderTooltip(i18n.t('openInRightSidebar', { title }))}
         </button>
         ${childSortControls}
         <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSearching && key.includes(normalizedQuery) ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>

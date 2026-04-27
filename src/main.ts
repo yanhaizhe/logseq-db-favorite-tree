@@ -51,6 +51,9 @@ async function main(): Promise<void> {
       void plugin.onNodeToggle(key)
     },
     onOpenPage: plugin.openPage,
+    onOpenPageInSidebar: (page) => {
+      void plugin.openPageInRightSidebar(page)
+    },
     onToggleSortMode: plugin.toggleSortModeForParent,
     onClearCustomSort: plugin.clearCustomSortForParent,
     onStartSortDrag: plugin.startSortDrag,
