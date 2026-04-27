@@ -6,7 +6,7 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-04-27
+## [1.1.1] - 2026-04-27
 
 ### Added
 
