@@ -12,13 +12,6 @@ export function renderSidebarTree(
   accessors: SidebarTreeRenderAccessors,
   i18n: FavoriteTreeI18n,
 ): string {
-  const autoRefreshActionLabel = state.autoRefreshPaused ? i18n.t('resumeAutoRefresh') : i18n.t('pauseAutoRefresh')
-  const autoRefreshActionIcon = state.autoRefreshPaused
-    ? renderIcon('play', 'favorite-sidebar-tree__icon favorite-sidebar-tree__icon--sm')
-    : renderIcon('pause', 'favorite-sidebar-tree__icon favorite-sidebar-tree__icon--sm')
-  const autoRefreshState = state.autoRefreshPaused
-    ? i18n.t('autoRefreshPaused')
-    : i18n.t('autoRefreshEverySeconds', { seconds: state.pollIntervalSeconds })
   const hasExpandedNodes = state.expandedKeys.size > 0
   const expandActionLabel = hasExpandedNodes ? i18n.t('collapseLabel') : i18n.t('expandLabel')
   const expandActionTitle = hasExpandedNodes ? i18n.t('collapseAllTitle') : i18n.t('expandAllTitle')
@@ -61,25 +54,10 @@ export function renderSidebarTree(
             title="${escapeHtml(i18n.t('locateTitle'))}"
           >${escapeHtml(i18n.t('locateLabel'))}</button>
           <button
-            class="favorite-sidebar-tree__text-btn"
-            data-on-click="sidebarTreeResetPanelSize"
-            title="${escapeHtml(i18n.t('resetPanelSizeTitle'))}"
-          >${escapeHtml(i18n.t('resetPanelSizeLabel'))}</button>
-          <button
             class="favorite-sidebar-tree__text-btn ${hasExpandedNodes ? 'is-active' : ''}"
             data-on-click="sidebarTreeToggleExpandAll"
             title="${escapeHtml(expandActionTitle)}"
           >${escapeHtml(expandActionLabel)}</button>
-          <button
-            class="favorite-sidebar-tree__text-btn ${state.autoRefreshPaused ? 'is-active' : ''}"
-            data-on-click="sidebarTreeToggleAutoRefresh"
-            title="${escapeHtml(autoRefreshActionLabel)}"
-            aria-pressed="${state.autoRefreshPaused ? 'true' : 'false'}"
-          >${autoRefreshActionIcon}${escapeHtml(i18n.t('autoRefreshLabel'))}</button>
-        </div>
-        <div class="favorite-sidebar-tree__meta">
-          <span>${escapeHtml(state.lastRefreshLabel)}</span>
-          <span>${state.refreshing ? escapeHtml(i18n.t('refreshing')) : `${escapeHtml(autoRefreshState)} · ${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}`}</span>
         </div>
       </div>
     `
@@ -92,12 +70,6 @@ export function renderSidebarTree(
           <span class="favorite-sidebar-tree__count">${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}</span>
         </div>
         <div class="favorite-sidebar-tree__actions">
-          <button
-            class="favorite-sidebar-tree__icon-btn"
-            data-on-click="sidebarTreeShowFloating"
-            title="${escapeHtml(i18n.t('switchToFloating'))}"
-            aria-label="${escapeHtml(i18n.t('switchToFloating'))}"
-          >${renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')}</button>
           <button
             class="favorite-sidebar-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
             data-on-click="sidebarTreeToggleControls"
@@ -113,22 +85,16 @@ export function renderSidebarTree(
           >${renderIcon('refresh', 'favorite-sidebar-tree__icon')}</button>
           <button
             class="favorite-sidebar-tree__icon-btn"
-            data-on-click="sidebarTreeCollapseToBubble"
-            title="${escapeHtml(i18n.t('collapseToBubble'))}"
-            aria-label="${escapeHtml(i18n.t('collapseToBubble'))}"
-          >${renderIcon('panel-to-bubble', 'favorite-sidebar-tree__icon')}</button>
-          <button
-            class="favorite-sidebar-tree__icon-btn"
             data-on-click="sidebarTreeOpenSettings"
             title="${escapeHtml(i18n.t('openSettings'))}"
             aria-label="${escapeHtml(i18n.t('openSettings'))}"
           >${renderIcon('sliders', 'favorite-sidebar-tree__icon')}</button>
           <button
             class="favorite-sidebar-tree__icon-btn"
-            data-on-click="sidebarTreeClose"
-            title="${escapeHtml(i18n.t('hidePlugin'))}"
-            aria-label="${escapeHtml(i18n.t('hidePlugin'))}"
-          >${renderIcon('close', 'favorite-sidebar-tree__icon')}</button>
+            data-on-click="sidebarTreeShowFloating"
+            title="${escapeHtml(i18n.t('switchToFloating'))}"
+            aria-label="${escapeHtml(i18n.t('switchToFloating'))}"
+          >${renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')}</button>
         </div>
       </div>
       ${controlsMarkup}
@@ -264,24 +230,9 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   color: var(--ls-link-text-color, #2563eb);
 }
 
-.favorite-sidebar-tree__meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 6px;
-  color: var(--ls-secondary-text-color, #6b7280);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
 .favorite-sidebar-tree__icon {
   width: 14px;
   height: 14px;
-}
-
-.favorite-sidebar-tree__icon--sm {
-  width: 12px;
-  height: 12px;
 }
 
 .favorite-sidebar-tree__body {
