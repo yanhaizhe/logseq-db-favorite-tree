@@ -15,6 +15,7 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 - Display mode preset setting with `sidebar`, `floating`, and `mixed`
 - Search keyword highlighting in both floating panel and native sidebar
 - Graph-scoped persistence for display mode, controls state, sorting, expanded nodes, and layout
+- Resizable floating panel with drag handle and default-size restore
 - Refreshed icons and tooltip hints for action buttons
 
 ### Changed

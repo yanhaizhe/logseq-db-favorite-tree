@@ -64,6 +64,7 @@ code {
   bottom: 0;
   width: 18px;
   height: 18px;
+  z-index: 5;
   cursor: nwse-resize;
   touch-action: none;
 }
@@ -718,7 +719,7 @@ body.is-dragging * {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 10px 8px;
+  padding: 6px 26px 8px 10px;
   border-top: 1px solid var(--ft-border);
   background: color-mix(in srgb, var(--ft-bg) 84%, var(--ft-bg-muted) 16%);
   font-size: 10px;
