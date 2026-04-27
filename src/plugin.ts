@@ -62,9 +62,12 @@ export class FavoriteTreePlugin {
   private flashTimerId: number | null = null
   private localeWatchTimerId: number | null = null
   private sidebarRenderVersion = 0
+  private sidebarTreePath: string | null = null
+  private sidebarTreeTemplate = ''
   private lastRefreshAt: number | null = null
   private lastRefreshReason: RefreshReason | null = null
   private lastRefreshError: string | null = null
+  private destroyed = false
   private offHooks: Array<() => void> = []
   private i18n: FavoriteTreeI18n
 
@@ -91,6 +94,10 @@ export class FavoriteTreePlugin {
     window.addEventListener('focus', this.handleWindowFocus)
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.addEventListener('input', this.handleSidebarSearchInput)
+    logseq.provideStyle({
+      key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
+      style: SIDEBAR_TREE_HOST_STYLE,
+    })
 
     this.render()
     this.applyMainUIState()
@@ -107,8 +114,9 @@ export class FavoriteTreePlugin {
   }
 
   destroy(): void {
+    this.destroyed = true
+    this.sidebarRenderVersion += 1
     this.persistInternalState()
-    this.clearSidebarTreeUI()
     this.layout.destroy()
     const hostDocument = this.getHostDocument()
     if (this.refreshTimerId !== null) {
@@ -900,6 +908,10 @@ export class FavoriteTreePlugin {
   }
 
   private async renderSidebarTreeUI(): Promise<void> {
+    if (this.destroyed) {
+      return
+    }
+
     if (this.displayMode !== 'sidebar') {
       this.clearSidebarTreeUI()
       return
@@ -912,13 +924,8 @@ export class FavoriteTreePlugin {
     const shouldRestoreSidebarSearchFocus = activeSidebarSearch !== null
     const selectionStart = activeSidebarSearch?.selectionStart ?? this.searchQuery.length
     const selectionEnd = activeSidebarSearch?.selectionEnd ?? this.searchQuery.length
-    logseq.provideStyle({
-      key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
-      style: SIDEBAR_TREE_HOST_STYLE,
-    })
-
     const path = await this.resolveSidebarTreePath()
-    if (!path || renderVersion !== this.sidebarRenderVersion) {
+    if (!path || renderVersion !== this.sidebarRenderVersion || this.destroyed) {
       return
     }
 
@@ -930,12 +937,22 @@ export class FavoriteTreePlugin {
       this.i18n,
     )
 
+    if (this.sidebarTreePath && this.sidebarTreePath !== path) {
+      this.clearSidebarTreeUI(this.sidebarTreePath)
+    }
+
+    if (this.sidebarTreePath === path && this.sidebarTreeTemplate === template) {
+      return
+    }
+
     logseq.provideUI({
       key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
       path,
       reset: true,
       template,
     })
+    this.sidebarTreePath = path
+    this.sidebarTreeTemplate = template
 
     if (shouldRestoreSidebarSearchFocus) {
       window.requestAnimationFrame(() => {
@@ -950,8 +967,17 @@ export class FavoriteTreePlugin {
     }
   }
 
-  private clearSidebarTreeUI(): void {
-    for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
+  private clearSidebarTreeUI(targetPath?: string): void {
+    const paths = targetPath ? [targetPath] : this.sidebarTreePath ? [this.sidebarTreePath] : []
+    this.sidebarRenderVersion += 1
+    this.sidebarTreePath = null
+    this.sidebarTreeTemplate = ''
+
+    for (const path of paths) {
+      if (!this.hasSidebarTarget(path)) {
+        continue
+      }
+
       logseq.provideUI({
         key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
         path,
@@ -963,6 +989,10 @@ export class FavoriteTreePlugin {
 
   private async resolveSidebarTreePath(): Promise<string | null> {
     for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
+      if (!this.hasSidebarTarget(path)) {
+        continue
+      }
+
       const rect = await logseq.UI.queryElementRect(path)
       if (rect) {
         return path
@@ -970,6 +1000,14 @@ export class FavoriteTreePlugin {
     }
 
     return null
+  }
+
+  private hasSidebarTarget(path: string): boolean {
+    try {
+      return Boolean(this.getHostDocument().querySelector(path))
+    } catch {
+      return false
+    }
   }
 
   private getHostDocument(): Document {
