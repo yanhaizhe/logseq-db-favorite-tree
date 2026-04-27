@@ -7,6 +7,13 @@ type TreeRenderAccessors = {
   getChildrenFor: (title: string) => string[]
 }
 
+type StatusTone = 'info' | 'warning' | 'error'
+
+type StatusAction = {
+  action: 'refresh' | 'settings'
+  label: string
+}
+
 type IconName =
   | 'bubble'
   | 'play'
@@ -317,16 +324,52 @@ export function renderFavoriteTree(
         ${toolbarMarkup}
       </div>
     `
-
+  const noticeMarkup = renderPanelNotice(state, i18n)
   const bodyMarkup = state.searching && isSearching
-    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('searchIndexing'))}</div>`
+    ? renderStatusCard({
+        title: i18n.t('searchIndexing'),
+      })
+    : state.searchError && isSearching
+    ? renderStatusCard({
+        tone: 'error',
+        title: i18n.t('searchFailedTitle'),
+        description: i18n.t('searchFailedBody', { message: state.searchError }),
+        hint: i18n.t('searchFailedHint'),
+        actions: [
+          { action: 'refresh', label: i18n.t('manualRefresh') },
+          { action: 'settings', label: i18n.t('openSettings') },
+        ],
+      })
     : state.refreshing && !state.rootFavorites.length
-    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('loadingFavorites'))}</div>`
+    ? renderStatusCard({
+        title: i18n.t('loadingFavorites'),
+      })
     : isSearching && !visibleRoots.length
-    ? `<div class="favorite-tree__status">${escapeHtml(i18n.t('noMatches'))}</div>`
+    ? renderStatusCard({
+        title: i18n.t('noMatchesTitle'),
+        description: i18n.t('noMatches'),
+        hint: i18n.t('noMatchesHint'),
+      })
     : state.rootFavorites.length
-    ? rootMarkup
-    : `<div class="favorite-tree__status">${escapeHtml(i18n.t('noFavorites'))}</div>`
+    ? `${noticeMarkup}${rootMarkup}`
+    : state.lastRefreshError
+    ? renderStatusCard({
+        tone: 'error',
+        title: i18n.t('refreshFailedTitle'),
+        description: i18n.t('refreshFailed', { message: state.lastRefreshError }),
+        hint: i18n.t('refreshFailedHint'),
+        actions: [
+          { action: 'refresh', label: i18n.t('manualRefresh') },
+          { action: 'settings', label: i18n.t('openSettings') },
+        ],
+      })
+    : renderStatusCard({
+        tone: 'warning',
+        title: i18n.t('noFavoritesTitle'),
+        description: i18n.t('noFavorites'),
+        hint: i18n.t('noFavoritesHint'),
+        actions: [{ action: 'refresh', label: i18n.t('manualRefresh') }],
+      })
 
   return `
     <div class="favorite-tree">
@@ -483,6 +526,69 @@ function renderSortModeControls(parentKey: string, mode: SortMode, i18n: Favorit
         title="${escapeHtml(i18n.t('clearCustomSort'))}"
       >${escapeHtml(i18n.t('clearCustomSort'))}</button>
     </span>
+  `
+}
+
+function renderPanelNotice(state: TreeStateSnapshot, i18n: FavoriteTreeI18n): string {
+  if (state.searchQuery || state.refreshing || !state.rootFavorites.length) {
+    return ''
+  }
+
+  if (state.lastRefreshError) {
+    return renderStatusCard({
+      tone: 'error',
+      title: i18n.t('refreshFailedTitle'),
+      description: i18n.t('refreshFailed', { message: state.lastRefreshError }),
+      hint: i18n.t('refreshFailedHint'),
+      actions: [
+        { action: 'refresh', label: i18n.t('manualRefresh') },
+        { action: 'settings', label: i18n.t('openSettings') },
+      ],
+    })
+  }
+
+  if (!state.hasHierarchyRelations) {
+    return renderStatusCard({
+      tone: 'warning',
+      title: i18n.t('noHierarchyTitle'),
+      description: i18n.t('noHierarchyBody', { property: state.hierarchyProperty }),
+      hint: i18n.t('noHierarchyHint'),
+      actions: [
+        { action: 'settings', label: i18n.t('openSettings') },
+        { action: 'refresh', label: i18n.t('manualRefresh') },
+      ],
+    })
+  }
+
+  return ''
+}
+
+function renderStatusCard(options: {
+  title: string
+  description?: string
+  hint?: string
+  tone?: StatusTone
+  actions?: StatusAction[]
+}): string {
+  const toneClass = options.tone && options.tone !== 'info' ? ` favorite-tree__status--${options.tone}` : ''
+  const descriptionMarkup = options.description ? `<div class="favorite-tree__status-body">${escapeHtml(options.description)}</div>` : ''
+  const hintMarkup = options.hint ? `<div class="favorite-tree__status-hint">${escapeHtml(options.hint)}</div>` : ''
+  const actionsMarkup = options.actions?.length
+    ? `<div class="favorite-tree__status-actions">${options.actions
+        .map(
+          (action) =>
+            `<button class="favorite-tree__text-btn" data-action="${action.action}">${escapeHtml(action.label)}</button>`,
+        )
+        .join('')}</div>`
+    : ''
+
+  return `
+    <div class="favorite-tree__status${toneClass}">
+      <div class="favorite-tree__status-title">${escapeHtml(options.title)}</div>
+      ${descriptionMarkup}
+      ${hintMarkup}
+      ${actionsMarkup}
+    </div>
   `
 }
 

@@ -59,7 +59,14 @@ type Messages = {
   searchIndexing: TranslationValue
   loadingFavorites: TranslationValue
   noMatches: TranslationValue
+  noMatchesTitle: TranslationValue
+  noMatchesHint: TranslationValue
   noFavorites: TranslationValue
+  noFavoritesTitle: TranslationValue
+  noFavoritesHint: TranslationValue
+  noHierarchyTitle: TranslationValue
+  noHierarchyBody: TranslationValue
+  noHierarchyHint: TranslationValue
   panelHeaderTitle: TranslationValue
   panelTitle: TranslationValue
   panelInfoAria: TranslationValue
@@ -90,12 +97,17 @@ type Messages = {
   cycleHint: TranslationValue
   loadingChildren: TranslationValue
   loadChildrenFailed: TranslationValue
+  searchFailedTitle: TranslationValue
+  searchFailedBody: TranslationValue
+  searchFailedHint: TranslationValue
   noDirectChildren: TranslationValue
   currentPageNotInTree: TranslationValue
   notRefreshedYet: TranslationValue
   locateNoCurrentPage: TranslationValue
   locatePageNotInTree: TranslationValue
   refreshFailed: TranslationValue
+  refreshFailedTitle: TranslationValue
+  refreshFailedHint: TranslationValue
   refreshToastFailed: TranslationValue
   refreshReasonStartup: TranslationValue
   refreshReasonPanelOpen: TranslationValue
@@ -158,8 +170,16 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchIndexing: 'Building search index...',
     loadingFavorites: 'Loading favorite tree...',
     noMatches: 'No matching pages. Try a shorter keyword.',
+    noMatchesTitle: 'No search results',
+    noMatchesHint: 'Try a shorter keyword, check spelling, or refresh after the graph updates.',
     noFavorites:
       'There are no favorite pages yet. Add pages to Logseq favorites first so the plugin can use them as tree roots.',
+    noFavoritesTitle: 'No favorite roots yet',
+    noFavoritesHint: 'Add one or more pages to Logseq favorites, then refresh here if the list does not update immediately.',
+    noHierarchyTitle: 'Favorite roots found, but no hierarchy yet',
+    noHierarchyBody: ({ property }) =>
+      `Favorite roots are loaded, but no child pages were found through the "${property}" property.`,
+    noHierarchyHint: 'Add parent-child relations with the configured property, or change the hierarchy property in settings.',
     panelHeaderTitle: 'Drag to move, double-click to collapse into a bubble',
     panelTitle: 'Favorite Tree',
     panelInfoAria: 'Show info',
@@ -190,12 +210,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: 'Cycle detected. Recursion stops here.',
     loadingChildren: 'Loading child pages from property relations on first expansion...',
     loadChildrenFailed: 'Failed to load child pages',
+    searchFailedTitle: 'Search is temporarily unavailable',
+    searchFailedBody: ({ message }) => `The tree index could not be built: ${message}`,
+    searchFailedHint: 'Refresh the tree or verify the hierarchy property setting, then try the search again.',
     noDirectChildren: 'No direct child pages found.',
     currentPageNotInTree: 'The current page is not in the favorite tree',
     notRefreshedYet: 'Not refreshed yet',
     locateNoCurrentPage: 'There is no current page to locate.',
     locatePageNotInTree: 'The current page is not in the favorite tree.',
     refreshFailed: ({ message }) => `Refresh failed: ${message}`,
+    refreshFailedTitle: 'Failed to load the favorite tree',
+    refreshFailedHint: 'Try refreshing again. If the issue persists, check graph data and the hierarchy property setting.',
     refreshToastFailed: ({ message }) => `DB Favorite Tree refresh failed: ${message}`,
     refreshReasonStartup: 'Startup',
     refreshReasonPanelOpen: 'Panel opened',
@@ -754,7 +779,14 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchIndexing: '正在建立搜索索引...',
     loadingFavorites: '正在加载收藏树...',
     noMatches: '没有匹配的页面，试试更短的关键词。',
+    noMatchesTitle: '没有搜索结果',
+    noMatchesHint: '可以尝试更短的关键词、检查拼写，或在图谱更新后重新刷新。',
     noFavorites: '当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。',
+    noFavoritesTitle: '还没有收藏树根节点',
+    noFavoritesHint: '先把一个或多个页面加入 Logseq 收藏夹；如果没有立即显示，再点一次手动刷新。',
+    noHierarchyTitle: '已识别收藏根节点，但还没有层级关系',
+    noHierarchyBody: ({ property }) => `当前已加载收藏根节点，但没有通过属性 “${property}” 找到任何子节点。`,
+    noHierarchyHint: '请先为页面补充父子属性关系，或到设置里改成你实际使用的层级属性名。',
     panelHeaderTitle: '拖动可移动，双击可收回为悬浮球',
     panelTitle: '收藏夹树',
     panelInfoAria: '查看说明',
@@ -785,12 +817,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: '检测到循环引用，已停止继续向下递归。',
     loadingChildren: '首次展开时正在按属性关系加载子节点...',
     loadChildrenFailed: '子节点加载失败',
+    searchFailedTitle: '搜索暂时不可用',
+    searchFailedBody: ({ message }) => `搜索索引构建失败：${message}`,
+    searchFailedHint: '可以先手动刷新，或检查层级属性设置后再重试搜索。',
     noDirectChildren: '未发现直接子页面。',
     currentPageNotInTree: '当前页不在收藏树中',
     notRefreshedYet: '尚未刷新',
     locateNoCurrentPage: '当前没有可定位的页面。',
     locatePageNotInTree: '当前页不在收藏树中。',
     refreshFailed: ({ message }) => `刷新失败: ${message}`,
+    refreshFailedTitle: '收藏树加载失败',
+    refreshFailedHint: '请先重试刷新；如果仍失败，再检查图谱数据和层级属性设置。',
     refreshToastFailed: ({ message }) => `DB Favorite Tree 刷新失败: ${message}`,
     refreshReasonStartup: '启动初始化',
     refreshReasonPanelOpen: '打开面板',
@@ -839,7 +876,14 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchIndexing: '正在建立搜尋索引...',
     loadingFavorites: '正在載入收藏樹...',
     noMatches: '找不到匹配頁面，試試更短的關鍵字。',
+    noMatchesTitle: '沒有搜尋結果',
+    noMatchesHint: '可以嘗試更短的關鍵字、檢查拼寫，或在圖譜更新後重新整理。',
     noFavorites: '目前沒有收藏頁面。請先把頁面加入 Logseq 收藏夾，外掛才會把它們作為樹根顯示。',
+    noFavoritesTitle: '還沒有收藏樹根節點',
+    noFavoritesHint: '先把一個或多個頁面加入 Logseq 收藏夾；如果沒有立即顯示，再點一次手動重新整理。',
+    noHierarchyTitle: '已識別收藏根節點，但還沒有層級關係',
+    noHierarchyBody: ({ property }) => `目前已載入收藏根節點，但沒有透過屬性「${property}」找到任何子節點。`,
+    noHierarchyHint: '請先為頁面補充父子屬性關係，或到設定裡改成你實際使用的層級屬性名稱。',
     panelHeaderTitle: '拖曳可移動，雙擊可收回為浮動球',
     panelTitle: '收藏樹',
     panelInfoAria: '查看說明',
@@ -870,12 +914,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: '偵測到循環引用，已停止繼續向下遞迴。',
     loadingChildren: '首次展開時正在依屬性關係載入子節點...',
     loadChildrenFailed: '子節點載入失敗',
+    searchFailedTitle: '搜尋暫時不可用',
+    searchFailedBody: ({ message }) => `搜尋索引建立失敗：${message}`,
+    searchFailedHint: '可以先手動重新整理，或檢查層級屬性設定後再重試搜尋。',
     noDirectChildren: '未發現直接子頁面。',
     currentPageNotInTree: '目前頁面不在收藏樹中',
     notRefreshedYet: '尚未重新整理',
     locateNoCurrentPage: '目前沒有可定位的頁面。',
     locatePageNotInTree: '目前頁不在收藏樹中。',
     refreshFailed: ({ message }) => `重新整理失敗: ${message}`,
+    refreshFailedTitle: '收藏樹載入失敗',
+    refreshFailedHint: '請先重試重新整理；如果仍失敗，再檢查圖譜資料和層級屬性設定。',
     refreshToastFailed: ({ message }) => `DB Favorite Tree 重新整理失敗: ${message}`,
     refreshReasonStartup: '啟動初始化',
     refreshReasonPanelOpen: '開啟面板',

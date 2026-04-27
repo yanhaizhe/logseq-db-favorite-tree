@@ -7,6 +7,13 @@ type SidebarTreeRenderAccessors = {
   getChildrenFor: (title: string) => string[]
 }
 
+type SidebarStatusTone = 'info' | 'warning' | 'error'
+
+type SidebarStatusAction = {
+  action: string
+  label: string
+}
+
 export function renderSidebarTree(
   state: TreeStateSnapshot,
   accessors: SidebarTreeRenderAccessors,
@@ -27,15 +34,50 @@ export function renderSidebarTree(
   const visibleRoots = isSearching
     ? state.rootFavorites.filter((title) => isSidebarNodeVisible(title, normalizedQuery, accessors, []))
     : state.rootFavorites
+  const noticeMarkup = renderSidebarNotice(state, i18n)
   const content = state.searching && isSearching
-    ? `<div class="favorite-sidebar-tree__empty">${escapeHtml(i18n.t('searchIndexing'))}</div>`
+    ? renderSidebarStatusCard({ title: i18n.t('searchIndexing') })
+    : state.searchError && isSearching
+    ? renderSidebarStatusCard({
+        tone: 'error',
+        title: i18n.t('searchFailedTitle'),
+        description: i18n.t('searchFailedBody', { message: state.searchError }),
+        hint: i18n.t('searchFailedHint'),
+        actions: [
+          { action: 'sidebarTreeRefresh', label: i18n.t('manualRefresh') },
+          { action: 'sidebarTreeOpenSettings', label: i18n.t('openSettings') },
+        ],
+      })
     : isSearching && !visibleRoots.length
-    ? `<div class="favorite-sidebar-tree__empty">${escapeHtml(i18n.t('noMatches'))}</div>`
+    ? renderSidebarStatusCard({
+        title: i18n.t('noMatchesTitle'),
+        description: i18n.t('noMatches'),
+        hint: i18n.t('noMatchesHint'),
+      })
     : state.rootFavorites.length > 0
-    ? visibleRoots
-      .map((title, index) => renderSidebarNode(title, 0, [], index === visibleRoots.length - 1, state, accessors, i18n, normalizedQuery))
-      .join('')
-    : `<div class="favorite-sidebar-tree__empty">${escapeHtml(state.refreshing ? i18n.t('loadingFavorites') : i18n.t('noFavorites'))}</div>`
+    ? `${noticeMarkup}${visibleRoots
+        .map((title, index) => renderSidebarNode(title, 0, [], index === visibleRoots.length - 1, state, accessors, i18n, normalizedQuery))
+        .join('')}`
+    : state.refreshing
+    ? renderSidebarStatusCard({ title: i18n.t('loadingFavorites') })
+    : state.lastRefreshError
+    ? renderSidebarStatusCard({
+        tone: 'error',
+        title: i18n.t('refreshFailedTitle'),
+        description: i18n.t('refreshFailed', { message: state.lastRefreshError }),
+        hint: i18n.t('refreshFailedHint'),
+        actions: [
+          { action: 'sidebarTreeRefresh', label: i18n.t('manualRefresh') },
+          { action: 'sidebarTreeOpenSettings', label: i18n.t('openSettings') },
+        ],
+      })
+    : renderSidebarStatusCard({
+        tone: 'warning',
+        title: i18n.t('noFavoritesTitle'),
+        description: i18n.t('noFavorites'),
+        hint: i18n.t('noFavoritesHint'),
+        actions: [{ action: 'sidebarTreeRefresh', label: i18n.t('manualRefresh') }],
+      })
   const controlsMarkup = state.controlsCollapsed
     ? ''
     : `
@@ -527,12 +569,107 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 .favorite-sidebar-tree__empty {
-  padding: 4px 12px;
+  margin: 4px 12px 8px;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--ls-border-color, #d7dce5) 78%, transparent 22%);
+  border-radius: 10px;
   color: var(--ls-secondary-text-color, #6b7280);
+  background: var(--ls-tertiary-background-color, #f5f7fb);
   font-size: 12px;
   line-height: 1.5;
 }
+
+.favorite-sidebar-tree__empty--warning {
+  border-color: color-mix(in srgb, #d97706 28%, var(--ls-border-color, #d7dce5) 72%);
+}
+
+.favorite-sidebar-tree__empty--error {
+  border-color: color-mix(in srgb, #dc2626 28%, var(--ls-border-color, #d7dce5) 72%);
+  color: #b91c1c;
+}
+
+.favorite-sidebar-tree__empty-title {
+  color: var(--ls-primary-text-color, #1f2937);
+  font-weight: 600;
+}
+
+.favorite-sidebar-tree__empty-body,
+.favorite-sidebar-tree__empty-hint {
+  margin-top: 4px;
+}
+
+.favorite-sidebar-tree__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
 `
+
+function renderSidebarNotice(state: TreeStateSnapshot, i18n: FavoriteTreeI18n): string {
+  if (state.searchQuery || state.refreshing || !state.rootFavorites.length) {
+    return ''
+  }
+
+  if (state.lastRefreshError) {
+    return renderSidebarStatusCard({
+      tone: 'error',
+      title: i18n.t('refreshFailedTitle'),
+      description: i18n.t('refreshFailed', { message: state.lastRefreshError }),
+      hint: i18n.t('refreshFailedHint'),
+      actions: [
+        { action: 'sidebarTreeRefresh', label: i18n.t('manualRefresh') },
+        { action: 'sidebarTreeOpenSettings', label: i18n.t('openSettings') },
+      ],
+    })
+  }
+
+  if (!state.hasHierarchyRelations) {
+    return renderSidebarStatusCard({
+      tone: 'warning',
+      title: i18n.t('noHierarchyTitle'),
+      description: i18n.t('noHierarchyBody', { property: state.hierarchyProperty }),
+      hint: i18n.t('noHierarchyHint'),
+      actions: [
+        { action: 'sidebarTreeOpenSettings', label: i18n.t('openSettings') },
+        { action: 'sidebarTreeRefresh', label: i18n.t('manualRefresh') },
+      ],
+    })
+  }
+
+  return ''
+}
+
+function renderSidebarStatusCard(options: {
+  title: string
+  description?: string
+  hint?: string
+  tone?: SidebarStatusTone
+  actions?: SidebarStatusAction[]
+}): string {
+  const toneClass = options.tone && options.tone !== 'info' ? ` favorite-sidebar-tree__empty--${options.tone}` : ''
+  const descriptionMarkup = options.description
+    ? `<div class="favorite-sidebar-tree__empty-body">${escapeHtml(options.description)}</div>`
+    : ''
+  const hintMarkup = options.hint ? `<div class="favorite-sidebar-tree__empty-hint">${escapeHtml(options.hint)}</div>` : ''
+  const actionsMarkup = options.actions?.length
+    ? `<div class="favorite-sidebar-tree__empty-actions">${options.actions
+        .map(
+          (action) =>
+            `<button class="favorite-sidebar-tree__text-btn" data-on-click="${action.action}">${escapeHtml(action.label)}</button>`,
+        )
+        .join('')}</div>`
+    : ''
+
+  return `
+    <div class="favorite-sidebar-tree__empty${toneClass}">
+      <div class="favorite-sidebar-tree__empty-title">${escapeHtml(options.title)}</div>
+      ${descriptionMarkup}
+      ${hintMarkup}
+      ${actionsMarkup}
+    </div>
+  `
+}
 
 function renderSidebarNode(
   title: string,

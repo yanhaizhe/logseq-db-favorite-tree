@@ -41,6 +41,7 @@ export class FavoriteTreePlugin {
   private refreshing = false
   private searching = false
   private searchQuery = ''
+  private searchError: string | null = null
   private currentPageName: string | null = null
   private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
@@ -295,20 +296,33 @@ export class FavoriteTreePlugin {
 
     if (!nextQuery) {
       this.searching = false
+      this.searchError = null
       this.render()
       return
     }
 
     this.searching = !this.treeService.hasChildIndex()
+    this.searchError = null
     this.render()
 
-    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-    if (this.searchQuery !== nextQuery) {
-      return
+    try {
+      await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+      if (this.searchQuery !== nextQuery) {
+        return
+      }
+
+      this.searching = false
+      this.searchError = null
+      this.render()
+    } catch (error) {
+      if (this.searchQuery !== nextQuery) {
+        return
+      }
+
+      this.searching = false
+      this.searchError = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      this.render()
     }
-
-    this.searching = false
-    this.render()
   }
 
   toggleExpandCollapseAll = async (): Promise<void> => {
@@ -726,6 +740,7 @@ export class FavoriteTreePlugin {
       loadedKeys: this.loadedKeys,
       loadStates: this.loadStates,
       loadErrors: this.loadErrors,
+      searchError: this.searchError,
       currentPageName: this.currentPageName,
       currentPagePath: this.currentPagePath,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
@@ -733,6 +748,8 @@ export class FavoriteTreePlugin {
       refreshing: this.refreshing,
       searching: this.searching,
       searchQuery: this.searchQuery,
+      lastRefreshError: this.lastRefreshError,
+      hasHierarchyRelations: this.hasHierarchyRelations(),
       autoRefreshPaused: this.autoRefreshPaused,
       pollIntervalSeconds: this.settings.getPollIntervalSeconds(),
       hierarchyProperty: this.settings.getHierarchyProperty(),
@@ -1161,9 +1178,13 @@ export class FavoriteTreePlugin {
     this.sortModes = restored.sortModes
     this.searchQuery = ''
     this.searching = false
+    this.searchError = null
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
     this.sortDragItem = null
+    this.lastRefreshAt = null
+    this.lastRefreshReason = null
+    this.lastRefreshError = null
 
     this.expandedKeys.clear()
     this.loadedKeys.clear()
@@ -1252,6 +1273,7 @@ export class FavoriteTreePlugin {
     if (!shouldBuildIndex) {
       this.currentPagePath = []
       this.searching = false
+      this.searchError = null
       return
     }
 
@@ -1260,6 +1282,7 @@ export class FavoriteTreePlugin {
     }
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    this.searchError = null
     this.syncExpandedLoadState()
     await this.syncCurrentPagePath()
     this.searching = false
@@ -1293,6 +1316,14 @@ export class FavoriteTreePlugin {
 
   private getOrderedTitlesForParent(parentKey: string): string[] {
     return parentKey === ROOT_SORT_KEY ? this.applySortOrder(this.rootFavorites, ROOT_SORT_KEY) : this.getOrderedChildrenFor(parentKey)
+  }
+
+  private hasHierarchyRelations(): boolean {
+    if (!this.rootFavorites.length || !this.treeService.hasChildIndex()) {
+      return false
+    }
+
+    return this.rootFavorites.some((title) => this.treeService.getChildrenFor(title).length > 0)
   }
 
   private applySortOrder(titles: string[], parentKey: string): string[] {

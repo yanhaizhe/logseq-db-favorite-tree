@@ -115,6 +115,7 @@ export type TreeStateSnapshot = {
   loadedKeys: Set<string>
   loadStates: Map<string, LoadState>
   loadErrors: Map<string, string>
+  searchError: string | null
   currentPageName: string | null
   currentPagePath: string[]
   lastLocatedNodeKey: string | null
@@ -122,6 +123,8 @@ export type TreeStateSnapshot = {
   refreshing: boolean
   searching: boolean
   searchQuery: string
+  lastRefreshError: string | null
+  hasHierarchyRelations: boolean
   autoRefreshPaused: boolean
   pollIntervalSeconds: number
   hierarchyProperty: string
