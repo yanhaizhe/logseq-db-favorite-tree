@@ -79,6 +79,7 @@ export class FavoriteTreePlugin {
   async init(): Promise<void> {
     await this.initializeGraphContext()
     await this.syncLocale()
+    const hostDocument = this.getHostDocument()
 
     window.addEventListener('pointermove', this.handlePointerMove)
     window.addEventListener('pointerup', this.handlePointerUp)
@@ -86,6 +87,7 @@ export class FavoriteTreePlugin {
     window.addEventListener('resize', this.handleWindowResize)
     window.addEventListener('focus', this.handleWindowFocus)
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
+    hostDocument.addEventListener('input', this.handleSidebarSearchInput)
 
     this.render()
     this.applyMainUIState()
@@ -105,6 +107,7 @@ export class FavoriteTreePlugin {
     this.persistInternalState()
     this.clearSidebarTreeUI()
     this.layout.destroy()
+    const hostDocument = this.getHostDocument()
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
     }
@@ -126,6 +129,7 @@ export class FavoriteTreePlugin {
     window.removeEventListener('resize', this.handleWindowResize)
     window.removeEventListener('focus', this.handleWindowFocus)
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
+    hostDocument.removeEventListener('input', this.handleSidebarSearchInput)
     for (const off of this.offHooks) {
       off()
     }
@@ -154,7 +158,17 @@ export class FavoriteTreePlugin {
   }
 
   closePanel = (): void => {
-    if (this.displayMode === 'sidebar' || !this.panelVisible) {
+    if (this.displayMode === 'sidebar') {
+      this.displayMode = 'floating'
+      this.panelVisible = false
+      this.viewMode = 'panel'
+      this.persistInternalState()
+      this.applyMainUIState()
+      this.render()
+      return
+    }
+
+    if (!this.panelVisible) {
       return
     }
 
@@ -164,8 +178,13 @@ export class FavoriteTreePlugin {
     this.render()
   }
 
-  collapseToBubble = (): void => {
-    if (this.displayMode === 'sidebar' || this.viewMode === 'bubble') {
+  collapseToBubble = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar') {
+      await this.switchToFloatingMode('bubble')
+      return
+    }
+
+    if (this.viewMode === 'bubble') {
       return
     }
 
@@ -739,11 +758,44 @@ export class FavoriteTreePlugin {
       sidebarTreeShowFloating: () => {
         void this.switchToFloatingMode('panel')
       },
+      sidebarTreeToggleControls: () => {
+        this.toggleControlsCollapsed()
+      },
+      sidebarTreeRefresh: () => {
+        void this.manualRefresh()
+      },
+      sidebarTreeCollapseToBubble: () => {
+        void this.collapseToBubble()
+      },
+      sidebarTreeOpenSettings: () => {
+        this.openSettings()
+      },
+      sidebarTreeClose: () => {
+        this.closePanel()
+      },
+      sidebarTreeLocateCurrent: () => {
+        void this.locateCurrentPage()
+      },
+      sidebarTreeResetPanelSize: () => {
+        this.resetPanelSize()
+      },
+      sidebarTreeToggleExpandAll: () => {
+        void this.toggleExpandCollapseAll()
+      },
+      sidebarTreeToggleAutoRefresh: () => {
+        this.toggleAutoRefresh()
+      },
     })
   }
 
   private async renderSidebarTreeUI(): Promise<void> {
     const renderVersion = ++this.sidebarRenderVersion
+    const hostDocument = this.getHostDocument()
+    const activeElement = hostDocument.activeElement
+    const activeSidebarSearch = this.asSidebarSearchInput(activeElement)
+    const shouldRestoreSidebarSearchFocus = activeSidebarSearch !== null
+    const selectionStart = activeSidebarSearch?.selectionStart ?? this.searchQuery.length
+    const selectionEnd = activeSidebarSearch?.selectionEnd ?? this.searchQuery.length
     logseq.provideStyle({
       key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
       style: SIDEBAR_TREE_HOST_STYLE,
@@ -768,6 +820,18 @@ export class FavoriteTreePlugin {
       reset: true,
       template,
     })
+
+    if (shouldRestoreSidebarSearchFocus) {
+      window.requestAnimationFrame(() => {
+        const nextInput = this.asSidebarSearchInput(
+          hostDocument.querySelector('[data-favorite-sidebar-tree="true"] [data-role="sidebar-search-input"]'),
+        )
+        if (nextInput) {
+          nextInput.focus({ preventScroll: true })
+          nextInput.setSelectionRange(selectionStart, selectionEnd)
+        }
+      })
+    }
   }
 
   private clearSidebarTreeUI(): void {
@@ -792,6 +856,39 @@ export class FavoriteTreePlugin {
     return null
   }
 
+  private getHostDocument(): Document {
+    try {
+      if (window.top?.document) {
+        return window.top.document
+      }
+    } catch {
+      // Ignore cross-frame access failures and fall back to the plugin iframe document.
+    }
+
+    return document
+  }
+
+  private asSidebarSearchInput(target: EventTarget | null): HTMLInputElement | null {
+    if (!target || typeof target !== 'object') {
+      return null
+    }
+
+    const candidate = target as Partial<HTMLInputElement> & {
+      getAttribute?: (name: string) => string | null
+      tagName?: string
+    }
+
+    if (candidate.getAttribute?.('data-role') !== 'sidebar-search-input') {
+      return null
+    }
+
+    if (typeof candidate.tagName !== 'string' || candidate.tagName.toUpperCase() !== 'INPUT') {
+      return null
+    }
+
+    return target as HTMLInputElement
+  }
+
   private readonly handleBodyScroll = (): void => {
     const body = this.getBodyElement()
     if (body) {
@@ -806,6 +903,15 @@ export class FavoriteTreePlugin {
 
   private readonly handleWindowFocus = (): void => {
     void this.refreshLocaleIfNeeded()
+  }
+
+  private readonly handleSidebarSearchInput = (event: Event): void => {
+    const target = this.asSidebarSearchInput(event.target)
+    if (!target) {
+      return
+    }
+
+    void this.setSearchQuery(target.value)
   }
 
   private readonly handleVisibilityChange = (): void => {

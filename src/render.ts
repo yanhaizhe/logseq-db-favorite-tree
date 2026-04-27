@@ -23,7 +23,7 @@ type IconName =
   | 'grip'
   | 'info'
 
-function renderIcon(name: IconName, className = 'ft-icon'): string {
+export function renderIcon(name: IconName, className = 'ft-icon'): string {
   const attrs = `class="${className}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"`
 
   switch (name) {

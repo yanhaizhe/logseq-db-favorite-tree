@@ -18,7 +18,9 @@ async function main(): Promise<void> {
   const plugin = new FavoriteTreePlugin(root, i18n)
   wireDOMEvents(root, {
     onStartDrag: plugin.startDrag,
-    onHeaderDoubleClick: plugin.collapseToBubble,
+    onHeaderDoubleClick: () => {
+      void plugin.collapseToBubble()
+    },
     onSearchQueryChange: (value) => {
       void plugin.setSearchQuery(value)
     },
@@ -38,7 +40,9 @@ async function main(): Promise<void> {
       void plugin.locateCurrentPage()
     },
     onOpenSettings: plugin.openSettings,
-    onCollapseToBubble: plugin.collapseToBubble,
+    onCollapseToBubble: () => {
+      void plugin.collapseToBubble()
+    },
     onExpandPanel: () => {
       void plugin.expandFromBubble()
     },
