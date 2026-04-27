@@ -131,6 +131,7 @@ Notes:
 - [Chinese User Guide](./docs/user-guide.md)
 - [Publish Guide](./docs/publish-guide.md)
 - [Feature List](./docs/feature-list.md)
+- [Product Roadmap PRD](./docs/product-roadmap-prd.md)
 - [Technical Design](./docs/technical-design.md)
 - [Changelog](./CHANGELOG.md)
 - [Release Notes Template](./docs/release-notes-template.md)

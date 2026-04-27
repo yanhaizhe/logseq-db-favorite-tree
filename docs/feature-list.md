@@ -134,5 +134,6 @@
 
 ## 5. 文档联动
 
+- 产品路线图与优先级见 [产品路线图 PRD](./product-roadmap-prd.md)
 - 技术实现细节见 [技术方案文档](./technical-design.md)
 - 操作说明与配置说明见 [使用指南](./user-guide.md)
