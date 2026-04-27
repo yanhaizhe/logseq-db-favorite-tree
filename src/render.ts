@@ -1,6 +1,6 @@
 import { ROOT_SORT_KEY } from './constants'
 import type { FavoriteTreeI18n } from './i18n'
-import type { LoadState, TreeStateSnapshot } from './types'
+import type { LoadState, SortMode, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
 type TreeRenderAccessors = {
@@ -272,6 +272,28 @@ export function renderFavoriteTree(
         ${escapeHtml(i18n.t('locateLabel'))}
         ${renderTooltip(i18n.t('locateTitle'))}
       </button>
+      ${state.rootSortHasCustomOrder
+        ? `
+          <button
+            class="favorite-tree__text-btn has-tooltip ${state.rootSortMode === 'custom' ? 'is-active' : ''}"
+            data-action="toggle-sort-mode"
+            data-parent-key="${escapeHtml(ROOT_SORT_KEY)}"
+            aria-label="${escapeHtml(state.rootSortMode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom'))}"
+          >
+            ${escapeHtml(state.rootSortMode === 'custom' ? i18n.t('sortModeCustomLabel') : i18n.t('sortModeDefaultLabel'))}
+            ${renderTooltip(state.rootSortMode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom'))}
+          </button>
+          <button
+            class="favorite-tree__text-btn has-tooltip"
+            data-action="clear-custom-sort"
+            data-parent-key="${escapeHtml(ROOT_SORT_KEY)}"
+            aria-label="${escapeHtml(i18n.t('clearCustomSort'))}"
+          >
+            ${escapeHtml(i18n.t('clearCustomSort'))}
+            ${renderTooltip(i18n.t('clearCustomSort'))}
+          </button>
+        `
+        : ''}
       <button class="favorite-tree__text-btn" data-action="reset-panel-size" title="${escapeHtml(i18n.t('resetPanelSizeTitle'))}">${escapeHtml(i18n.t('resetPanelSizeLabel'))}</button>
       <button class="favorite-tree__text-btn has-tooltip ${hasExpandedNodes ? 'is-active' : ''}" data-action="toggle-expand-all" aria-label="${escapeHtml(expandActionTitle)}">
         ${expandActionIcon}
@@ -373,6 +395,7 @@ function renderNode(
   const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, state, i18n)
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
+  const childSortControls = renderSortModeControlsForParent(state, key, i18n)
   const sortHandleMarkup = isSearching
     ? '<span class="tree-node__sort-placeholder"></span>'
     : `
@@ -422,11 +445,44 @@ function renderNode(
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
         </button>
+        ${childSortControls}
         <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSearching && key.includes(normalizedQuery) ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>
       </div>
       ${statusHint}
       ${childrenMarkup}
     </div>
+  `
+}
+
+function renderSortModeControlsForParent(state: TreeStateSnapshot, parentKey: string, i18n: FavoriteTreeI18n): string {
+  const customOrder = state.sortOrders[parentKey]
+  if (!customOrder?.length) {
+    return ''
+  }
+
+  const mode: SortMode = state.sortModes[parentKey] === 'default' ? 'default' : 'custom'
+  return renderSortModeControls(parentKey, mode, i18n)
+}
+
+function renderSortModeControls(parentKey: string, mode: SortMode, i18n: FavoriteTreeI18n): string {
+  const switchTitle = mode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom')
+  const badgeLabel = mode === 'custom' ? i18n.t('sortStateCustomActive') : i18n.t('sortStateCustomSaved')
+  return `
+    <span class="tree-node__sort-mode">
+      <span class="tree-node__badge tree-node__badge--sort">${escapeHtml(badgeLabel)}</span>
+      <button
+        class="tree-node__sort-action ${mode === 'custom' ? 'is-active' : ''}"
+        data-action="toggle-sort-mode"
+        data-parent-key="${escapeHtml(parentKey)}"
+        title="${escapeHtml(switchTitle)}"
+      >${escapeHtml(mode === 'custom' ? i18n.t('sortModeCustomLabel') : i18n.t('sortModeDefaultLabel'))}</button>
+      <button
+        class="tree-node__sort-action"
+        data-action="clear-custom-sort"
+        data-parent-key="${escapeHtml(parentKey)}"
+        title="${escapeHtml(i18n.t('clearCustomSort'))}"
+      >${escapeHtml(i18n.t('clearCustomSort'))}</button>
+    </span>
   `
 }
 

@@ -14,6 +14,8 @@ import type {
   PluginSettings,
   RefreshReason,
   SortDropTarget,
+  SortMode,
+  SortModeMap,
   SortOrderMap,
   SortableItem,
   TreeStateSnapshot,
@@ -46,6 +48,7 @@ export class FavoriteTreePlugin {
   private autoRefreshPaused = true
   private controlsCollapsed = false
   private sortOrders: SortOrderMap = {}
+  private sortModes: SortModeMap = {}
   private bodyScrollTop = 0
   private lastLocatedNodeKey: string | null = null
   private flashLocatedNodeKey: string | null = null
@@ -437,6 +440,40 @@ export class FavoriteTreePlugin {
     logseq.App.pushState('page', { name: pageName })
   }
 
+  toggleSortModeForParent = (parentKey: string): void => {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return
+    }
+
+    const nextMode: SortMode = this.getSortModeForParent(key) === 'custom' ? 'default' : 'custom'
+    this.sortModes = {
+      ...this.sortModes,
+      [key]: nextMode,
+    }
+    this.persistInternalState()
+    this.render()
+  }
+
+  clearCustomSortForParent = (parentKey: string): void => {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return
+    }
+
+    const confirmed = window.confirm(this.i18n.t('clearCustomSortConfirm'))
+    if (!confirmed) {
+      return
+    }
+
+    const { [key]: _removedOrder, ...remainingOrders } = this.sortOrders
+    const { [key]: _removedMode, ...remainingModes } = this.sortModes
+    this.sortOrders = remainingOrders
+    this.sortModes = remainingModes
+    this.persistInternalState()
+    this.render()
+  }
+
   startSortDrag = (item: SortableItem): void => {
     if (this.searchQuery) {
       return
@@ -616,7 +653,7 @@ export class FavoriteTreePlugin {
     this.render()
 
     try {
-      this.rootFavorites = this.applySortOrder(await this.treeService.loadFavoriteRoots(), ROOT_SORT_KEY)
+      this.rootFavorites = await this.treeService.loadFavoriteRoots()
       this.treeService.invalidateIndex()
       await this.syncDerivedTreeState()
 
@@ -681,7 +718,9 @@ export class FavoriteTreePlugin {
 
   private getRenderState(): TreeStateSnapshot {
     return {
-      rootFavorites: this.rootFavorites,
+      rootFavorites: this.getOrderedTitlesForParent(ROOT_SORT_KEY),
+      sortOrders: this.sortOrders,
+      sortModes: this.sortModes,
       expandedKeys: this.expandedKeys,
       searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,
@@ -702,6 +741,8 @@ export class FavoriteTreePlugin {
       displayMode: this.displayMode,
       canSwitchDisplayMode: this.canSwitchDisplayMode(),
       controlsCollapsed: this.controlsCollapsed,
+      rootSortHasCustomOrder: this.hasCustomSortOrder(ROOT_SORT_KEY),
+      rootSortMode: this.getSortModeForParent(ROOT_SORT_KEY),
     }
   }
 
@@ -805,6 +846,7 @@ export class FavoriteTreePlugin {
       viewMode: this.viewMode,
       controlsCollapsed: this.controlsCollapsed,
       sortOrders: this.sortOrders,
+      sortModes: this.sortModes,
       layout: this.layout.getPositions(),
       panelSize: this.layout.getPanelSize(),
     })
@@ -872,6 +914,18 @@ export class FavoriteTreePlugin {
         const page = event.dataset?.page
         if (page) {
           this.openPage(page)
+        }
+      },
+      sidebarTreeToggleSortMode: (event: { dataset?: Record<string, string> }) => {
+        const parentKey = event.dataset?.parentKey
+        if (parentKey) {
+          this.toggleSortModeForParent(parentKey)
+        }
+      },
+      sidebarTreeClearCustomSort: (event: { dataset?: Record<string, string> }) => {
+        const parentKey = event.dataset?.parentKey
+        if (parentKey) {
+          this.clearCustomSortForParent(parentKey)
         }
       },
       sidebarTreeShowFloating: () => {
@@ -1104,6 +1158,7 @@ export class FavoriteTreePlugin {
     this.viewMode = restored.viewMode
     this.controlsCollapsed = restored.controlsCollapsed
     this.sortOrders = restored.sortOrders
+    this.sortModes = restored.sortModes
     this.searchQuery = ''
     this.searching = false
     this.currentPagePath = []
@@ -1237,17 +1292,17 @@ export class FavoriteTreePlugin {
   }
 
   private getOrderedTitlesForParent(parentKey: string): string[] {
-    return parentKey === ROOT_SORT_KEY ? [...this.rootFavorites] : this.getOrderedChildrenFor(parentKey)
+    return parentKey === ROOT_SORT_KEY ? this.applySortOrder(this.rootFavorites, ROOT_SORT_KEY) : this.getOrderedChildrenFor(parentKey)
   }
 
   private applySortOrder(titles: string[], parentKey: string): string[] {
-    const key = parentKey.trim()
+    const key = this.normalizeSortParentKey(parentKey)
     if (!key) {
       return [...titles]
     }
 
     const customOrder = this.sortOrders[key]
-    if (!customOrder?.length) {
+    if (!customOrder?.length || this.getSortModeForParent(key) !== 'custom') {
       return [...titles]
     }
 
@@ -1264,7 +1319,7 @@ export class FavoriteTreePlugin {
   }
 
   private applyCustomSortOrderForParent(parentKey: string, titles: string[]): void {
-    const key = parentKey.trim()
+    const key = this.normalizeSortParentKey(parentKey)
     if (!key) {
       return
     }
@@ -1273,10 +1328,28 @@ export class FavoriteTreePlugin {
       ...this.sortOrders,
       [key]: [...titles],
     }
-
-    if (key === ROOT_SORT_KEY) {
-      this.rootFavorites = [...titles]
+    this.sortModes = {
+      ...this.sortModes,
+      [key]: 'custom',
     }
+  }
+
+  private normalizeSortParentKey(parentKey: string): string {
+    const trimmed = parentKey.trim()
+    return trimmed || ''
+  }
+
+  private hasCustomSortOrder(parentKey: string): boolean {
+    const key = this.normalizeSortParentKey(parentKey)
+    return Boolean(key && this.sortOrders[key]?.length)
+  }
+
+  private getSortModeForParent(parentKey: string): SortMode {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return 'default'
+    }
+    return this.sortModes[key] === 'default' ? 'default' : 'custom'
   }
 
   private moveTitleWithinSiblings(

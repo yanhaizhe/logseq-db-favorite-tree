@@ -73,6 +73,14 @@ type Messages = {
   rootCount: TranslationValue
   resizePanel: TranslationValue
   dragSort: TranslationValue
+  sortModeDefaultLabel: TranslationValue
+  sortModeCustomLabel: TranslationValue
+  sortSwitchToDefault: TranslationValue
+  sortSwitchToCustom: TranslationValue
+  clearCustomSort: TranslationValue
+  clearCustomSortConfirm: TranslationValue
+  sortStateCustomActive: TranslationValue
+  sortStateCustomSaved: TranslationValue
   toggleNode: TranslationValue
   openPage: TranslationValue
   badgeCurrent: TranslationValue
@@ -165,6 +173,14 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} root${Number(count) === 1 ? '' : 's'}`,
     resizePanel: 'Drag to resize the panel',
     dragSort: 'Drag to customize order',
+    sortModeDefaultLabel: 'Default',
+    sortModeCustomLabel: 'Custom',
+    sortSwitchToDefault: 'Switch to default order',
+    sortSwitchToCustom: 'Restore custom order',
+    clearCustomSort: 'Clear custom order',
+    clearCustomSortConfirm: 'Clear the saved custom order for this level? This action cannot be undone.',
+    sortStateCustomActive: 'Custom order active',
+    sortStateCustomSaved: 'Custom order saved',
     toggleNode: 'Expand or collapse',
     openPage: ({ title }) => `Open page ${title}`,
     badgeCurrent: 'Current',
@@ -752,6 +768,14 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 个根节点`,
     resizePanel: '拖动调整面板大小',
     dragSort: '拖动自定义排序',
+    sortModeDefaultLabel: '默认排序',
+    sortModeCustomLabel: '自定义排序',
+    sortSwitchToDefault: '切换到默认排序',
+    sortSwitchToCustom: '切回自定义排序',
+    clearCustomSort: '清除自定义排序',
+    clearCustomSortConfirm: '确认清除当前层的自定义排序吗？此操作不可撤销。',
+    sortStateCustomActive: '自定义排序中',
+    sortStateCustomSaved: '已保存自定义排序',
     toggleNode: '展开或折叠',
     openPage: ({ title }) => `打开页面 ${title}`,
     badgeCurrent: '当前页',
@@ -829,6 +853,14 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 個根節點`,
     resizePanel: '拖曳調整面板大小',
     dragSort: '拖曳自訂排序',
+    sortModeDefaultLabel: '預設排序',
+    sortModeCustomLabel: '自訂排序',
+    sortSwitchToDefault: '切換到預設排序',
+    sortSwitchToCustom: '切回自訂排序',
+    clearCustomSort: '清除自訂排序',
+    clearCustomSortConfirm: '確認清除目前層級的自訂排序嗎？此操作不可復原。',
+    sortStateCustomActive: '自訂排序中',
+    sortStateCustomSaved: '已儲存自訂排序',
     toggleNode: '展開或摺疊',
     openPage: ({ title }) => `開啟頁面 ${title}`,
     badgeCurrent: '目前頁',

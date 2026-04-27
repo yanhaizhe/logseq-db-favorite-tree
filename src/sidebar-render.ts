@@ -59,6 +59,22 @@ export function renderSidebarTree(
             data-on-click="sidebarTreeLocateCurrent"
             aria-label="${escapeHtml(i18n.t('locateTitle'))}"
           >${renderIcon('locate', 'favorite-sidebar-tree__button-icon')}${escapeHtml(i18n.t('locateLabel'))}${renderTooltip(i18n.t('locateTitle'), 'favorite-sidebar-tree__tooltip')}</button>
+          ${state.rootSortHasCustomOrder
+            ? `
+              <button
+                class="favorite-sidebar-tree__text-btn has-tooltip ${state.rootSortMode === 'custom' ? 'is-active' : ''}"
+                data-on-click="sidebarTreeToggleSortMode"
+                data-parent-key="__root__"
+                aria-label="${escapeHtml(state.rootSortMode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom'))}"
+              >${escapeHtml(state.rootSortMode === 'custom' ? i18n.t('sortModeCustomLabel') : i18n.t('sortModeDefaultLabel'))}${renderTooltip(state.rootSortMode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom'), 'favorite-sidebar-tree__tooltip')}</button>
+              <button
+                class="favorite-sidebar-tree__text-btn has-tooltip"
+                data-on-click="sidebarTreeClearCustomSort"
+                data-parent-key="__root__"
+                aria-label="${escapeHtml(i18n.t('clearCustomSort'))}"
+              >${escapeHtml(i18n.t('clearCustomSort'))}${renderTooltip(i18n.t('clearCustomSort'), 'favorite-sidebar-tree__tooltip')}</button>
+            `
+            : ''}
           <button
             class="favorite-sidebar-tree__text-btn has-tooltip ${hasExpandedNodes ? 'is-active' : ''}"
             data-on-click="sidebarTreeToggleExpandAll"
@@ -479,6 +495,31 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   font-weight: 600;
 }
 
+.favorite-sidebar-tree__sort-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.favorite-sidebar-tree__sort-action {
+  padding: 0 6px;
+  min-height: 20px;
+  border: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 72%, transparent 28%);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ls-secondary-text-color, #6b7280);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.favorite-sidebar-tree__sort-action.is-active {
+  color: var(--ls-link-text-color, #2563eb);
+  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 30%, transparent 70%);
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 10%, transparent 90%);
+}
+
 .favorite-sidebar-tree__children {
   margin-left: 18px;
   padding-left: 10px;
@@ -568,9 +609,40 @@ function renderSidebarNode(
           <span class="favorite-sidebar-tree__title-text">${renderSidebarHighlightedTitle(title, normalizedQuery)}</span>
           ${isCurrent ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}
         </button>
+        ${renderSidebarSortModeControls(state, key, i18n)}
       </div>
       ${childrenMarkup}
     </div>
+  `
+}
+
+function renderSidebarSortModeControls(state: TreeStateSnapshot, parentKey: string, i18n: FavoriteTreeI18n): string {
+  const customOrder = state.sortOrders[parentKey]
+  if (!customOrder?.length) {
+    return ''
+  }
+
+  const mode = state.sortModes[parentKey] === 'default' ? 'default' : 'custom'
+  const switchLabel = mode === 'custom' ? i18n.t('sortModeCustomLabel') : i18n.t('sortModeDefaultLabel')
+  const switchTitle = mode === 'custom' ? i18n.t('sortSwitchToDefault') : i18n.t('sortSwitchToCustom')
+  const badgeLabel = mode === 'custom' ? i18n.t('sortStateCustomActive') : i18n.t('sortStateCustomSaved')
+
+  return `
+    <span class="favorite-sidebar-tree__sort-mode">
+      <span class="favorite-sidebar-tree__badge">${escapeHtml(badgeLabel)}</span>
+      <button
+        class="favorite-sidebar-tree__sort-action ${mode === 'custom' ? 'is-active' : ''}"
+        data-on-click="sidebarTreeToggleSortMode"
+        data-parent-key="${escapeHtml(parentKey)}"
+        title="${escapeHtml(switchTitle)}"
+      >${escapeHtml(switchLabel)}</button>
+      <button
+        class="favorite-sidebar-tree__sort-action"
+        data-on-click="sidebarTreeClearCustomSort"
+        data-parent-key="${escapeHtml(parentKey)}"
+        title="${escapeHtml(i18n.t('clearCustomSort'))}"
+      >${escapeHtml(i18n.t('clearCustomSort'))}</button>
+    </span>
   `
 }
 

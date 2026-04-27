@@ -685,6 +685,31 @@ body.is-dragging * {
   flex: 0 0 auto;
 }
 
+.tree-node__sort-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.tree-node__sort-action {
+  padding: 0 6px;
+  min-height: 20px;
+  border: 1px solid var(--ft-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ft-text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.tree-node__sort-action.is-active {
+  color: var(--ft-accent);
+  border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
+  background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
+}
+
 .tree-node__badge {
   display: inline-flex;
   align-items: center;
@@ -696,6 +721,11 @@ body.is-dragging * {
   border: 1px solid var(--ft-border);
   color: var(--ft-text-muted);
   background: var(--ft-bg);
+}
+
+.tree-node__badge.tree-node__badge--sort {
+  color: var(--ft-accent);
+  border-color: color-mix(in srgb, var(--ft-accent) 35%, var(--ft-border) 65%);
 }
 
 .tree-node__children {

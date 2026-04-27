@@ -17,6 +17,8 @@ export type FavoriteTreeDOMHandlers = {
   onClose: () => void
   onToggleNode: (key: string) => void
   onOpenPage: (page: string) => void
+  onToggleSortMode: (parentKey: string) => void
+  onClearCustomSort: (parentKey: string) => void
   onStartSortDrag: (item: SortableItem) => void
   onMoveSortDropTarget: (target: SortDropTarget) => boolean
   onFinishSortDrop: (target: SortDropTarget) => boolean
@@ -181,6 +183,20 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       const page = target.dataset.page
       if (page) {
         handlers.onOpenPage(page)
+      }
+      return
+    }
+    if (action === 'toggle-sort-mode') {
+      const parentKey = target.dataset.parentKey
+      if (parentKey) {
+        handlers.onToggleSortMode(parentKey)
+      }
+      return
+    }
+    if (action === 'clear-custom-sort') {
+      const parentKey = target.dataset.parentKey
+      if (parentKey) {
+        handlers.onClearCustomSort(parentKey)
       }
     }
   })

@@ -19,6 +19,8 @@ export type RefreshReason =
   | 'settings-property'
 
 export type SortOrderMap = Record<string, string[]>
+export type SortMode = 'default' | 'custom'
+export type SortModeMap = Record<string, SortMode>
 
 export type SortableItem = {
   itemId: string
@@ -89,6 +91,7 @@ export type PersistedPluginState = {
   viewMode: ViewMode
   controlsCollapsed: boolean
   sortOrders: SortOrderMap
+  sortModes: SortModeMap
   layout: FloatingPositions
   panelSize: PanelSize
 }
@@ -105,6 +108,8 @@ export type GraphScopedStateMap = Record<string, GraphScopedPersistedState>
 
 export type TreeStateSnapshot = {
   rootFavorites: string[]
+  sortOrders: SortOrderMap
+  sortModes: SortModeMap
   expandedKeys: Set<string>
   searchCollapsedKeys: Set<string>
   loadedKeys: Set<string>
@@ -125,6 +130,8 @@ export type TreeStateSnapshot = {
   displayMode: DisplayMode
   canSwitchDisplayMode: boolean
   controlsCollapsed: boolean
+  rootSortHasCustomOrder: boolean
+  rootSortMode: SortMode
 }
 
 export type PageLookup = Pick<PageEntity, 'name' | 'originalName' | 'properties' | 'uuid'>
