@@ -112,6 +112,7 @@ export type TreeStateSnapshot = {
   sortModes: SortModeMap
   createChildDraftParent: string | null
   createChildDraftTitle: string
+  perfSummary: string | null
   expandedKeys: Set<string>
   searchCollapsedKeys: Set<string>
   loadedKeys: Set<string>

@@ -303,7 +303,9 @@ export function renderFavoriteTree(
     : ''
 
   const breadcrumbMarkup = renderBreadcrumbs(state, i18n)
-  const infoTooltip = i18n.t('infoTooltip', { property: state.hierarchyProperty })
+  const infoTooltip = `${i18n.t('infoTooltip', { property: state.hierarchyProperty })}${
+    state.perfSummary ? `\n${state.perfSummary}` : ''
+  }`
   const searchMarkup = `
     <div class="favorite-tree__searchbar">
       <div class="favorite-tree__search-shell">

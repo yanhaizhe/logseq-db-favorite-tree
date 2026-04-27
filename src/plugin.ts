@@ -52,6 +52,8 @@ export class FavoriteTreePlugin {
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
   private activePageKeysCache: { at: number; keys: Set<string> } | null = null
+  private lastRefreshMs: number | null = null
+  private lastRenderMs: number | null = null
   private autoRefreshPaused = true
   private controlsCollapsed = false
   private sortOrders: SortOrderMap = {}
@@ -815,6 +817,9 @@ export class FavoriteTreePlugin {
       return
     }
 
+    const refreshStartedAt = performance.now()
+    this.activePageKeysCache = null
+    this.treeService.invalidateIndex()
     this.refreshing = true
     this.render()
     try {
@@ -825,17 +830,18 @@ export class FavoriteTreePlugin {
 
     try {
       this.rootFavorites = await this.treeService.loadFavoriteRoots()
-      this.treeService.invalidateIndex()
       await this.syncDerivedTreeState()
 
       this.lastRefreshAt = Date.now()
       this.lastRefreshReason = reason
       this.lastRefreshError = null
+      this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
     } catch (error) {
       const message = error instanceof Error ? error.message : this.i18n.t('refreshReasonDefault')
       this.lastRefreshAt = Date.now()
       this.lastRefreshReason = reason
       this.lastRefreshError = message
+      this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
       logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
     } finally {
       this.refreshing = false
@@ -857,6 +863,7 @@ export class FavoriteTreePlugin {
   }
 
   private render(): void {
+    const renderStartedAt = performance.now()
     this.captureBodyScrollTop()
     const activeElement = document.activeElement
     const shouldRestoreSearchFocus =
@@ -864,39 +871,62 @@ export class FavoriteTreePlugin {
     const selectionStart = shouldRestoreSearchFocus ? activeElement.selectionStart ?? this.searchQuery.length : null
     const selectionEnd = shouldRestoreSearchFocus ? activeElement.selectionEnd ?? this.searchQuery.length : null
 
-    this.root.innerHTML = renderFavoriteTree(
-      this.getRenderState(),
-      {
-        getChildrenFor: (title) => this.getOrderedChildrenFor(title),
-      },
-      this.i18n,
-    )
+    const shouldRenderMainPanel = this.displayMode !== 'sidebar' && this.panelVisible
+    if (shouldRenderMainPanel) {
+      this.root.innerHTML = renderFavoriteTree(
+        this.getRenderState(),
+        {
+          getChildrenFor: (title) => this.getOrderedChildrenFor(title),
+        },
+        this.i18n,
+      )
+    } else {
+      this.root.innerHTML = ''
+    }
     void this.renderSidebarTreeUI()
 
-    const body = this.getBodyElement()
-    if (body) {
-      body.scrollTop = this.bodyScrollTop
-      body.addEventListener('scroll', this.handleBodyScroll, { passive: true })
-    }
+    if (shouldRenderMainPanel) {
+      const body = this.getBodyElement()
+      if (body) {
+        body.scrollTop = this.bodyScrollTop
+        body.addEventListener('scroll', this.handleBodyScroll, { passive: true })
+      }
 
-    if (shouldRestoreSearchFocus) {
-      const nextInput = this.root.querySelector<HTMLInputElement>('[data-role="search-input"]')
-      if (nextInput) {
-        nextInput.focus({ preventScroll: true })
-        nextInput.setSelectionRange(selectionStart, selectionEnd)
+      if (shouldRestoreSearchFocus) {
+        const nextInput = this.root.querySelector<HTMLInputElement>('[data-role="search-input"]')
+        if (nextInput) {
+          nextInput.focus({ preventScroll: true })
+          nextInput.setSelectionRange(selectionStart, selectionEnd)
+        }
       }
     }
 
     this.restoreCreateChildInputFocus()
+    this.lastRenderMs = Math.max(0, Math.round(performance.now() - renderStartedAt))
   }
 
   private getRenderState(): TreeStateSnapshot {
+    const indexMs = this.treeService.getLastIndexBuildMs()
+    const pages = this.treeService.getLastIndexBuildPageCount()
+    const perfSummary =
+      this.lastRefreshMs !== null && this.lastRenderMs !== null
+        ? this.i18n.t('perfSummary', {
+            refreshMs: this.lastRefreshMs,
+            renderMs: this.lastRenderMs,
+            indexMs: indexMs ?? '-',
+            roots: this.rootFavorites.length,
+            expanded: this.expandedKeys.size,
+            pages: pages ?? '-',
+          })
+        : null
+
     return {
       rootFavorites: this.getOrderedTitlesForParent(ROOT_SORT_KEY),
       sortOrders: this.sortOrders,
       sortModes: this.sortModes,
       createChildDraftParent: this.createChildDraftParent,
       createChildDraftTitle: this.createChildDraftTitle,
+      perfSummary,
       expandedKeys: this.expandedKeys,
       searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,

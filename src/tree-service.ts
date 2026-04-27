@@ -5,6 +5,8 @@ export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
   private childIndexPromise: Promise<void> | null = null
   private allPageCache: { at: number; pages: PageEntity[] } | null = null
+  private lastIndexBuildMs: number | null = null
+  private lastIndexBuildPageCount: number | null = null
 
   hasChildIndex(): boolean {
     return this.childIndex !== null
@@ -14,6 +16,16 @@ export class FavoriteTreeTreeService {
     this.childIndex = null
     this.childIndexPromise = null
     this.allPageCache = null
+    this.lastIndexBuildMs = null
+    this.lastIndexBuildPageCount = null
+  }
+
+  getLastIndexBuildMs(): number | null {
+    return this.lastIndexBuildMs
+  }
+
+  getLastIndexBuildPageCount(): number | null {
+    return this.lastIndexBuildPageCount
   }
 
   async loadFavoriteRoots(): Promise<string[]> {
@@ -42,7 +54,18 @@ export class FavoriteTreeTreeService {
         continue
       }
 
-      const title = activePageTitleByKey.get(normalized)
+      let title = activePageTitleByKey.get(normalized) ?? null
+      if (!title) {
+        try {
+          const page = await logseq.Editor.getPage(normalizedSeed)
+          if (page && !isPageDeletedLike(page)) {
+            title = pageTitle(page)
+          }
+        } catch {
+          title = null
+        }
+      }
+
       if (!title) {
         continue
       }
@@ -115,7 +138,9 @@ export class FavoriteTreeTreeService {
   }
 
   private async buildChildIndex(propertyName: string): Promise<void> {
+    const startedAt = performance.now()
     const allPages = await this.getAllPagesCached()
+    this.lastIndexBuildPageCount = allPages.length
     const index = new Map<string, string[]>()
     const existingPageKeys = new Set<string>()
     for (const page of allPages) {
@@ -161,6 +186,7 @@ export class FavoriteTreeTreeService {
     }
 
     this.childIndex = index
+    this.lastIndexBuildMs = Math.max(0, Math.round(performance.now() - startedAt))
   }
 
   private async getAllPagesCached(): Promise<PageEntity[]> {

@@ -50,6 +50,7 @@ type Messages = {
   expandControlsTitle: TranslationValue
   collapseControlsTitle: TranslationValue
   infoTooltip: TranslationValue
+  perfSummary: TranslationValue
   searchPlaceholder: TranslationValue
   locateLabel: TranslationValue
   locateTitle: TranslationValue
@@ -183,6 +184,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     collapseControlsTitle: 'Collapse controls',
     infoTooltip: ({ property }) =>
       `Drag the header to move, double-click to collapse into a bubble; hierarchy property: ${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `Perf: refresh ${refreshMs}ms · render ${renderMs}ms · index ${indexMs ?? '-'}ms · roots ${roots} · expanded ${expanded} · pages ${pages ?? '-'}`,
     searchPlaceholder: 'Search page titles',
     locateLabel: 'Find current',
     locateTitle: 'Expand the current page path and scroll to the current page',
@@ -815,6 +818,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     expandControlsTitle: '展开功能区',
     collapseControlsTitle: '收起功能区',
     infoTooltip: ({ property }) => `拖动标题栏移动，双击收回为悬浮球；当前层级属性：${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `性能：刷新 ${refreshMs}ms · 渲染 ${renderMs}ms · 索引 ${indexMs ?? '-'}ms · 根 ${roots} · 展开 ${expanded} · 页 ${pages ?? '-'}`,
     searchPlaceholder: '搜索页面标题',
     locateLabel: '找到当前页',
     locateTitle: '展开当前页路径并滚动到当前页',
@@ -934,6 +939,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     expandControlsTitle: '展開功能區',
     collapseControlsTitle: '收起功能區',
     infoTooltip: ({ property }) => `拖曳標題列可移動，雙擊可收回為浮動球；目前層級屬性：${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `效能：刷新 ${refreshMs}ms · 渲染 ${renderMs}ms · 索引 ${indexMs ?? '-'}ms · 根 ${roots} · 展開 ${expanded} · 頁 ${pages ?? '-'}`,
     searchPlaceholder: '搜尋頁面標題',
     locateLabel: '找到目前頁',
     locateTitle: '展開目前頁路徑並捲動到目前頁',
