@@ -5,6 +5,7 @@ export type FavoriteTreeDOMHandlers = {
   onHeaderDoubleClick: () => void
   onSearchQueryChange: (value: string) => void
   onToggleControls: () => void
+  onSwitchDisplayMode: () => void
   onResetPanelSize: () => void
   onRefresh: () => void
   onToggleAutoRefresh: () => void
@@ -124,6 +125,10 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     const action = target.dataset.action
     if (action === 'toggle-controls') {
       handlers.onToggleControls()
+      return
+    }
+    if (action === 'switch-display-mode') {
+      handlers.onSwitchDisplayMode()
       return
     }
     if (action === 'reset-panel-size') {

@@ -23,6 +23,9 @@ async function main(): Promise<void> {
       void plugin.setSearchQuery(value)
     },
     onToggleControls: plugin.toggleControlsCollapsed,
+    onSwitchDisplayMode: () => {
+      void plugin.switchDisplayMode()
+    },
     onResetPanelSize: plugin.resetPanelSize,
     onRefresh: () => {
       void plugin.manualRefresh()

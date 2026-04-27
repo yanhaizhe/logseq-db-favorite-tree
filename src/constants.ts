@@ -42,6 +42,7 @@ export const INTERNAL_SETTINGS = {
   bodyScrollTop: '__bodyScrollTop',
   lastLocatedNodeKey: '__lastLocatedNodeKey',
   viewMode: '__viewMode',
+  displayMode: '__displayMode',
   panelX: '__panelX',
   panelY: '__panelY',
   bubbleX: '__bubbleX',

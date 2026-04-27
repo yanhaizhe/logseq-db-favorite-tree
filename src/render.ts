@@ -246,6 +246,7 @@ export function renderFavoriteTree(
           </div>
         </div>
         <div class="favorite-tree__actions">
+          <button class="favorite-tree__icon-btn" data-action="switch-display-mode" title="${escapeHtml(i18n.t('switchToSidebar'))}">${renderIcon('panel-controls-open')}</button>
           <button
             class="favorite-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
             data-action="toggle-controls"

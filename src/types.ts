@@ -2,6 +2,7 @@ import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
 
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export type ViewMode = 'panel' | 'bubble'
+export type DisplayMode = 'floating' | 'sidebar'
 export type DragKind = 'panel' | 'bubble' | 'panel-resize'
 export type SidebarPosition = 'left' | 'right'
 export type SortPlacement = 'before' | 'after'
@@ -52,6 +53,7 @@ export type PluginSettings = {
   __bodyScrollTop?: number
   __lastLocatedNodeKey?: string
   __viewMode?: ViewMode
+  __displayMode?: DisplayMode
   __panelX?: number
   __panelY?: number
   __bubbleX?: number
@@ -92,6 +94,7 @@ export type PersistedPluginState = {
 export type RestoredPluginState = PersistedPluginState & {
   panelVisible: boolean
   autoRefreshPaused: boolean
+  displayMode: DisplayMode
 }
 
 export type GraphScopedPersistedState = PersistedPluginState
@@ -116,6 +119,7 @@ export type TreeStateSnapshot = {
   hierarchyProperty: string
   lastRefreshLabel: string
   viewMode: ViewMode
+  displayMode: DisplayMode
   controlsCollapsed: boolean
 }
 

@@ -1,5 +1,6 @@
 import { DEFAULT_POLL_INTERVAL_SECONDS, INTERNAL_SETTINGS } from './constants'
 import type {
+  DisplayMode,
   GraphScopedPersistedState,
   GraphScopedStateMap,
   PanelSize,
@@ -43,6 +44,10 @@ export class FavoriteTreeSettingsStore {
     return this.getString(INTERNAL_SETTINGS.viewMode) === 'bubble' ? 'bubble' : 'panel'
   }
 
+  getDisplayMode(): DisplayMode {
+    return this.getString(INTERNAL_SETTINGS.displayMode) === 'sidebar' ? 'sidebar' : 'floating'
+  }
+
   readInternalState(graphKey: string): RestoredPluginState {
     const graphState = this.getGraphScopedState(graphKey) ?? this.readLegacyScopedState()
 
@@ -50,6 +55,7 @@ export class FavoriteTreeSettingsStore {
       panelVisible: this.getBoolean(INTERNAL_SETTINGS.panelVisible, true),
       expandedKeys: graphState.expandedKeys,
       autoRefreshPaused: this.getBoolean(INTERNAL_SETTINGS.autoRefreshPaused, true),
+      displayMode: this.getDisplayMode(),
       bodyScrollTop: graphState.bodyScrollTop,
       lastLocatedNodeKey: graphState.lastLocatedNodeKey,
       viewMode: graphState.viewMode,
@@ -67,6 +73,7 @@ export class FavoriteTreeSettingsStore {
     logseq.updateSettings({
       [INTERNAL_SETTINGS.panelVisible]: state.panelVisible,
       [INTERNAL_SETTINGS.autoRefreshPaused]: state.autoRefreshPaused,
+      [INTERNAL_SETTINGS.displayMode]: state.displayMode,
       [INTERNAL_SETTINGS.graphStates]: JSON.stringify(graphStates),
     })
   }

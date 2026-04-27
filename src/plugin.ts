@@ -3,9 +3,11 @@ import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
 import { FloatingLayoutManager } from './floating-layout'
 import { createFavoriteTreeI18n, getFavoriteTreeI18n, type FavoriteTreeI18n } from './i18n'
 import { renderFavoriteTree } from './render'
+import { renderSidebarTree, SIDEBAR_TREE_HOST_STYLE } from './sidebar-render'
 import { FavoriteTreeSettingsStore } from './settings'
 import { FavoriteTreeTreeService } from './tree-service'
 import type {
+  DisplayMode,
   DragKind,
   LoadState,
   PluginSettings,
@@ -20,7 +22,16 @@ import { applyTheme } from './theme'
 import { escapeSelectorValue, normalizeTitle } from './utils'
 
 export class FavoriteTreePlugin {
+  private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
+  private static readonly SIDEBAR_TREE_STYLE_KEY = 'db-favorite-tree-left-sidebar-style'
+  private static readonly SIDEBAR_TREE_PATHS = [
+    '.left-sidebar-inner .favorites',
+    '.left-sidebar-inner .nav-content-item[data-ref="favorites"]',
+    '.left-sidebar-inner',
+  ] as const
+
   private currentGraphKey = 'default'
+  private displayMode: DisplayMode = 'floating'
   private panelVisible = false
   private viewMode: ViewMode = 'panel'
   private refreshing = false
@@ -47,6 +58,7 @@ export class FavoriteTreePlugin {
   private pollTimerId: number | null = null
   private flashTimerId: number | null = null
   private localeWatchTimerId: number | null = null
+  private sidebarRenderVersion = 0
   private lastRefreshAt: number | null = null
   private lastRefreshReason: RefreshReason | null = null
   private lastRefreshError: string | null = null
@@ -61,6 +73,7 @@ export class FavoriteTreePlugin {
 
   constructor(private readonly root: HTMLElement, initialI18n: FavoriteTreeI18n = createFavoriteTreeI18n('en')) {
     this.i18n = initialI18n
+    this.registerInjectedModels()
   }
 
   async init(): Promise<void> {
@@ -90,6 +103,7 @@ export class FavoriteTreePlugin {
 
   destroy(): void {
     this.persistInternalState()
+    this.clearSidebarTreeUI()
     this.layout.destroy()
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
@@ -118,6 +132,11 @@ export class FavoriteTreePlugin {
   }
 
   togglePanel = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar') {
+      await this.switchToFloatingMode('panel')
+      return
+    }
+
     this.panelVisible = !this.panelVisible
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.persistInternalState()
@@ -135,7 +154,7 @@ export class FavoriteTreePlugin {
   }
 
   closePanel = (): void => {
-    if (!this.panelVisible) {
+    if (this.displayMode === 'sidebar' || !this.panelVisible) {
       return
     }
 
@@ -146,7 +165,7 @@ export class FavoriteTreePlugin {
   }
 
   collapseToBubble = (): void => {
-    if (this.viewMode === 'bubble') {
+    if (this.displayMode === 'sidebar' || this.viewMode === 'bubble') {
       return
     }
 
@@ -159,6 +178,11 @@ export class FavoriteTreePlugin {
   }
 
   expandFromBubble = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar') {
+      await this.switchToFloatingMode('panel')
+      return
+    }
+
     this.panelVisible = true
     this.viewMode = 'panel'
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
@@ -176,6 +200,20 @@ export class FavoriteTreePlugin {
 
   manualRefresh = async (): Promise<void> => {
     await this.refresh('manual')
+  }
+
+  switchDisplayMode = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar') {
+      await this.switchToFloatingMode('panel')
+      return
+    }
+
+    this.displayMode = 'sidebar'
+    this.panelVisible = false
+    this.viewMode = 'panel'
+    this.persistInternalState()
+    this.applyMainUIState()
+    this.render()
   }
 
   toggleAutoRefresh = (): void => {
@@ -399,12 +437,23 @@ export class FavoriteTreePlugin {
       logseq.App.onThemeModeChanged(({ mode }) => {
         this.currentThemeMode = mode
         this.syncTheme()
+        void this.renderSidebarTreeUI()
       }),
     )
 
     this.offHooks.push(
       logseq.App.onCurrentGraphChanged(() => {
         void this.handleGraphChanged()
+      }),
+    )
+
+    this.offHooks.push(
+      logseq.App.onSidebarVisibleChanged(({ visible }) => {
+        if (visible) {
+          void this.renderSidebarTreeUI()
+        } else {
+          this.clearSidebarTreeUI()
+        }
       }),
     )
 
@@ -526,6 +575,7 @@ export class FavoriteTreePlugin {
       },
       this.i18n,
     )
+    void this.renderSidebarTreeUI()
 
     const body = this.getBodyElement()
     if (body) {
@@ -561,8 +611,20 @@ export class FavoriteTreePlugin {
       hierarchyProperty: this.settings.getHierarchyProperty(),
       lastRefreshLabel: this.getLastRefreshLabel(),
       viewMode: this.viewMode,
+      displayMode: this.displayMode,
       controlsCollapsed: this.controlsCollapsed,
     }
+  }
+
+  private async switchToFloatingMode(nextViewMode: ViewMode): Promise<void> {
+    this.displayMode = 'floating'
+    this.viewMode = nextViewMode
+    this.panelVisible = true
+    this.layout.ensureInViewport(this.settings.getSidebarPosition())
+    this.persistInternalState()
+    this.applyMainUIState()
+    await this.syncLocale()
+    this.render()
   }
 
   private hasExpandedNodes(): boolean {
@@ -601,6 +663,7 @@ export class FavoriteTreePlugin {
       panelVisible: this.panelVisible,
       expandedKeys: [...this.expandedKeys],
       autoRefreshPaused: this.autoRefreshPaused,
+      displayMode: this.displayMode,
       bodyScrollTop: this.bodyScrollTop,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
       viewMode: this.viewMode,
@@ -612,6 +675,11 @@ export class FavoriteTreePlugin {
   }
 
   private applyMainUIState(): void {
+    if (this.displayMode === 'sidebar') {
+      logseq.hideMainUI({ restoreEditingCursor: false })
+      return
+    }
+
     logseq.setMainUIAttrs({
       draggable: false,
       resizable: false,
@@ -652,6 +720,76 @@ export class FavoriteTreePlugin {
 
   private syncTheme(): void {
     applyTheme(this.currentThemeMode)
+  }
+
+  private registerInjectedModels(): void {
+    logseq.provideModel({
+      sidebarTreeToggle: (event: { dataset?: Record<string, string> }) => {
+        const key = event.dataset?.key
+        if (key) {
+          void this.onNodeToggle(key)
+        }
+      },
+      sidebarTreeOpenPage: (event: { dataset?: Record<string, string> }) => {
+        const page = event.dataset?.page
+        if (page) {
+          this.openPage(page)
+        }
+      },
+      sidebarTreeShowFloating: () => {
+        void this.switchToFloatingMode('panel')
+      },
+    })
+  }
+
+  private async renderSidebarTreeUI(): Promise<void> {
+    const renderVersion = ++this.sidebarRenderVersion
+    logseq.provideStyle({
+      key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
+      style: SIDEBAR_TREE_HOST_STYLE,
+    })
+
+    const path = await this.resolveSidebarTreePath()
+    if (!path || renderVersion !== this.sidebarRenderVersion) {
+      return
+    }
+
+    const template = renderSidebarTree(
+      this.getRenderState(),
+      {
+        getChildrenFor: (title) => this.getOrderedChildrenFor(title),
+      },
+      this.i18n,
+    )
+
+    logseq.provideUI({
+      key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
+      path,
+      reset: true,
+      template,
+    })
+  }
+
+  private clearSidebarTreeUI(): void {
+    for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
+      logseq.provideUI({
+        key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
+        path,
+        reset: true,
+        template: '',
+      })
+    }
+  }
+
+  private async resolveSidebarTreePath(): Promise<string | null> {
+    for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
+      const rect = await logseq.UI.queryElementRect(path)
+      if (rect) {
+        return path
+      }
+    }
+
+    return null
   }
 
   private readonly handleBodyScroll = (): void => {
@@ -697,6 +835,7 @@ export class FavoriteTreePlugin {
 
   private restoreGraphState(): void {
     const restored = this.settings.readInternalState(this.currentGraphKey)
+    this.displayMode = restored.displayMode
     this.panelVisible = restored.panelVisible
     this.autoRefreshPaused = restored.autoRefreshPaused
     this.bodyScrollTop = restored.bodyScrollTop

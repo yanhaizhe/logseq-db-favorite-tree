@@ -65,6 +65,8 @@ type Messages = {
   collapseToBubble: TranslationValue
   openSettings: TranslationValue
   hidePlugin: TranslationValue
+  switchToSidebar: TranslationValue
+  switchToFloating: TranslationValue
   refreshing: TranslationValue
   rootCount: TranslationValue
   resizePanel: TranslationValue
@@ -152,6 +154,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     collapseToBubble: 'Collapse to bubble',
     openSettings: 'Open settings',
     hidePlugin: 'Hide plugin',
+    switchToSidebar: 'Show in sidebar',
+    switchToFloating: 'Show as floating panel',
     refreshing: 'Refreshing...',
     rootCount: ({ count }) => `${count} root${Number(count) === 1 ? '' : 's'}`,
     resizePanel: 'Drag to resize the panel',
@@ -735,6 +739,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     collapseToBubble: '收回为悬浮球',
     openSettings: '打开设置',
     hidePlugin: '隐藏插件',
+    switchToSidebar: '切到原生侧边栏',
+    switchToFloating: '切回悬浮面板',
     refreshing: '刷新中...',
     rootCount: ({ count }) => `${count} 个根节点`,
     resizePanel: '拖动调整面板大小',
@@ -808,6 +814,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     collapseToBubble: '收回為浮動球',
     openSettings: '開啟設定',
     hidePlugin: '隱藏外掛',
+    switchToSidebar: '切到原生側邊欄',
+    switchToFloating: '切回懸浮面板',
     refreshing: '重新整理中...',
     rootCount: ({ count }) => `${count} 個根節點`,
     resizePanel: '拖曳調整面板大小',
