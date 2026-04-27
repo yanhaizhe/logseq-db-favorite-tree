@@ -21,6 +21,7 @@ export type FavoriteTreeDOMHandlers = {
   onClearCustomSort: (parentKey: string) => void
   onStartSortDrag: (item: SortableItem) => void
   onMoveSortDropTarget: (target: SortDropTarget) => boolean
+  onClearSortDropTarget: () => void
   onFinishSortDrop: (target: SortDropTarget) => boolean
   onEndSortDrag: () => void
   shouldIgnoreBubbleClick: () => boolean
@@ -28,6 +29,7 @@ export type FavoriteTreeDOMHandlers = {
 
 export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
   let activeSortMarker: HTMLElement | null = null
+  let activeSortSource: HTMLElement | null = null
 
   const clearSortMarker = (): void => {
     if (!activeSortMarker) {
@@ -35,6 +37,25 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
     activeSortMarker.classList.remove('is-sort-before', 'is-sort-after')
     activeSortMarker = null
+  }
+
+  const setSortSource = (element: HTMLElement | null): void => {
+    if (activeSortSource === element) {
+      return
+    }
+    if (activeSortSource) {
+      activeSortSource.classList.remove('is-sort-dragging')
+    }
+    activeSortSource = element
+    activeSortSource?.classList.add('is-sort-dragging')
+  }
+
+  const clearSortSource = (): void => {
+    if (!activeSortSource) {
+      return
+    }
+    activeSortSource.classList.remove('is-sort-dragging')
+    activeSortSource = null
   }
 
   const readSortableItem = (element: HTMLElement | null): SortableItem | null => {
@@ -212,6 +233,7 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move'
     }
+    setSortSource(handle.closest<HTMLElement>('[data-sort-item-id]'))
     handlers.onStartSortDrag(item)
   })
 
@@ -219,6 +241,7 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     const drop = readDropTarget(event)
     if (!drop) {
       clearSortMarker()
+      handlers.onClearSortDropTarget()
       return
     }
 
@@ -237,6 +260,15 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     activeSortMarker.classList.add(drop.target.placement === 'before' ? 'is-sort-before' : 'is-sort-after')
   })
 
+  root.addEventListener('dragleave', (event) => {
+    const relatedTarget = event.relatedTarget
+    if (relatedTarget instanceof Node && root.contains(relatedTarget)) {
+      return
+    }
+    clearSortMarker()
+    handlers.onClearSortDropTarget()
+  })
+
   root.addEventListener('drop', (event) => {
     const drop = readDropTarget(event)
     clearSortMarker()
@@ -253,6 +285,7 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
 
   root.addEventListener('dragend', () => {
     clearSortMarker()
+    clearSortSource()
     handlers.onEndSortDrag()
   })
 

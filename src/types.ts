@@ -32,6 +32,17 @@ export type SortDropTarget = SortableItem & {
   placement: SortPlacement
 }
 
+export type SortFeedbackKind = 'idle' | 'before' | 'after' | 'invalid-self' | 'invalid-level'
+
+export type SortFeedbackState = {
+  itemId: string
+  parentKey: string
+  targetItemId: string | null
+  targetParentKey: string | null
+  placement: SortPlacement | null
+  kind: SortFeedbackKind
+}
+
 export type DragState = {
   kind: DragKind
   pointerId: number
@@ -110,6 +121,8 @@ export type TreeStateSnapshot = {
   rootFavorites: string[]
   sortOrders: SortOrderMap
   sortModes: SortModeMap
+  sortDragItem: SortableItem | null
+  sortFeedback: SortFeedbackState | null
   expandedKeys: Set<string>
   searchCollapsedKeys: Set<string>
   loadedKeys: Set<string>

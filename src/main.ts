@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     onClearCustomSort: plugin.clearCustomSortForParent,
     onStartSortDrag: plugin.startSortDrag,
     onMoveSortDropTarget: plugin.moveSortDropTarget,
+    onClearSortDropTarget: plugin.clearSortDropTarget,
     onFinishSortDrop: plugin.finishSortDrop,
     onEndSortDrag: plugin.endSortDrag,
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,

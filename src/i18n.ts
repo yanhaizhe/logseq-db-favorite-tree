@@ -73,6 +73,11 @@ type Messages = {
   rootCount: TranslationValue
   resizePanel: TranslationValue
   dragSort: TranslationValue
+  sortDragHintIdle: TranslationValue
+  sortDragHintBefore: TranslationValue
+  sortDragHintAfter: TranslationValue
+  sortDragHintInvalidSelf: TranslationValue
+  sortDragHintInvalidLevel: TranslationValue
   sortModeDefaultLabel: TranslationValue
   sortModeCustomLabel: TranslationValue
   sortSwitchToDefault: TranslationValue
@@ -173,6 +178,11 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} root${Number(count) === 1 ? '' : 's'}`,
     resizePanel: 'Drag to resize the panel',
     dragSort: 'Drag to customize order',
+    sortDragHintIdle: 'Drag onto a sibling row to change order',
+    sortDragHintBefore: 'Drop before',
+    sortDragHintAfter: 'Drop after',
+    sortDragHintInvalidSelf: 'Choose another row to place this item',
+    sortDragHintInvalidLevel: 'Only items at the same level can be reordered',
     sortModeDefaultLabel: 'Default',
     sortModeCustomLabel: 'Custom',
     sortSwitchToDefault: 'Switch to default order',
@@ -768,6 +778,11 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 个根节点`,
     resizePanel: '拖动调整面板大小',
     dragSort: '拖动自定义排序',
+    sortDragHintIdle: '拖到同级节点上即可调整顺序',
+    sortDragHintBefore: '放到前面',
+    sortDragHintAfter: '放到后面',
+    sortDragHintInvalidSelf: '请选择另一条同级节点作为落点',
+    sortDragHintInvalidLevel: '只能在同一层级内调整顺序',
     sortModeDefaultLabel: '默认排序',
     sortModeCustomLabel: '自定义排序',
     sortSwitchToDefault: '切换到默认排序',
@@ -853,6 +868,11 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 個根節點`,
     resizePanel: '拖曳調整面板大小',
     dragSort: '拖曳自訂排序',
+    sortDragHintIdle: '拖到同層節點上即可調整順序',
+    sortDragHintBefore: '放到前面',
+    sortDragHintAfter: '放到後面',
+    sortDragHintInvalidSelf: '請選擇另一個同層節點作為落點',
+    sortDragHintInvalidLevel: '只能在同一層級內調整順序',
     sortModeDefaultLabel: '預設排序',
     sortModeCustomLabel: '自訂排序',
     sortSwitchToDefault: '切換到預設排序',

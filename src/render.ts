@@ -1,6 +1,6 @@
 import { ROOT_SORT_KEY } from './constants'
 import type { FavoriteTreeI18n } from './i18n'
-import type { LoadState, SortMode, TreeStateSnapshot } from './types'
+import type { LoadState, SortFeedbackKind, SortMode, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
 type TreeRenderAccessors = {
@@ -358,7 +358,22 @@ export function renderFavoriteTree(
         </div>
       </div>
       ${controlsMarkup}
-      <div class="favorite-tree__body">${bodyMarkup}</div>
+      <div
+        class="favorite-tree__body ${state.sortDragItem ? 'is-sort-dragging' : ''}"
+        data-sort-feedback-idle="${escapeHtml(i18n.t('sortDragHintIdle'))}"
+        data-sort-feedback-before="${escapeHtml(i18n.t('sortDragHintBefore'))}"
+        data-sort-feedback-after="${escapeHtml(i18n.t('sortDragHintAfter'))}"
+        data-sort-feedback-invalid-self="${escapeHtml(i18n.t('sortDragHintInvalidSelf'))}"
+        data-sort-feedback-invalid-level="${escapeHtml(i18n.t('sortDragHintInvalidLevel'))}"
+      >
+        <div
+          class="favorite-tree__drag-feedback ${state.sortFeedback && state.sortFeedback.kind.startsWith('invalid') ? 'is-invalid' : ''}"
+          data-role="sort-feedback"
+          aria-live="polite"
+          ${state.sortDragItem ? '' : 'hidden'}
+        >${state.sortDragItem ? escapeHtml(getSortFeedbackLabel(state.sortFeedback, i18n)) : ''}</div>
+        ${bodyMarkup}
+      </div>
       <div class="favorite-tree__footer">
         <span>${escapeHtml(state.lastRefreshLabel)}</span>
         <span>${state.refreshing ? escapeHtml(i18n.t('refreshing')) : `${escapeHtml(autoRefreshState)} · ${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}`}</span>
@@ -396,6 +411,9 @@ function renderNode(
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
   const childSortControls = renderSortModeControlsForParent(state, key, i18n)
+  const isSortSource = state.sortDragItem?.itemId === sortItemId
+  const isSortTarget = state.sortFeedback?.targetItemId === sortItemId
+  const isSortInvalid = isSortTarget && state.sortFeedback?.kind.startsWith('invalid')
   const sortHandleMarkup = isSearching
     ? '<span class="tree-node__sort-placeholder"></span>'
     : `
@@ -434,7 +452,7 @@ function renderNode(
   return `
     <div class="tree-node" data-node-key="${escapeHtml(key)}">
       <div
-        class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''}"
+        class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''} ${isSortSource ? 'is-sort-source' : ''} ${isSortTarget ? 'is-sort-target' : ''} ${isSortInvalid ? 'is-sort-invalid' : ''}"
         style="--depth:${depth}"
         data-sort-item-id="${escapeHtml(sortItemId)}"
         data-sort-parent-key="${escapeHtml(sortParentKey)}"
@@ -595,4 +613,24 @@ function renderHighlightedTitle(title: string, normalizedQuery: string): string 
 
 function buildSortItemId(parentKey: string, itemKey: string): string {
   return `${parentKey}::${itemKey}`
+}
+
+function getSortFeedbackLabel(
+  feedback: TreeStateSnapshot['sortFeedback'],
+  i18n: FavoriteTreeI18n,
+): string {
+  const kind: SortFeedbackKind = feedback?.kind ?? 'idle'
+  if (kind === 'before') {
+    return i18n.t('sortDragHintBefore')
+  }
+  if (kind === 'after') {
+    return i18n.t('sortDragHintAfter')
+  }
+  if (kind === 'invalid-self') {
+    return i18n.t('sortDragHintInvalidSelf')
+  }
+  if (kind === 'invalid-level') {
+    return i18n.t('sortDragHintInvalidLevel')
+  }
+  return i18n.t('sortDragHintIdle')
 }
