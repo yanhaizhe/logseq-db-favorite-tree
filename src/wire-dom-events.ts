@@ -11,6 +11,8 @@ export type FavoriteTreeDOMHandlers = {
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
   onLocateCurrent: () => void
+  onFocusCurrentPath: () => void
+  onCollapseOtherBranches: () => void
   onOpenSettings: () => void
   onCollapseToBubble: () => void
   onExpandPanel: () => void
@@ -152,6 +154,14 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
     if (action === 'locate-current') {
       handlers.onLocateCurrent()
+      return
+    }
+    if (action === 'focus-current-path') {
+      handlers.onFocusCurrentPath()
+      return
+    }
+    if (action === 'collapse-other-branches') {
+      handlers.onCollapseOtherBranches()
       return
     }
     if (action === 'settings') {

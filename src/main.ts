@@ -39,6 +39,12 @@ async function main(): Promise<void> {
     onLocateCurrent: () => {
       void plugin.locateCurrentPage()
     },
+    onFocusCurrentPath: () => {
+      void plugin.focusCurrentPath()
+    },
+    onCollapseOtherBranches: () => {
+      void plugin.collapseOtherBranches()
+    },
     onOpenSettings: plugin.openSettings,
     onCollapseToBubble: () => {
       void plugin.collapseToBubble()

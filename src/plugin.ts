@@ -372,36 +372,34 @@ export class FavoriteTreePlugin {
   }
 
   locateCurrentPage = async (): Promise<void> => {
-    await this.updateCurrentPage()
-
-    if (!this.currentPageName) {
-      logseq.UI.showMsg(this.i18n.t('locateNoCurrentPage'), 'warning')
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
       return
     }
 
-    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-    const paths = this.treeService.findPathsToPage(this.rootFavorites, this.currentPageName)
-    if (!paths.length) {
-      logseq.UI.showMsg(this.i18n.t('locatePageNotInTree'), 'warning')
-      return
-    }
-
-    for (const path of paths) {
-      for (const title of path.slice(0, -1)) {
-        const key = normalizeTitle(title)
-        if (!key) {
-          continue
-        }
-        this.expandedKeys.add(key)
-        this.loadedKeys.add(key)
-        this.loadStates.set(key, 'loaded')
-        this.loadErrors.delete(key)
-      }
-    }
-
-    this.persistInternalState()
+    this.revealPath(path, 'merge')
     this.render()
-    this.scrollNodeIntoView(normalizeTitle(this.currentPageName))
+    this.scrollNodeIntoView(normalizeTitle(path[path.length - 1]))
+  }
+
+  focusCurrentPath = async (): Promise<void> => {
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
+      return
+    }
+
+    this.revealPath(path, 'replace')
+    this.scrollNodeIntoView(normalizeTitle(path[path.length - 1]))
+  }
+
+  collapseOtherBranches = async (): Promise<void> => {
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
+      return
+    }
+
+    this.revealPath(path, 'replace')
+    this.render()
   }
 
   onNodeToggle = async (nodeKey: string): Promise<void> => {
@@ -983,6 +981,12 @@ export class FavoriteTreePlugin {
       sidebarTreeLocateCurrent: () => {
         void this.locateCurrentPage()
       },
+      sidebarTreeFocusCurrentPath: () => {
+        void this.focusCurrentPath()
+      },
+      sidebarTreeCollapseOtherBranches: () => {
+        void this.collapseOtherBranches()
+      },
       sidebarTreeResetPanelSize: () => {
         this.resetPanelSize()
       },
@@ -1340,6 +1344,42 @@ export class FavoriteTreePlugin {
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
     this.currentPagePath = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName) ?? []
+  }
+
+  private async resolveCurrentPagePathOrWarn(): Promise<string[] | null> {
+    await this.updateCurrentPage()
+
+    if (!this.currentPageName) {
+      logseq.UI.showMsg(this.i18n.t('locateNoCurrentPage'), 'warning')
+      return null
+    }
+
+    if (!this.currentPagePath.length) {
+      logseq.UI.showMsg(this.i18n.t('locatePageNotInTree'), 'warning')
+      return null
+    }
+
+    return [...this.currentPagePath]
+  }
+
+  private revealPath(path: string[], mode: 'merge' | 'replace'): void {
+    if (mode === 'replace') {
+      this.expandedKeys.clear()
+    }
+
+    for (const title of path.slice(0, -1)) {
+      const key = normalizeTitle(title)
+      if (!key) {
+        continue
+      }
+
+      this.expandedKeys.add(key)
+      this.loadedKeys.add(key)
+      this.loadStates.set(key, 'loaded')
+      this.loadErrors.delete(key)
+    }
+
+    this.persistInternalState()
   }
 
   private getOrderedChildrenFor(parentTitle: string): string[] {

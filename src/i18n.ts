@@ -53,6 +53,10 @@ type Messages = {
   searchPlaceholder: TranslationValue
   locateLabel: TranslationValue
   locateTitle: TranslationValue
+  focusCurrentPathLabel: TranslationValue
+  focusCurrentPathTitle: TranslationValue
+  collapseOtherBranchesLabel: TranslationValue
+  collapseOtherBranchesTitle: TranslationValue
   resetPanelSizeLabel: TranslationValue
   resetPanelSizeTitle: TranslationValue
   autoRefreshLabel: TranslationValue
@@ -166,6 +170,10 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchPlaceholder: 'Search page titles',
     locateLabel: 'Locate',
     locateTitle: 'Locate the current page',
+    focusCurrentPathLabel: 'Current path',
+    focusCurrentPathTitle: 'Keep only the current page path expanded and scroll to the current page',
+    collapseOtherBranchesLabel: 'Collapse others',
+    collapseOtherBranchesTitle: 'Collapse branches outside the current page path',
     resetPanelSizeLabel: 'Default size',
     resetPanelSizeTitle: 'Restore the default panel size',
     autoRefreshLabel: 'Auto refresh',
@@ -777,6 +785,10 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchPlaceholder: '搜索页面标题',
     locateLabel: '定位',
     locateTitle: '快速定位当前页',
+    focusCurrentPathLabel: '当前路径',
+    focusCurrentPathTitle: '只保留当前页路径展开，并滚动定位到当前页',
+    collapseOtherBranchesLabel: '折叠其他分支',
+    collapseOtherBranchesTitle: '折叠当前页路径之外的其他分支',
     resetPanelSizeLabel: '默认尺寸',
     resetPanelSizeTitle: '恢复面板默认宽高',
     autoRefreshLabel: '自动刷新',
@@ -876,6 +888,10 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     searchPlaceholder: '搜尋頁面標題',
     locateLabel: '定位',
     locateTitle: '快速定位目前頁面',
+    focusCurrentPathLabel: '目前路徑',
+    focusCurrentPathTitle: '只保留目前頁面路徑展開，並捲動定位到目前頁面',
+    collapseOtherBranchesLabel: '折疊其他分支',
+    collapseOtherBranchesTitle: '折疊目前頁面路徑之外的其他分支',
     resetPanelSizeLabel: '預設尺寸',
     resetPanelSizeTitle: '恢復面板預設寬高',
     autoRefreshLabel: '自動重新整理',

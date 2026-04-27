@@ -101,6 +101,16 @@ export function renderSidebarTree(
             data-on-click="sidebarTreeLocateCurrent"
             aria-label="${escapeHtml(i18n.t('locateTitle'))}"
           >${renderIcon('locate', 'favorite-sidebar-tree__button-icon')}${escapeHtml(i18n.t('locateLabel'))}${renderTooltip(i18n.t('locateTitle'), 'favorite-sidebar-tree__tooltip')}</button>
+          <button
+            class="favorite-sidebar-tree__text-btn has-tooltip"
+            data-on-click="sidebarTreeFocusCurrentPath"
+            aria-label="${escapeHtml(i18n.t('focusCurrentPathTitle'))}"
+          >${escapeHtml(i18n.t('focusCurrentPathLabel'))}${renderTooltip(i18n.t('focusCurrentPathTitle'), 'favorite-sidebar-tree__tooltip')}</button>
+          <button
+            class="favorite-sidebar-tree__text-btn has-tooltip"
+            data-on-click="sidebarTreeCollapseOtherBranches"
+            aria-label="${escapeHtml(i18n.t('collapseOtherBranchesTitle'))}"
+          >${escapeHtml(i18n.t('collapseOtherBranchesLabel'))}${renderTooltip(i18n.t('collapseOtherBranchesTitle'), 'favorite-sidebar-tree__tooltip')}</button>
           ${state.rootSortHasCustomOrder
             ? `
               <button

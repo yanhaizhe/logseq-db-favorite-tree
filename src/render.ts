@@ -288,6 +288,22 @@ export function renderFavoriteTree(
         ${escapeHtml(i18n.t('locateLabel'))}
         ${renderTooltip(i18n.t('locateTitle'))}
       </button>
+      <button
+        class="favorite-tree__text-btn has-tooltip"
+        data-action="focus-current-path"
+        aria-label="${escapeHtml(i18n.t('focusCurrentPathTitle'))}"
+      >
+        ${escapeHtml(i18n.t('focusCurrentPathLabel'))}
+        ${renderTooltip(i18n.t('focusCurrentPathTitle'))}
+      </button>
+      <button
+        class="favorite-tree__text-btn has-tooltip"
+        data-action="collapse-other-branches"
+        aria-label="${escapeHtml(i18n.t('collapseOtherBranchesTitle'))}"
+      >
+        ${escapeHtml(i18n.t('collapseOtherBranchesLabel'))}
+        ${renderTooltip(i18n.t('collapseOtherBranchesTitle'))}
+      </button>
       ${state.rootSortHasCustomOrder
         ? `
           <button
