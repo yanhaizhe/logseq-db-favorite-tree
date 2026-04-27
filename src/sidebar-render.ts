@@ -89,12 +89,16 @@ export function renderSidebarTree(
             title="${escapeHtml(i18n.t('openSettings'))}"
             aria-label="${escapeHtml(i18n.t('openSettings'))}"
           >${renderIcon('sliders', 'favorite-sidebar-tree__icon')}</button>
-          <button
-            class="favorite-sidebar-tree__icon-btn"
-            data-on-click="sidebarTreeShowFloating"
-            title="${escapeHtml(i18n.t('switchToFloating'))}"
-            aria-label="${escapeHtml(i18n.t('switchToFloating'))}"
-          >${renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')}</button>
+          ${state.canSwitchDisplayMode
+            ? `
+              <button
+                class="favorite-sidebar-tree__icon-btn"
+                data-on-click="sidebarTreeShowFloating"
+                title="${escapeHtml(i18n.t('switchToFloating'))}"
+                aria-label="${escapeHtml(i18n.t('switchToFloating'))}"
+              >${renderIcon('panel-controls-open', 'favorite-sidebar-tree__icon')}</button>
+            `
+            : ''}
         </div>
       </div>
       ${controlsMarkup}
@@ -381,7 +385,8 @@ function renderSidebarNode(
     : children
   const hasChildren = visibleChildren.length > 0
   const isExpanded = state.expandedKeys.has(key)
-  const effectiveExpanded = isSearching ? hasChildren : isExpanded
+  const isSearchCollapsed = state.searchCollapsedKeys.has(key)
+  const effectiveExpanded = isSearching ? hasChildren && !isSearchCollapsed : isExpanded
 
   const toggleMarkup = hasChildren
     ? `

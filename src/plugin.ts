@@ -8,6 +8,7 @@ import { FavoriteTreeSettingsStore } from './settings'
 import { FavoriteTreeTreeService } from './tree-service'
 import type {
   DisplayMode,
+  DisplayModePreference,
   DragKind,
   LoadState,
   PluginSettings,
@@ -31,7 +32,8 @@ export class FavoriteTreePlugin {
   ] as const
 
   private currentGraphKey = 'default'
-  private displayMode: DisplayMode = 'floating'
+  private displayMode: DisplayMode = 'sidebar'
+  private displayModePreference: DisplayModePreference = 'sidebar'
   private panelVisible = false
   private viewMode: ViewMode = 'panel'
   private refreshing = false
@@ -50,6 +52,7 @@ export class FavoriteTreePlugin {
   private suppressBubbleClick = false
   private sortDragItem: SortableItem | null = null
   private readonly expandedKeys = new Set<string>()
+  private readonly searchCollapsedKeys = new Set<string>()
   private readonly loadedKeys = new Set<string>()
   private readonly loadStates = new Map<string, LoadState>()
   private readonly loadErrors = new Map<string, string>()
@@ -98,7 +101,7 @@ export class FavoriteTreePlugin {
     this.startPolling()
     this.startLocaleWatcher()
 
-    if (this.panelVisible) {
+    if (this.panelVisible && this.displayMode === 'floating') {
       logseq.showMainUI({ autoFocus: false })
     }
   }
@@ -136,6 +139,13 @@ export class FavoriteTreePlugin {
   }
 
   togglePanel = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar' && !this.canSwitchDisplayMode()) {
+      this.render()
+      await this.refresh('panel-open')
+      await this.updateCurrentPage()
+      return
+    }
+
     if (this.displayMode === 'sidebar') {
       await this.switchToFloatingMode('panel')
       return
@@ -158,6 +168,10 @@ export class FavoriteTreePlugin {
   }
 
   closePanel = (): void => {
+    if (this.displayMode === 'sidebar' && !this.canSwitchDisplayMode()) {
+      return
+    }
+
     if (this.displayMode === 'sidebar') {
       this.displayMode = 'floating'
       this.panelVisible = false
@@ -179,6 +193,10 @@ export class FavoriteTreePlugin {
   }
 
   collapseToBubble = async (): Promise<void> => {
+    if (this.displayMode === 'sidebar' && !this.canSwitchDisplayMode()) {
+      return
+    }
+
     if (this.displayMode === 'sidebar') {
       await this.switchToFloatingMode('bubble')
       return
@@ -222,6 +240,10 @@ export class FavoriteTreePlugin {
   }
 
   switchDisplayMode = async (): Promise<void> => {
+    if (!this.canSwitchDisplayMode()) {
+      return
+    }
+
     if (this.displayMode === 'sidebar') {
       await this.switchToFloatingMode('panel')
       return
@@ -255,6 +277,9 @@ export class FavoriteTreePlugin {
 
   setSearchQuery = async (value: string): Promise<void> => {
     const nextQuery = value.trim()
+    if (nextQuery !== this.searchQuery) {
+      this.searchCollapsedKeys.clear()
+    }
     this.searchQuery = nextQuery
 
     if (!nextQuery) {
@@ -276,6 +301,24 @@ export class FavoriteTreePlugin {
   }
 
   toggleExpandCollapseAll = async (): Promise<void> => {
+    if (this.searchQuery) {
+      const visibleExpandableKeys = this.collectVisibleExpandableKeys()
+      if (visibleExpandableKeys.size === 0) {
+        return
+      }
+
+      if (this.searchCollapsedKeys.size > 0) {
+        this.searchCollapsedKeys.clear()
+      } else {
+        this.searchCollapsedKeys.clear()
+        for (const key of visibleExpandableKeys) {
+          this.searchCollapsedKeys.add(key)
+        }
+      }
+      this.render()
+      return
+    }
+
     if (this.hasExpandedNodes()) {
       this.collapseAll()
       return
@@ -337,6 +380,16 @@ export class FavoriteTreePlugin {
   }
 
   onNodeToggle = async (nodeKey: string): Promise<void> => {
+    if (this.searchQuery) {
+      if (this.searchCollapsedKeys.has(nodeKey)) {
+        this.searchCollapsedKeys.delete(nodeKey)
+      } else {
+        this.searchCollapsedKeys.add(nodeKey)
+      }
+      this.render()
+      return
+    }
+
     if (this.expandedKeys.has(nodeKey)) {
       this.expandedKeys.delete(nodeKey)
       this.persistInternalState()
@@ -482,6 +535,7 @@ export class FavoriteTreePlugin {
         const widthChanged = newSettings.panelWidth !== oldSettings?.panelWidth
         const pollIntervalChanged = newSettings.pollIntervalSeconds !== oldSettings?.pollIntervalSeconds
         const positionChanged = newSettings.sidebarPosition !== oldSettings?.sidebarPosition
+        const displayModePreferenceChanged = newSettings.displayModePreference !== oldSettings?.displayModePreference
 
         if (propertyChanged) {
           this.treeService.invalidateIndex()
@@ -495,6 +549,12 @@ export class FavoriteTreePlugin {
 
         if (pollIntervalChanged) {
           this.startPolling()
+        }
+
+        if (displayModePreferenceChanged) {
+          this.applyDisplayModePreference()
+          this.persistInternalState()
+          this.applyMainUIState()
         }
 
         this.render()
@@ -615,6 +675,7 @@ export class FavoriteTreePlugin {
     return {
       rootFavorites: this.rootFavorites,
       expandedKeys: this.expandedKeys,
+      searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,
       loadStates: this.loadStates,
       loadErrors: this.loadErrors,
@@ -631,11 +692,16 @@ export class FavoriteTreePlugin {
       lastRefreshLabel: this.getLastRefreshLabel(),
       viewMode: this.viewMode,
       displayMode: this.displayMode,
+      canSwitchDisplayMode: this.canSwitchDisplayMode(),
       controlsCollapsed: this.controlsCollapsed,
     }
   }
 
   private async switchToFloatingMode(nextViewMode: ViewMode): Promise<void> {
+    if (this.displayModePreference === 'sidebar') {
+      return
+    }
+
     this.displayMode = 'floating'
     this.viewMode = nextViewMode
     this.panelVisible = true
@@ -648,6 +714,49 @@ export class FavoriteTreePlugin {
 
   private hasExpandedNodes(): boolean {
     return this.expandedKeys.size > 0
+  }
+
+  private canSwitchDisplayMode(): boolean {
+    return this.displayModePreference === 'mixed'
+  }
+
+  private collectVisibleExpandableKeys(): Set<string> {
+    const normalizedQuery = normalizeTitle(this.searchQuery)
+    const keys = new Set<string>()
+    if (!normalizedQuery) {
+      return keys
+    }
+
+    for (const title of this.rootFavorites) {
+      this.collectVisibleExpandableKeysForNode(title, normalizedQuery, [], keys)
+    }
+
+    return keys
+  }
+
+  private collectVisibleExpandableKeysForNode(
+    title: string,
+    normalizedQuery: string,
+    ancestors: string[],
+    keys: Set<string>,
+  ): boolean {
+    const key = normalizeTitle(title)
+    if (!key || ancestors.includes(key)) {
+      return false
+    }
+
+    const children = this.getOrderedChildrenFor(title)
+    const nextAncestors = [...ancestors, key]
+    const visibleChildren = children.filter((childTitle) =>
+      this.collectVisibleExpandableKeysForNode(childTitle, normalizedQuery, nextAncestors, keys),
+    )
+
+    const selfMatches = key.includes(normalizedQuery)
+    if (visibleChildren.length > 0) {
+      keys.add(key)
+    }
+
+    return selfMatches || visibleChildren.length > 0
   }
 
   private scrollNodeIntoView(nodeKey: string): void {
@@ -698,6 +807,8 @@ export class FavoriteTreePlugin {
       logseq.hideMainUI({ restoreEditingCursor: false })
       return
     }
+
+    this.clearSidebarTreeUI()
 
     logseq.setMainUIAttrs({
       draggable: false,
@@ -789,6 +900,11 @@ export class FavoriteTreePlugin {
   }
 
   private async renderSidebarTreeUI(): Promise<void> {
+    if (this.displayMode !== 'sidebar') {
+      this.clearSidebarTreeUI()
+      return
+    }
+
     const renderVersion = ++this.sidebarRenderVersion
     const hostDocument = this.getHostDocument()
     const activeElement = hostDocument.activeElement
@@ -941,6 +1057,7 @@ export class FavoriteTreePlugin {
 
   private restoreGraphState(): void {
     const restored = this.settings.readInternalState(this.currentGraphKey)
+    this.displayModePreference = this.settings.getDisplayModePreference()
     this.displayMode = restored.displayMode
     this.panelVisible = restored.panelVisible
     this.autoRefreshPaused = restored.autoRefreshPaused
@@ -964,6 +1081,39 @@ export class FavoriteTreePlugin {
     for (const key of restored.expandedKeys) {
       this.expandedKeys.add(key)
       this.loadedKeys.add(key)
+    }
+    this.applyDisplayModePreference(true)
+  }
+
+  private applyDisplayModePreference(preferSidebarInMixed = false): void {
+    this.displayModePreference = this.settings.getDisplayModePreference()
+
+    if (this.displayModePreference === 'sidebar') {
+      this.displayMode = 'sidebar'
+      this.viewMode = 'panel'
+      this.panelVisible = false
+      return
+    }
+
+    if (this.displayModePreference === 'floating') {
+      this.displayMode = 'floating'
+      this.viewMode = this.viewMode === 'bubble' ? 'bubble' : 'panel'
+      this.panelVisible = true
+      return
+    }
+
+    if (this.displayMode !== 'sidebar' && this.displayMode !== 'floating') {
+      this.displayMode = 'sidebar'
+    }
+
+    if (preferSidebarInMixed) {
+      this.displayMode = 'sidebar'
+      this.panelVisible = false
+      return
+    }
+
+    if (this.displayMode === 'sidebar') {
+      this.panelVisible = false
     }
   }
 

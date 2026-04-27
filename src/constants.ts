@@ -32,6 +32,14 @@ export function buildSettingsSchema(i18n: FavoriteTreeI18n): SettingSchemaDesc[]
       description: i18n.t('settingsSidebarPositionDescription'),
       enumChoices: ['left', 'right'],
     },
+    {
+      key: 'displayModePreference',
+      type: 'enum',
+      default: 'sidebar',
+      title: i18n.t('settingsDisplayModePreferenceTitle'),
+      description: i18n.t('settingsDisplayModePreferenceDescription'),
+      enumChoices: ['sidebar', 'floating', 'mixed'],
+    },
   ]
 }
 

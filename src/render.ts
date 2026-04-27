@@ -246,7 +246,7 @@ export function renderFavoriteTree(
           </div>
         </div>
         <div class="favorite-tree__actions">
-          <button class="favorite-tree__icon-btn" data-action="switch-display-mode" title="${escapeHtml(i18n.t('switchToSidebar'))}">${renderIcon('panel-controls-open')}</button>
+          ${state.canSwitchDisplayMode ? `<button class="favorite-tree__icon-btn" data-action="switch-display-mode" title="${escapeHtml(i18n.t('switchToSidebar'))}">${renderIcon('panel-controls-open')}</button>` : ''}
           <button
             class="favorite-tree__icon-btn ${state.controlsCollapsed ? 'is-active' : ''}"
             data-action="toggle-controls"
@@ -289,12 +289,12 @@ function renderNode(
   const loadState = state.loadStates.get(key) ?? 'idle'
   const children = accessors.getChildrenFor(title)
   const isSearching = normalizedQuery.length > 0
-  const hasLoadedLeaf = state.loadedKeys.has(key) && children.length === 0
   const visibleChildren = isSearching
     ? children.filter((childTitle) => isNodeVisible(childTitle, normalizedQuery, accessors, [...ancestors, key]))
     : children
   const hasKnownChildren = visibleChildren.length > 0
-  const effectiveExpanded = isSearching ? hasKnownChildren : isExpanded
+  const isSearchCollapsed = state.searchCollapsedKeys.has(key)
+  const effectiveExpanded = isSearching ? hasKnownChildren && !isSearchCollapsed : isExpanded
   const statusHint = renderNodeHint(key, depth, effectiveExpanded, loadState, state, i18n)
   const sortParentKey = parentKey ?? ROOT_SORT_KEY
   const sortItemId = buildSortItemId(sortParentKey, key)
@@ -330,11 +330,7 @@ function renderNode(
 
   const chevron = effectiveExpanded ? renderIcon('chevron-down', 'ft-icon ft-icon--xs') : renderIcon('chevron-right', 'ft-icon ft-icon--xs')
   const toggleMarkup = hasKnownChildren
-    ? (
-      isSearching || hasLoadedLeaf
-        ? `<span class="tree-node__toggle is-passive">${chevron}</span>`
-        : `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
-    )
+    ? `<button class="tree-node__toggle" data-action="toggle-node" data-key="${escapeHtml(key)}" title="${escapeHtml(i18n.t('toggleNode'))}">${chevron}</button>`
     : '<span class="tree-node__toggle is-passive"></span>'
 
   return `

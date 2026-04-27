@@ -33,6 +33,8 @@ type Messages = {
   settingsPollIntervalDescription: TranslationValue
   settingsSidebarPositionTitle: TranslationValue
   settingsSidebarPositionDescription: TranslationValue
+  settingsDisplayModePreferenceTitle: TranslationValue
+  settingsDisplayModePreferenceDescription: TranslationValue
   mountPointMissing: TranslationValue
   startupFailed: TranslationValue
   bubbleExpandTitle: TranslationValue
@@ -120,6 +122,9 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     settingsSidebarPositionTitle: 'Initial Side Preference',
     settingsSidebarPositionDescription:
       'Choose whether the panel prefers the left or right side on first display. Remembered drag positions take priority afterward.',
+    settingsDisplayModePreferenceTitle: 'Display Mode Preset',
+    settingsDisplayModePreferenceDescription:
+      'Choose the default behavior: sidebar = native sidebar only, floating = floating panel only, mixed = both and can switch.',
     mountPointMissing: 'Plugin mount point is missing.',
     startupFailed: ({ message }) => `DB Favorite Tree failed to start: ${message}`,
     bubbleExpandTitle: 'Click to open the favorite tree, drag to move',
@@ -707,6 +712,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     settingsPollIntervalDescription: '轮询自动刷新的时间间隔，单位为秒。',
     settingsSidebarPositionTitle: '初始侧向偏好',
     settingsSidebarPositionDescription: '首次显示时默认靠左或靠右；拖动后会优先记住当前位置。',
+    settingsDisplayModePreferenceTitle: '显示模式预设',
+    settingsDisplayModePreferenceDescription: '可选 sidebar、floating、mixed；默认 sidebar。sidebar 为仅原生侧边栏，floating 为仅悬浮模式，mixed 为两者可切换。',
     mountPointMissing: '插件挂载点不存在',
     startupFailed: ({ message }) => `DB Favorite Tree 启动失败: ${message}`,
     bubbleExpandTitle: '点击展开收藏夹树，拖拽可移动位置',
@@ -782,6 +789,8 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     settingsPollIntervalDescription: '輪詢自動重新整理的時間間隔，單位為秒。',
     settingsSidebarPositionTitle: '初始側邊偏好',
     settingsSidebarPositionDescription: '首次顯示時預設靠左或靠右；拖動後會優先記住目前位置。',
+    settingsDisplayModePreferenceTitle: '顯示模式預設',
+    settingsDisplayModePreferenceDescription: '可選 sidebar、floating、mixed；預設 sidebar。sidebar 為僅原生側邊欄，floating 為僅浮動模式，mixed 為兩者可切換。',
     mountPointMissing: '找不到外掛掛載點',
     startupFailed: ({ message }) => `DB Favorite Tree 啟動失敗: ${message}`,
     bubbleExpandTitle: '點擊展開收藏樹，拖曳可移動位置',

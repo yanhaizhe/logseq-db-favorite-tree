@@ -1,6 +1,7 @@
 import { DEFAULT_POLL_INTERVAL_SECONDS, INTERNAL_SETTINGS } from './constants'
 import type {
   DisplayMode,
+  DisplayModePreference,
   GraphScopedPersistedState,
   GraphScopedStateMap,
   PanelSize,
@@ -45,7 +46,12 @@ export class FavoriteTreeSettingsStore {
   }
 
   getDisplayMode(): DisplayMode {
-    return this.getString(INTERNAL_SETTINGS.displayMode) === 'sidebar' ? 'sidebar' : 'floating'
+    return this.getString(INTERNAL_SETTINGS.displayMode) === 'floating' ? 'floating' : 'sidebar'
+  }
+
+  getDisplayModePreference(): DisplayModePreference {
+    const value = this.getSettings()?.displayModePreference
+    return value === 'mixed' || value === 'floating' ? value : 'sidebar'
   }
 
   readInternalState(graphKey: string): RestoredPluginState {

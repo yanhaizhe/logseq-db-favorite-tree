@@ -3,6 +3,7 @@ import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export type ViewMode = 'panel' | 'bubble'
 export type DisplayMode = 'floating' | 'sidebar'
+export type DisplayModePreference = 'mixed' | 'sidebar' | 'floating'
 export type DragKind = 'panel' | 'bubble' | 'panel-resize'
 export type SidebarPosition = 'left' | 'right'
 export type SortPlacement = 'before' | 'after'
@@ -47,6 +48,7 @@ export type PluginSettings = {
   panelWidth?: number
   pollIntervalSeconds?: number
   sidebarPosition?: string
+  displayModePreference?: DisplayModePreference
   __panelVisible?: boolean
   __expandedKeys?: string[]
   __autoRefreshPaused?: boolean
@@ -104,6 +106,7 @@ export type GraphScopedStateMap = Record<string, GraphScopedPersistedState>
 export type TreeStateSnapshot = {
   rootFavorites: string[]
   expandedKeys: Set<string>
+  searchCollapsedKeys: Set<string>
   loadedKeys: Set<string>
   loadStates: Map<string, LoadState>
   loadErrors: Map<string, string>
@@ -120,6 +123,7 @@ export type TreeStateSnapshot = {
   lastRefreshLabel: string
   viewMode: ViewMode
   displayMode: DisplayMode
+  canSwitchDisplayMode: boolean
   controlsCollapsed: boolean
 }
 
