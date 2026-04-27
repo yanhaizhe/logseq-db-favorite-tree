@@ -14,6 +14,36 @@ type SidebarStatusAction = {
   label: string
 }
 
+type SidebarCreateChildComposerState = {
+  parentTitle: string
+  draftTitle: string
+}
+
+function renderSidebarCreateChildComposer(state: SidebarCreateChildComposerState, i18n: FavoriteTreeI18n): string {
+  return `
+    <div class="favorite-sidebar-tree__create-child-composer">
+      <div class="favorite-sidebar-tree__create-child-copy">
+        <span class="favorite-sidebar-tree__create-child-title">${escapeHtml(i18n.t('createChildPageForParent', { title: state.parentTitle }))}</span>
+        <span class="favorite-sidebar-tree__create-child-hint">${escapeHtml(
+          i18n.t('createChildInputHint', { parent: state.parentTitle }),
+        )}</span>
+      </div>
+      <div class="favorite-sidebar-tree__create-child-controls">
+        <input
+          class="favorite-sidebar-tree__create-child-input"
+          data-role="create-child-input"
+          type="text"
+          value="${escapeHtml(state.draftTitle)}"
+          placeholder="${escapeHtml(i18n.t('createChildInputPlaceholder'))}"
+          spellcheck="false"
+        />
+        <button class="favorite-sidebar-tree__text-btn" data-on-click="sidebarTreeSubmitCreateChild">${escapeHtml(i18n.t('createChildSubmit'))}</button>
+        <button class="favorite-sidebar-tree__text-btn" data-on-click="sidebarTreeCancelCreateChild">${escapeHtml(i18n.t('createChildCancel'))}</button>
+      </div>
+    </div>
+  `
+}
+
 export function renderSidebarTree(
   state: TreeStateSnapshot,
   accessors: SidebarTreeRenderAccessors,
@@ -117,6 +147,15 @@ export function renderSidebarTree(
             `
             : ''}
         </div>
+        ${state.createChildDraftParent
+          ? renderSidebarCreateChildComposer(
+              {
+                parentTitle: state.createChildDraftParent,
+                draftTitle: state.createChildDraftTitle,
+              },
+              i18n,
+            )
+          : ''}
         <div class="favorite-sidebar-tree__toolbar">
           <button
             class="favorite-sidebar-tree__text-btn has-tooltip"
@@ -382,6 +421,59 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.favorite-sidebar-tree__create-child-composer {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--ls-link-text-color, #2563eb) 18%, transparent 82%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 6%, transparent 94%);
+}
+
+.favorite-sidebar-tree__create-child-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.favorite-sidebar-tree__create-child-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ls-primary-text-color, #1f2937);
+}
+
+.favorite-sidebar-tree__create-child-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ls-secondary-text-color, #6b7280);
+}
+
+.favorite-sidebar-tree__create-child-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.favorite-sidebar-tree__create-child-input {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 72%, transparent 28%);
+  border-radius: 8px;
+  background: var(--ls-primary-background-color, #ffffff);
+  color: var(--ls-primary-text-color, #1f2937);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.favorite-sidebar-tree__create-child-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 58%, transparent 42%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ls-link-text-color, #2563eb) 12%, transparent 88%);
 }
 
 .favorite-sidebar-tree__toolbar {
@@ -833,6 +925,12 @@ function renderSidebarNode(
         </button>
         <button
           class="favorite-sidebar-tree__inline-action has-tooltip"
+          data-on-click="sidebarTreeCreateChildPage"
+          data-page="${escapeHtml(title)}"
+          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
+        >${renderIcon('child-plus', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('createChildPageForParent', { title }), 'favorite-sidebar-tree__tooltip')}</button>
+        <button
+          class="favorite-sidebar-tree__inline-action has-tooltip"
           data-on-click="sidebarTreeOpenPageInSidebar"
           data-page="${escapeHtml(title)}"
           aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
@@ -888,6 +986,12 @@ function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI1
           <span class="favorite-sidebar-tree__title-text">${renderSidebarHighlightedTitle(title, normalizedQuery)}</span>
           ${isCycle ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCycle'))}</span>` : ''}
         </button>
+        <button
+          class="favorite-sidebar-tree__inline-action has-tooltip"
+          data-on-click="sidebarTreeCreateChildPage"
+          data-page="${escapeHtml(title)}"
+          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
+        >${renderIcon('child-plus', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('createChildPageForParent', { title }), 'favorite-sidebar-tree__tooltip')}</button>
         <button
           class="favorite-sidebar-tree__inline-action has-tooltip"
           data-on-click="sidebarTreeOpenPageInSidebar"

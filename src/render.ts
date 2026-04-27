@@ -14,6 +14,11 @@ type StatusAction = {
   label: string
 }
 
+type CreateChildComposerState = {
+  parentTitle: string
+  draftTitle: string
+}
+
 type IconName =
   | 'bubble'
   | 'play'
@@ -32,6 +37,7 @@ type IconName =
   | 'search'
   | 'locate'
   | 'sidebar'
+  | 'child-plus'
   | 'right-sidebar'
   | 'floating'
   | 'expand-tree'
@@ -176,6 +182,15 @@ export function renderIcon(name: IconName, className = 'ft-icon'): string {
           <path d="M12 9.25h4.25M12 12h3.25M12 14.75h4.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
       `
+    case 'child-plus':
+      return `
+        <svg ${attrs}>
+          <path d="M7.75 8.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7.75 12h8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7.75 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M17 7.5v5M14.5 10h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      `
     case 'right-sidebar':
       return `
         <svg ${attrs}>
@@ -217,6 +232,29 @@ export function renderIcon(name: IconName, className = 'ft-icon'): string {
 
 export function renderTooltip(label: string, className = 'ft-ui-tooltip'): string {
   return `<span class="${className}" role="tooltip">${escapeHtml(label)}</span>`
+}
+
+function renderCreateChildComposer(state: CreateChildComposerState, i18n: FavoriteTreeI18n): string {
+  return `
+    <div class="favorite-tree__create-child-composer">
+      <div class="favorite-tree__create-child-copy">
+        <span class="favorite-tree__create-child-title">${escapeHtml(i18n.t('createChildPageForParent', { title: state.parentTitle }))}</span>
+        <span class="favorite-tree__create-child-hint">${escapeHtml(i18n.t('createChildInputHint', { parent: state.parentTitle }))}</span>
+      </div>
+      <div class="favorite-tree__create-child-controls">
+        <input
+          class="favorite-tree__create-child-input"
+          data-role="create-child-input"
+          type="text"
+          value="${escapeHtml(state.draftTitle)}"
+          placeholder="${escapeHtml(i18n.t('createChildInputPlaceholder'))}"
+          spellcheck="false"
+        />
+        <button class="favorite-tree__text-btn" data-action="submit-create-child">${escapeHtml(i18n.t('createChildSubmit'))}</button>
+        <button class="favorite-tree__text-btn" data-action="cancel-create-child">${escapeHtml(i18n.t('createChildCancel'))}</button>
+      </div>
+    </div>
+  `
 }
 
 export function renderFavoriteTree(
@@ -301,6 +339,15 @@ export function renderFavoriteTree(
         : ''}
     </div>
   `
+  const createChildMarkup = state.createChildDraftParent
+    ? renderCreateChildComposer(
+        {
+          parentTitle: state.createChildDraftParent,
+          draftTitle: state.createChildDraftTitle,
+        },
+        i18n,
+      )
+    : ''
   const toolbarMarkup = `
     <div class="favorite-tree__toolbar">
       <button class="favorite-tree__text-btn has-tooltip" data-action="locate-current" aria-label="${escapeHtml(i18n.t('locateTitle'))}">
@@ -365,6 +412,7 @@ export function renderFavoriteTree(
     : `
       <div class="favorite-tree__controls">
         ${searchMarkup}
+        ${createChildMarkup}
         ${breadcrumbMarkup}
         ${toolbarMarkup}
       </div>
@@ -534,6 +582,16 @@ function renderNode(
         ${sortHandleMarkup}
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">
           <span class="tree-node__title-text">${renderHighlightedTitle(title, normalizedQuery)}</span>
+        </button>
+        <button
+          class="tree-node__inline-action has-tooltip"
+          data-action="create-child-page"
+          data-page="${escapeHtml(title)}"
+          data-no-drag="true"
+          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
+        >
+          ${renderIcon('child-plus', 'ft-icon ft-icon--xs')}
+          ${renderTooltip(i18n.t('createChildPageForParent', { title }))}
         </button>
         <button
           class="tree-node__inline-action has-tooltip"

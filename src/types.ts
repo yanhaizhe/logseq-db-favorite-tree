@@ -110,6 +110,8 @@ export type TreeStateSnapshot = {
   rootFavorites: string[]
   sortOrders: SortOrderMap
   sortModes: SortModeMap
+  createChildDraftParent: string | null
+  createChildDraftTitle: string
   expandedKeys: Set<string>
   searchCollapsedKeys: Set<string>
   loadedKeys: Set<string>

@@ -29,7 +29,10 @@ export class FavoriteTreeTreeService {
       }
 
       const page = await this.resolveFavoritePage(normalizedSeed)
-      const title = pageTitle(page) ?? normalizedSeed
+      const title = pageTitle(page)
+      if (!title) {
+        continue
+      }
       const titleKey = normalizeTitle(title)
       if (!titleKey || seen.has(titleKey)) {
         continue

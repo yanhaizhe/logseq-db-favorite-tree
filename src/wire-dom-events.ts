@@ -4,6 +4,7 @@ export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
   onHeaderDoubleClick: () => void
   onSearchQueryChange: (value: string) => void
+  onCreateChildDraftChange: (value: string) => void
   onToggleControls: () => void
   onSwitchDisplayMode: () => void
   onResetPanelSize: () => void
@@ -21,6 +22,9 @@ export type FavoriteTreeDOMHandlers = {
   onClose: () => void
   onToggleNode: (key: string) => void
   onOpenPage: (page: string) => void
+  onCreateChildPage: (page: string) => void
+  onSubmitCreateChild: () => void
+  onCancelCreateChild: () => void
   onOpenPageInSidebar: (page: string) => void
   onToggleSortMode: (parentKey: string) => void
   onClearCustomSort: (parentKey: string) => void
@@ -116,11 +120,18 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
 
   root.addEventListener('input', (event) => {
     const target = event.target as HTMLInputElement | null
-    if (!target || target.dataset.role !== 'search-input') {
+    if (!target) {
       return
     }
 
-    handlers.onSearchQueryChange(target.value)
+    if (target.dataset.role === 'search-input') {
+      handlers.onSearchQueryChange(target.value)
+      return
+    }
+
+    if (target.dataset.role === 'create-child-input') {
+      handlers.onCreateChildDraftChange(target.value)
+    }
   })
 
   root.addEventListener('click', (event) => {
@@ -207,6 +218,21 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       }
       return
     }
+    if (action === 'create-child-page') {
+      const page = target.dataset.page
+      if (page) {
+        handlers.onCreateChildPage(page)
+      }
+      return
+    }
+    if (action === 'submit-create-child') {
+      handlers.onSubmitCreateChild()
+      return
+    }
+    if (action === 'cancel-create-child') {
+      handlers.onCancelCreateChild()
+      return
+    }
     if (action === 'open-page-in-sidebar') {
       const page = target.dataset.page
       if (page) {
@@ -285,6 +311,20 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
   })
 
   root.addEventListener('keydown', (event) => {
+    const createChildInput = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-role="create-child-input"]')
+    if (createChildInput) {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        handlers.onSubmitCreateChild()
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handlers.onCancelCreateChild()
+        return
+      }
+    }
+
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action="expand-panel"]')
     if (!target) {
       return

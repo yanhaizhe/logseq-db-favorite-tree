@@ -22,7 +22,7 @@ import type {
   ViewMode,
 } from './types'
 import { applyTheme } from './theme'
-import { escapeSelectorValue, normalizeTitle } from './utils'
+import { escapeSelectorValue, normalizeTitle, unwrapPageRef } from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -42,6 +42,9 @@ export class FavoriteTreePlugin {
   private searching = false
   private searchQuery = ''
   private searchError: string | null = null
+  private createChildDraftParent: string | null = null
+  private createChildDraftTitle = ''
+  private shouldFocusCreateChildInput = false
   private activeSearchMatchKey: string | null = null
   private searchMatchKeys: string[] = []
   private currentPageName: string | null = null
@@ -100,6 +103,7 @@ export class FavoriteTreePlugin {
     window.addEventListener('focus', this.handleWindowFocus)
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.addEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.addEventListener('keydown', this.handleSidebarKeydown)
     logseq.provideStyle({
       key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
       style: SIDEBAR_TREE_HOST_STYLE,
@@ -147,6 +151,7 @@ export class FavoriteTreePlugin {
     window.removeEventListener('focus', this.handleWindowFocus)
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.removeEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.removeEventListener('keydown', this.handleSidebarKeydown)
     for (const off of this.offHooks) {
       off()
     }
@@ -483,6 +488,117 @@ export class FavoriteTreePlugin {
     }
   }
 
+  createChildPage = async (parentTitle: string): Promise<void> => {
+    const normalizedParentKey = normalizeTitle(parentTitle)
+    if (!normalizedParentKey) {
+      return
+    }
+
+    this.createChildDraftParent = parentTitle
+    this.createChildDraftTitle = ''
+    this.shouldFocusCreateChildInput = true
+    this.render()
+  }
+
+  setCreateChildDraftTitle = (value: string): void => {
+    if (!this.createChildDraftParent) {
+      return
+    }
+
+    this.createChildDraftTitle = value
+  }
+
+  cancelCreateChildPage = (): void => {
+    if (!this.createChildDraftParent && !this.createChildDraftTitle) {
+      return
+    }
+
+    this.createChildDraftParent = null
+    this.createChildDraftTitle = ''
+    this.shouldFocusCreateChildInput = false
+    this.render()
+  }
+
+  submitCreateChildPage = async (): Promise<void> => {
+    const parentTitle = this.createChildDraftParent
+    if (!parentTitle) {
+      return
+    }
+
+    const normalizedParentKey = normalizeTitle(parentTitle)
+    if (!normalizedParentKey) {
+      return
+    }
+
+    const hierarchyProperty = this.settings.getHierarchyProperty()
+    const childTitle = unwrapPageRef(this.createChildDraftTitle).trim()
+    if (!childTitle) {
+      logseq.UI.showMsg(this.i18n.t('createChildEmpty'), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    if (normalizeTitle(childTitle) === normalizedParentKey) {
+      logseq.UI.showMsg(this.i18n.t('createChildSelfParent'), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    const existing = await logseq.Editor.getPage(childTitle)
+    if (existing) {
+      logseq.UI.showMsg(this.i18n.t('createChildDuplicate', { title: childTitle }), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    let createdPageName: string | null = null
+    try {
+      const createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false, createFirstBlock: false })
+      const createdPageId = createdPage?.uuid
+      const createdTitle = createdPage?.originalName ?? createdPage?.name ?? childTitle
+      if (!createdPageId) {
+        throw new Error(this.i18n.t('createChildEmpty'))
+      }
+
+      createdPageName = createdTitle
+      await logseq.Editor.upsertBlockProperty(createdPageId, hierarchyProperty, `[[${parentTitle}]]`)
+
+      this.createChildDraftParent = null
+      this.createChildDraftTitle = ''
+      this.shouldFocusCreateChildInput = false
+      this.expandedKeys.add(normalizedParentKey)
+      this.loadedKeys.add(normalizedParentKey)
+      this.loadStates.set(normalizedParentKey, 'loaded')
+      this.loadErrors.delete(normalizedParentKey)
+      this.treeService.invalidateIndex()
+      await this.refresh('manual')
+      this.scrollNodeIntoView(normalizeTitle(createdTitle))
+      logseq.UI.showMsg(this.i18n.t('createChildSuccess', { title: createdTitle, parent: parentTitle }), 'success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      let rolledBack = false
+
+      if (createdPageName) {
+        try {
+          await logseq.Editor.deletePage(createdPageName)
+          rolledBack = true
+        } catch {
+          rolledBack = false
+        }
+      }
+
+      logseq.UI.showMsg(
+        rolledBack
+          ? this.i18n.t('createChildFailedRolledBack', { message })
+          : this.i18n.t('createChildFailedNeedsCleanup', { title: createdPageName ?? childTitle, message }),
+        'warning',
+      )
+    }
+  }
+
   toggleSortModeForParent = (parentKey: string): void => {
     const key = this.normalizeSortParentKey(parentKey)
     if (!key || !this.hasCustomSortOrder(key)) {
@@ -507,7 +623,7 @@ export class FavoriteTreePlugin {
       return
     }
 
-    const confirmed = window.confirm(this.i18n.t('clearCustomSortConfirm'))
+    const confirmed = this.getHostWindow().confirm(this.i18n.t('clearCustomSortConfirm'))
     if (!confirmed) {
       return
     }
@@ -585,6 +701,7 @@ export class FavoriteTreePlugin {
     this.offHooks.push(
       logseq.DB.onChanged(() => {
         this.scheduleRefresh('db-changed')
+        void this.updateCurrentPage()
       }),
     )
 
@@ -719,7 +836,8 @@ export class FavoriteTreePlugin {
 
   private async updateCurrentPage(): Promise<void> {
     const current = await logseq.Editor.getCurrentPage()
-    this.currentPageName = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    const currentTitle = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    this.currentPageName = await this.resolveExistingCurrentPageTitle(currentTitle)
     const currentPageKey = normalizeTitle(this.currentPageName)
     if (this.lastLocatedNodeKey && this.lastLocatedNodeKey !== currentPageKey) {
       this.lastLocatedNodeKey = null
@@ -759,6 +877,8 @@ export class FavoriteTreePlugin {
         nextInput.setSelectionRange(selectionStart, selectionEnd)
       }
     }
+
+    this.restoreCreateChildInputFocus()
   }
 
   private getRenderState(): TreeStateSnapshot {
@@ -766,6 +886,8 @@ export class FavoriteTreePlugin {
       rootFavorites: this.getOrderedTitlesForParent(ROOT_SORT_KEY),
       sortOrders: this.sortOrders,
       sortModes: this.sortModes,
+      createChildDraftParent: this.createChildDraftParent,
+      createChildDraftTitle: this.createChildDraftTitle,
       expandedKeys: this.expandedKeys,
       searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,
@@ -965,6 +1087,18 @@ export class FavoriteTreePlugin {
           this.openPage(page)
         }
       },
+      sidebarTreeCreateChildPage: (event: { dataset?: Record<string, string> }) => {
+        const page = event.dataset?.page
+        if (page) {
+          void this.createChildPage(page)
+        }
+      },
+      sidebarTreeSubmitCreateChild: () => {
+        void this.submitCreateChildPage()
+      },
+      sidebarTreeCancelCreateChild: () => {
+        this.cancelCreateChildPage()
+      },
       sidebarTreeOpenPageInSidebar: (event: { dataset?: Record<string, string> }) => {
         const page = event.dataset?.page
         if (page) {
@@ -1158,6 +1292,18 @@ export class FavoriteTreePlugin {
     return document
   }
 
+  private getHostWindow(): Window {
+    try {
+      if (window.top) {
+        return window.top
+      }
+    } catch {
+      // Ignore cross-frame access failures and fall back to the plugin iframe window.
+    }
+
+    return window
+  }
+
   private asSidebarSearchInput(target: EventTarget | null): HTMLInputElement | null {
     if (!target || typeof target !== 'object') {
       return null
@@ -1179,6 +1325,54 @@ export class FavoriteTreePlugin {
     return target as HTMLInputElement
   }
 
+  private asCreateChildInput(target: EventTarget | null): HTMLInputElement | null {
+    if (!target || typeof target !== 'object') {
+      return null
+    }
+
+    const candidate = target as Partial<HTMLInputElement> & {
+      getAttribute?: (name: string) => string | null
+      tagName?: string
+    }
+
+    if (candidate.getAttribute?.('data-role') !== 'create-child-input') {
+      return null
+    }
+
+    if (typeof candidate.tagName !== 'string' || candidate.tagName.toUpperCase() !== 'INPUT') {
+      return null
+    }
+
+    return target as HTMLInputElement
+  }
+
+  private restoreCreateChildInputFocus(): void {
+    if (!this.shouldFocusCreateChildInput) {
+      return
+    }
+
+    this.shouldFocusCreateChildInput = false
+    const focus = (): void => {
+      const selector = '[data-role="create-child-input"]'
+      const target =
+        this.displayMode === 'sidebar'
+          ? this.getHostDocument().querySelector<HTMLInputElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+          : this.root.querySelector<HTMLInputElement>(selector)
+
+      if (!target) {
+        return
+      }
+
+      target.focus({ preventScroll: false })
+      const length = target.value.length
+      target.setSelectionRange(length, length)
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(focus)
+    })
+  }
+
   private readonly handleBodyScroll = (): void => {
     const body = this.getBodyElement()
     if (body) {
@@ -1196,12 +1390,34 @@ export class FavoriteTreePlugin {
   }
 
   private readonly handleSidebarSearchInput = (event: Event): void => {
-    const target = this.asSidebarSearchInput(event.target)
+    const sidebarSearchInput = this.asSidebarSearchInput(event.target)
+    if (sidebarSearchInput) {
+      void this.setSearchQuery(sidebarSearchInput.value)
+      return
+    }
+
+    const createChildInput = this.asCreateChildInput(event.target)
+    if (createChildInput) {
+      this.setCreateChildDraftTitle(createChildInput.value)
+    }
+  }
+
+  private readonly handleSidebarKeydown = (event: KeyboardEvent): void => {
+    const target = this.asCreateChildInput(event.target)
     if (!target) {
       return
     }
 
-    void this.setSearchQuery(target.value)
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void this.submitCreateChildPage()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      this.cancelCreateChildPage()
+    }
   }
 
   private readonly handleVisibilityChange = (): void => {
@@ -1376,6 +1592,19 @@ export class FavoriteTreePlugin {
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
     this.currentPagePath = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName) ?? []
+  }
+
+  private async resolveExistingCurrentPageTitle(currentTitle: string | null): Promise<string | null> {
+    if (!currentTitle) {
+      return null
+    }
+
+    try {
+      const existingPage = await logseq.Editor.getPage(currentTitle)
+      return existingPage ? currentTitle : null
+    } catch {
+      return null
+    }
   }
 
   private async resolveCurrentPagePathOrWarn(): Promise<string[] | null> {

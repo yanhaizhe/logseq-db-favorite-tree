@@ -97,6 +97,19 @@ type Messages = {
   sortStateCustomSaved: TranslationValue
   toggleNode: TranslationValue
   openPage: TranslationValue
+  createChildPage: TranslationValue
+  createChildPageForParent: TranslationValue
+  createChildPrompt: TranslationValue
+  createChildInputHint: TranslationValue
+  createChildInputPlaceholder: TranslationValue
+  createChildSubmit: TranslationValue
+  createChildCancel: TranslationValue
+  createChildEmpty: TranslationValue
+  createChildDuplicate: TranslationValue
+  createChildSelfParent: TranslationValue
+  createChildSuccess: TranslationValue
+  createChildFailedRolledBack: TranslationValue
+  createChildFailedNeedsCleanup: TranslationValue
   openInRightSidebar: TranslationValue
   openInRightSidebarFailed: TranslationValue
   badgeCurrent: TranslationValue
@@ -219,6 +232,20 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: 'Custom order saved',
     toggleNode: 'Expand or collapse',
     openPage: ({ title }) => `Open page ${title}`,
+    createChildPage: 'New child',
+    createChildPageForParent: ({ title }) => `Create a child page under ${title}`,
+    createChildPrompt: ({ parent, property }) => `New child page under ${parent}\nHierarchy property: ${property}\n\nEnter the child page title:`,
+    createChildInputHint: ({ parent }) => `Create a child page under ${parent}. Press Enter to submit or Esc to cancel.`,
+    createChildInputPlaceholder: 'Enter the child page title',
+    createChildSubmit: 'Create',
+    createChildCancel: 'Cancel',
+    createChildEmpty: 'Please enter a child page title.',
+    createChildDuplicate: ({ title }) => `${title} already exists. Choose a different page title.`,
+    createChildSelfParent: 'A page cannot be created as its own child.',
+    createChildSuccess: ({ title, parent }) => `Created ${title} under ${parent}.`,
+    createChildFailedRolledBack: ({ message }) => `Creating the child page failed and has been rolled back: ${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) =>
+      `${title} was created, but writing the parent relation failed: ${message}. Please check it manually.`,
     openInRightSidebar: ({ title }) => `Open ${title} in the right sidebar`,
     openInRightSidebarFailed: ({ title }) => `Failed to open ${title} in the right sidebar.`,
     badgeCurrent: 'Current',
@@ -835,6 +862,19 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: '已保存自定义排序',
     toggleNode: '展开或折叠',
     openPage: ({ title }) => `打开页面 ${title}`,
+    createChildPage: '新建子页',
+    createChildPageForParent: ({ title }) => `在 ${title} 下新建子页面`,
+    createChildPrompt: ({ parent, property }) => `在 ${parent} 下新建子页面\n层级属性：${property}\n\n请输入子页面标题：`,
+    createChildInputHint: ({ parent }) => `在 ${parent} 下新建子页面。按 Enter 提交，按 Esc 取消。`,
+    createChildInputPlaceholder: '请输入子页面标题',
+    createChildSubmit: '创建',
+    createChildCancel: '取消',
+    createChildEmpty: '请输入子页面标题。',
+    createChildDuplicate: ({ title }) => `${title} 已存在，请使用其他页面标题。`,
+    createChildSelfParent: '不能把页面创建为自己的子页面。',
+    createChildSuccess: ({ title, parent }) => `已在 ${parent} 下创建 ${title}。`,
+    createChildFailedRolledBack: ({ message }) => `创建子页面失败，已自动回滚：${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已创建，但写入父子关系失败：${message}。请手动检查。`,
     openInRightSidebar: ({ title }) => `在右侧边栏打开 ${title}`,
     openInRightSidebarFailed: ({ title }) => `无法在右侧边栏打开 ${title}。`,
     badgeCurrent: '当前页',
@@ -941,6 +981,19 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     sortStateCustomSaved: '已儲存自訂排序',
     toggleNode: '展開或摺疊',
     openPage: ({ title }) => `開啟頁面 ${title}`,
+    createChildPage: '新建子頁',
+    createChildPageForParent: ({ title }) => `在 ${title} 下新建子頁面`,
+    createChildPrompt: ({ parent, property }) => `在 ${parent} 下新建子頁面\n層級屬性：${property}\n\n請輸入子頁面標題：`,
+    createChildInputHint: ({ parent }) => `在 ${parent} 下新建子頁面。按 Enter 送出，按 Esc 取消。`,
+    createChildInputPlaceholder: '請輸入子頁面標題',
+    createChildSubmit: '建立',
+    createChildCancel: '取消',
+    createChildEmpty: '請輸入子頁面標題。',
+    createChildDuplicate: ({ title }) => `${title} 已存在，請使用其他頁面標題。`,
+    createChildSelfParent: '不能把頁面建立為自己的子頁面。',
+    createChildSuccess: ({ title, parent }) => `已在 ${parent} 下建立 ${title}。`,
+    createChildFailedRolledBack: ({ message }) => `建立子頁面失敗，已自動回滾：${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已建立，但寫入父子關係失敗：${message}。請手動檢查。`,
     openInRightSidebar: ({ title }) => `在右側邊欄開啟 ${title}`,
     openInRightSidebarFailed: ({ title }) => `無法在右側邊欄開啟 ${title}。`,
     badgeCurrent: '目前頁',

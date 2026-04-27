@@ -24,6 +24,7 @@ async function main(): Promise<void> {
     onSearchQueryChange: (value) => {
       void plugin.setSearchQuery(value)
     },
+    onCreateChildDraftChange: plugin.setCreateChildDraftTitle,
     onToggleControls: plugin.toggleControlsCollapsed,
     onSwitchDisplayMode: () => {
       void plugin.switchDisplayMode()
@@ -59,6 +60,13 @@ async function main(): Promise<void> {
       void plugin.onNodeToggle(key)
     },
     onOpenPage: plugin.openPage,
+    onCreateChildPage: (page) => {
+      void plugin.createChildPage(page)
+    },
+    onSubmitCreateChild: () => {
+      void plugin.submitCreateChildPage()
+    },
+    onCancelCreateChild: plugin.cancelCreateChildPage,
     onOpenPageInSidebar: (page) => {
       void plugin.openPageInRightSidebar(page)
     },
