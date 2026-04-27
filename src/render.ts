@@ -465,7 +465,7 @@ export function renderFavoriteTree(
       })
 
   return `
-    <div class="favorite-tree">
+    <div class="favorite-tree ${state.refreshing ? 'is-refreshing' : ''}">
       <div class="favorite-tree__header" data-drag-handle="panel" title="${escapeHtml(i18n.t('panelHeaderTitle'))}">
         <div class="favorite-tree__header-main">
           <div class="favorite-tree__title-row">

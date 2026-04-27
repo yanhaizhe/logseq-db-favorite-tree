@@ -58,6 +58,31 @@ code {
   box-shadow: var(--ft-shadow);
 }
 
+.favorite-tree.is-refreshing::before {
+  content: "";
+  position: absolute;
+  left: -30%;
+  top: 0;
+  width: 60%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--ft-accent) 58%, transparent 42%) 30%,
+    color-mix(in srgb, var(--ft-accent) 88%, transparent 12%) 50%,
+    color-mix(in srgb, var(--ft-accent) 58%, transparent 42%) 70%,
+    transparent 100%
+  );
+  opacity: 0.95;
+  z-index: 60;
+  animation: ft-refresh-bar 1.05s ease-in-out infinite;
+}
+
+.favorite-tree.is-refreshing .favorite-tree__icon-btn[data-action="refresh"] svg {
+  animation: ft-spin 0.9s linear infinite;
+}
+
 .favorite-tree__resize-handle {
   position: absolute;
   right: 0;
@@ -893,5 +918,25 @@ body.is-dragging * {
 
   50% {
     transform: scale(1.04);
+  }
+}
+
+@keyframes ft-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ft-refresh-bar {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(260%);
   }
 }

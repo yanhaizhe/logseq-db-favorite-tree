@@ -198,7 +198,7 @@ export function renderSidebarTree(
     `
 
   return `
-    <section class="favorite-sidebar-tree" data-favorite-sidebar-tree="true">
+    <section class="favorite-sidebar-tree ${state.refreshing ? 'is-refreshing' : ''}" data-favorite-sidebar-tree="true">
       <div class="favorite-sidebar-tree__header">
         <div class="favorite-sidebar-tree__header-main">
           <span class="favorite-sidebar-tree__heading-wrap">
@@ -250,6 +250,31 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   position: relative;
   isolation: isolate;
   color: var(--ls-primary-text-color, #1f2937);
+}
+
+.favorite-sidebar-tree.is-refreshing::before {
+  content: "";
+  position: absolute;
+  left: -30%;
+  top: 0;
+  width: 60%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--ls-link-text-color, #2563eb) 58%, transparent 42%) 30%,
+    color-mix(in srgb, var(--ls-link-text-color, #2563eb) 88%, transparent 12%) 50%,
+    color-mix(in srgb, var(--ls-link-text-color, #2563eb) 58%, transparent 42%) 70%,
+    transparent 100%
+  );
+  opacity: 0.95;
+  z-index: 70;
+  animation: ft-sidebar-refresh-bar 1.05s ease-in-out infinite;
+}
+
+.favorite-sidebar-tree.is-refreshing .favorite-sidebar-tree__icon-btn[data-on-click="sidebarTreeRefresh"] svg {
+  animation: ft-sidebar-spin 0.9s linear infinite;
 }
 
 .favorite-sidebar-tree__header {
@@ -769,6 +794,26 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 .favorite-sidebar-tree__empty-body,
 .favorite-sidebar-tree__empty-hint {
   margin-top: 4px;
+}
+
+@keyframes ft-sidebar-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ft-sidebar-refresh-bar {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
 }
 
 .favorite-sidebar-tree__empty-actions {
