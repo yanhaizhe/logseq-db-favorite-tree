@@ -8,18 +8,21 @@
 
 - Uses favorite pages as tree roots
 - Uses the page property `parent` to build hierarchy
-- Provides a floating panel and collapsible bubble entry
+- Supports `sidebar`, `floating`, and `mixed` display modes
+- Defaults to native sidebar mode, with optional floating panel switching
 - Designed for `DB graph` only and does not support `file graph`
 
 ## Features
 
 - Loads favorite pages as root nodes automatically
 - Resolves page hierarchy and supports lazy loading
-- Highlights the current page and expands matching paths
-- Supports in-tree search, breadcrumb navigation, and locate-current-page actions
-- Supports panel dragging, resizing, bubble mode, and persisted layout state
-- Supports manual refresh, auto-refresh control, and graph-scoped UI state
+- Hides expand toggles on leaf nodes and keeps tree indentation clean
+- Supports native sidebar rendering with search, locate-current-page, expand/collapse all, refresh, and settings
+- Supports floating panel, floating bubble, and mixed switching behavior
+- Supports in-tree search with ancestor-path retention and keyword highlighting
+- Supports breadcrumb navigation and locate-current-page expansion across multiple matched paths
 - Supports default title sorting and custom sibling drag sorting
+- Remembers layout, expanded nodes, sorting, controls state, and display mode per graph
 - Follows the current Logseq UI language with English fallback
 
 ## Install from Marketplace
@@ -77,25 +80,37 @@ Value: [[Project Management]]
 - The `parent` property can contain multiple page references
 - A page with multiple parents appears in multiple paths
 
+## Display Modes
+
+- `sidebar`: renders the tree in Logseq's native left sidebar only
+- `floating`: uses the floating panel and bubble flow only
+- `mixed`: allows switching between native sidebar and floating panel
+- Default preset is `sidebar`
+- In `mixed` mode, initialization still prefers `sidebar` first
+
 ## Everyday Workflow
 
-- Open the floating panel from the toolbar icon
+- Open the tree from the toolbar icon
+- Use native sidebar mode for always-on navigation
+- Switch to the floating panel when you need dragging, resizing, or bubble mode
 - Expand nodes to lazy-load child pages
 - Use search to filter the tree and keep ancestor paths visible
 - Use `Locate current page` to reveal the current page in all matching paths
-- Drag sibling nodes to save a custom order
+- Drag sibling nodes to save a custom order when not searching
 
 ## Settings
 
 - `Hierarchy property`: the property used to describe parent page relations, default is `parent`
 - `Panel width`: default floating panel width in pixels
 - `Auto-refresh interval (seconds)`: polling interval, default is `60`
-- `Initial side preference`: first-open side placement preference
+- `Initial side preference`: first-open side placement preference for floating mode
+- `Display mode preset`: choose `sidebar`, `floating`, or `mixed`
 
 Notes:
 
 - Auto-refresh is disabled by default
 - When enabled, the default polling interval is `60` seconds and can be changed in settings
+- When display mode is fixed to `sidebar` or `floating`, the mode-switch button is hidden
 
 ## Limitations
 
@@ -104,6 +119,7 @@ Notes:
 - Root nodes come from favorite pages
 - Drag sorting works only between sibling nodes
 - Drag sorting is disabled while searching
+- The plugin reads hierarchy relations but does not rewrite parent-child structure in Logseq
 
 ## Screenshots
 
@@ -112,13 +128,15 @@ Notes:
 ## Documentation
 
 - [User Guide](./docs/user-guide.en.md)
+- [Chinese User Guide](./docs/user-guide.md)
 - [Publish Guide](./docs/publish-guide.md)
 - [Feature List](./docs/feature-list.md)
 - [Technical Design](./docs/technical-design.md)
+- [Changelog](./CHANGELOG.md)
+- [Release Notes Template](./docs/release-notes-template.md)
 - [Marketplace Manifest Example](./docs/marketplace-manifest.example.json)
 - [Marketplace PR Template](./docs/marketplace-pr-template.md)
 - [Chinese README](./README.zh-CN.md)
-- [Chinese User Guide](./docs/user-guide.md)
 
 ## Marketplace Notes
 
@@ -130,10 +148,11 @@ Notes:
 ## Code Structure
 
 - `src/main.ts`: startup entry and plugin bootstrapping
-- `src/plugin.ts`: orchestration layer for refresh, lifecycle, and UI state
+- `src/plugin.ts`: orchestration layer for refresh, lifecycle, display mode, and UI state
+- `src/sidebar-render.ts`: native sidebar tree rendering and host-side styles
 - `src/tree-service.ts`: favorite roots, property normalization, and tree/path logic
 - `src/floating-layout.ts`: panel and bubble layout, dragging, resizing, and snapping
-- `src/render.ts`: pure HTML rendering for the panel and tree nodes
+- `src/render.ts`: pure HTML rendering for the floating panel and tree nodes
 - `src/settings.ts`: plugin settings and graph-scoped internal state persistence
 - `src/wire-dom-events.ts`: DOM event wiring and drag-sort binding
 - `src/toolbar.ts`: Logseq toolbar registration

@@ -129,20 +129,31 @@ Result:
 ### 5.1 Open the plugin
 
 - Click the toolbar icon in Logseq
-- The plugin opens as a floating panel
+- Depending on the preset, the plugin opens in sidebar, floating panel, or bubble flow
 
-### 5.2 Browse the tree
+### 5.2 Display modes
+
+- `sidebar`: renders the tree inside Logseq's native left sidebar
+- `floating`: uses the floating panel and bubble flow only
+- `mixed`: allows switching between native sidebar and floating panel
+- Default preset is `sidebar`
+- `mixed` still prefers `sidebar` when initialized
+
+### 5.3 Browse the tree
 
 - Click the expand control to load children
 - Click a page title to open that page
 - The current page is highlighted in the tree
+- Leaf nodes do not show meaningless expand toggles
 
-### 5.3 Search
+### 5.4 Search
 
 - Type keywords in the search box
 - The plugin shows matched pages and their ancestor paths
+- Matching text is highlighted
+- Search results can still be manually collapsed or expanded
 
-### 5.4 Locate current page
+### 5.5 Locate current page
 
 - Click the locate action in the toolbar
 - The plugin expands all matched paths to the current page
@@ -161,6 +172,7 @@ Result:
 - Auto-refresh is disabled by default
 - Default polling interval is `60` seconds
 - UI text follows the current Logseq language with English fallback
+- Sidebar mode also includes search, locate, expand/collapse all, refresh, and settings
 
 ## 8. Sorting
 
@@ -176,6 +188,7 @@ Result:
 - `Panel width`: default panel width
 - `Auto-refresh interval (seconds)`: polling interval for refresh
 - `Initial side preference`: initial left or right placement
+- `Display mode preset`: choose `sidebar`, `floating`, or `mixed`
 
 ## 10. Graph-Scoped State
 
@@ -187,4 +200,4 @@ The plugin remembers these states separately for each graph:
 - Expanded nodes
 - Collapsed control area state
 - Sorting results
-- View mode
+- Display mode and view mode
