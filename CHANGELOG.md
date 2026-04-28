@@ -23,7 +23,8 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 ### Changed
 
 - Expand/collapse all in search mode now operates on visible matched branches only
-- Updated feature-list.md and product-roadmap-prd.md to reflect current implementation state
+- Updated feature-list.md, product-roadmap-prd.md, and technical-design.md to reflect current implementation state
+- Added UI/UX optimization plan document with phased improvement roadmap
 
 ## [1.1.1] - 2026-04-27
 

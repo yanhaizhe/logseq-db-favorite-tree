@@ -145,5 +145,6 @@
 ## 5. 文档联动
 
 - 产品路线图与优先级见 [产品路线图 PRD](./product-roadmap-prd.md)
+- UI/UX 优化与交互演进见 [UI/UX 优化计划](./ux-optimization-plan.md)
 - 技术实现细节见 [技术方案文档](./technical-design.md)
 - 操作说明与配置说明见 [使用指南](./user-guide.md)
