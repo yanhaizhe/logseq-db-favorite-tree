@@ -14,13 +14,15 @@ import type {
   PluginSettings,
   RefreshReason,
   SortDropTarget,
+  SortMode,
+  SortModeMap,
   SortOrderMap,
   SortableItem,
   TreeStateSnapshot,
   ViewMode,
 } from './types'
 import { applyTheme } from './theme'
-import { escapeSelectorValue, normalizeTitle } from './utils'
+import { escapeSelectorValue, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -39,13 +41,23 @@ export class FavoriteTreePlugin {
   private refreshing = false
   private searching = false
   private searchQuery = ''
+  private searchError: string | null = null
+  private createChildDraftParent: string | null = null
+  private createChildDraftTitle = ''
+  private shouldFocusCreateChildInput = false
+  private activeSearchMatchKey: string | null = null
+  private searchMatchKeys: string[] = []
   private currentPageName: string | null = null
   private currentPagePath: string[] = []
   private currentThemeMode: ThemeMode = 'light'
   private rootFavorites: string[] = []
+  private activePageKeysCache: { at: number; keys: Set<string> } | null = null
+  private lastRefreshMs: number | null = null
+  private lastRenderMs: number | null = null
   private autoRefreshPaused = true
   private controlsCollapsed = false
   private sortOrders: SortOrderMap = {}
+  private sortModes: SortModeMap = {}
   private bodyScrollTop = 0
   private lastLocatedNodeKey: string | null = null
   private flashLocatedNodeKey: string | null = null
@@ -94,6 +106,7 @@ export class FavoriteTreePlugin {
     window.addEventListener('focus', this.handleWindowFocus)
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.addEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.addEventListener('keydown', this.handleSidebarKeydown)
     logseq.provideStyle({
       key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
       style: SIDEBAR_TREE_HOST_STYLE,
@@ -141,6 +154,7 @@ export class FavoriteTreePlugin {
     window.removeEventListener('focus', this.handleWindowFocus)
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.removeEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.removeEventListener('keydown', this.handleSidebarKeydown)
     for (const off of this.offHooks) {
       off()
     }
@@ -244,6 +258,10 @@ export class FavoriteTreePlugin {
   }
 
   manualRefresh = async (): Promise<void> => {
+    if (this.refreshing) {
+      logseq.UI.showMsg(this.i18n.t('refreshing'), 'info')
+      return
+    }
     await this.refresh('manual')
   }
 
@@ -292,20 +310,37 @@ export class FavoriteTreePlugin {
 
     if (!nextQuery) {
       this.searching = false
+      this.searchError = null
+      this.clearSearchMatchState()
       this.render()
       return
     }
 
     this.searching = !this.treeService.hasChildIndex()
+    this.searchError = null
     this.render()
 
-    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-    if (this.searchQuery !== nextQuery) {
-      return
+    try {
+      await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+      if (this.searchQuery !== nextQuery) {
+        return
+      }
+
+      this.searching = false
+      this.searchError = null
+      this.syncSearchMatchState(true)
+      this.render()
+      this.scrollActiveSearchMatchIntoView()
+    } catch (error) {
+      if (this.searchQuery !== nextQuery) {
+        return
+      }
+
+      this.searching = false
+      this.searchError = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      this.clearSearchMatchState()
+      this.render()
     }
-
-    this.searching = false
-    this.render()
   }
 
   toggleExpandCollapseAll = async (): Promise<void> => {
@@ -323,6 +358,7 @@ export class FavoriteTreePlugin {
           this.searchCollapsedKeys.add(key)
         }
       }
+      this.syncSearchMatchState()
       this.render()
       return
     }
@@ -355,36 +391,42 @@ export class FavoriteTreePlugin {
   }
 
   locateCurrentPage = async (): Promise<void> => {
-    await this.updateCurrentPage()
-
-    if (!this.currentPageName) {
-      logseq.UI.showMsg(this.i18n.t('locateNoCurrentPage'), 'warning')
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
       return
     }
 
-    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
-    const paths = this.treeService.findPathsToPage(this.rootFavorites, this.currentPageName)
-    if (!paths.length) {
-      logseq.UI.showMsg(this.i18n.t('locatePageNotInTree'), 'warning')
-      return
-    }
-
-    for (const path of paths) {
-      for (const title of path.slice(0, -1)) {
-        const key = normalizeTitle(title)
-        if (!key) {
-          continue
-        }
-        this.expandedKeys.add(key)
-        this.loadedKeys.add(key)
-        this.loadStates.set(key, 'loaded')
-        this.loadErrors.delete(key)
-      }
-    }
-
-    this.persistInternalState()
+    this.revealPath(path, 'merge')
     this.render()
-    this.scrollNodeIntoView(normalizeTitle(this.currentPageName))
+    this.scrollNodeIntoView(normalizeTitle(path[path.length - 1]))
+  }
+
+  focusCurrentPath = async (): Promise<void> => {
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
+      return
+    }
+
+    this.revealPath(path, 'replace')
+    this.scrollNodeIntoView(normalizeTitle(path[path.length - 1]))
+  }
+
+  collapseOtherBranches = async (): Promise<void> => {
+    const path = await this.resolveCurrentPagePathOrWarn()
+    if (!path) {
+      return
+    }
+
+    this.revealPath(path, 'replace')
+    this.render()
+  }
+
+  focusPreviousSearchMatch = (): void => {
+    this.moveActiveSearchMatch(-1)
+  }
+
+  focusNextSearchMatch = (): void => {
+    this.moveActiveSearchMatch(1)
   }
 
   onNodeToggle = async (nodeKey: string): Promise<void> => {
@@ -394,6 +436,7 @@ export class FavoriteTreePlugin {
       } else {
         this.searchCollapsedKeys.add(nodeKey)
       }
+      this.syncSearchMatchState()
       this.render()
       return
     }
@@ -435,6 +478,172 @@ export class FavoriteTreePlugin {
 
   openPage = (pageName: string): void => {
     logseq.App.pushState('page', { name: pageName })
+  }
+
+  openPageInRightSidebar = async (pageName: string): Promise<void> => {
+    try {
+      const page = await logseq.Editor.getPage(pageName)
+      const pageId = page?.uuid ?? page?.id
+      if (!pageId) {
+        logseq.UI.showMsg(this.i18n.t('openInRightSidebarFailed', { title: pageName }), 'warning')
+        return
+      }
+
+      logseq.Editor.openInRightSidebar(pageId)
+    } catch {
+      logseq.UI.showMsg(this.i18n.t('openInRightSidebarFailed', { title: pageName }), 'warning')
+    }
+  }
+
+  createChildPage = async (parentTitle: string): Promise<void> => {
+    const normalizedParentKey = normalizeTitle(parentTitle)
+    if (!normalizedParentKey) {
+      return
+    }
+
+    this.createChildDraftParent = parentTitle
+    this.createChildDraftTitle = ''
+    this.shouldFocusCreateChildInput = true
+    this.render()
+  }
+
+  setCreateChildDraftTitle = (value: string): void => {
+    if (!this.createChildDraftParent) {
+      return
+    }
+
+    this.createChildDraftTitle = value
+  }
+
+  cancelCreateChildPage = (): void => {
+    if (!this.createChildDraftParent && !this.createChildDraftTitle) {
+      return
+    }
+
+    this.createChildDraftParent = null
+    this.createChildDraftTitle = ''
+    this.shouldFocusCreateChildInput = false
+    this.render()
+  }
+
+  submitCreateChildPage = async (): Promise<void> => {
+    const parentTitle = this.createChildDraftParent
+    if (!parentTitle) {
+      return
+    }
+
+    const normalizedParentKey = normalizeTitle(parentTitle)
+    if (!normalizedParentKey) {
+      return
+    }
+
+    const hierarchyProperty = this.settings.getHierarchyProperty()
+    const childTitle = unwrapPageRef(this.createChildDraftTitle).trim()
+    if (!childTitle) {
+      logseq.UI.showMsg(this.i18n.t('createChildEmpty'), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    if (normalizeTitle(childTitle) === normalizedParentKey) {
+      logseq.UI.showMsg(this.i18n.t('createChildSelfParent'), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    const existing = await logseq.Editor.getPage(childTitle)
+    if (existing && (await this.isPageActive(childTitle))) {
+      logseq.UI.showMsg(this.i18n.t('createChildDuplicate', { title: childTitle }), 'warning')
+      this.shouldFocusCreateChildInput = true
+      this.render()
+      return
+    }
+
+    let createdPageName: string | null = null
+    try {
+      const createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false, createFirstBlock: false })
+      const createdPageId = createdPage?.uuid
+      const createdTitle = createdPage?.originalName ?? createdPage?.name ?? childTitle
+      if (!createdPageId) {
+        throw new Error(this.i18n.t('createChildEmpty'))
+      }
+
+      createdPageName = createdTitle
+      await logseq.Editor.upsertBlockProperty(createdPageId, hierarchyProperty, `[[${parentTitle}]]`)
+
+      this.createChildDraftParent = null
+      this.createChildDraftTitle = ''
+      this.shouldFocusCreateChildInput = false
+      this.expandedKeys.add(normalizedParentKey)
+      this.loadedKeys.add(normalizedParentKey)
+      this.loadStates.set(normalizedParentKey, 'loaded')
+      this.loadErrors.delete(normalizedParentKey)
+      this.treeService.invalidateIndex()
+      await this.refresh('manual')
+      this.scrollNodeIntoView(normalizeTitle(createdTitle))
+      logseq.UI.showMsg(this.i18n.t('createChildSuccess', { title: createdTitle, parent: parentTitle }), 'success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      let rolledBack = false
+
+      if (createdPageName) {
+        try {
+          await logseq.Editor.deletePage(createdPageName)
+          rolledBack = true
+        } catch {
+          rolledBack = false
+        }
+      }
+
+      logseq.UI.showMsg(
+        rolledBack
+          ? this.i18n.t('createChildFailedRolledBack', { message })
+          : this.i18n.t('createChildFailedNeedsCleanup', { title: createdPageName ?? childTitle, message }),
+        'warning',
+      )
+    }
+  }
+
+  toggleSortModeForParent = (parentKey: string): void => {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return
+    }
+
+    const nextMode: SortMode = this.getSortModeForParent(key) === 'custom' ? 'default' : 'custom'
+    this.sortModes = {
+      ...this.sortModes,
+      [key]: nextMode,
+    }
+    if (this.searchQuery) {
+      this.syncSearchMatchState()
+    }
+    this.persistInternalState()
+    this.render()
+  }
+
+  clearCustomSortForParent = (parentKey: string): void => {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return
+    }
+
+    const confirmed = this.getHostWindow().confirm(this.i18n.t('clearCustomSortConfirm'))
+    if (!confirmed) {
+      return
+    }
+
+    const { [key]: _removedOrder, ...remainingOrders } = this.sortOrders
+    const { [key]: _removedMode, ...remainingModes } = this.sortModes
+    this.sortOrders = remainingOrders
+    this.sortModes = remainingModes
+    if (this.searchQuery) {
+      this.syncSearchMatchState()
+    }
+    this.persistInternalState()
+    this.render()
   }
 
   startSortDrag = (item: SortableItem): void => {
@@ -499,6 +708,7 @@ export class FavoriteTreePlugin {
     this.offHooks.push(
       logseq.DB.onChanged(() => {
         this.scheduleRefresh('db-changed')
+        void this.updateCurrentPage()
       }),
     )
 
@@ -528,12 +738,8 @@ export class FavoriteTreePlugin {
     )
 
     this.offHooks.push(
-      logseq.App.onSidebarVisibleChanged(({ visible }) => {
-        if (visible) {
-          void this.renderSidebarTreeUI()
-        } else {
-          this.clearSidebarTreeUI()
-        }
+      logseq.App.onSidebarVisibleChanged(() => {
+        void this.syncSidebarTreeVisibility()
       }),
     )
 
@@ -611,23 +817,31 @@ export class FavoriteTreePlugin {
       return
     }
 
-    await this.syncLocale()
+    const refreshStartedAt = performance.now()
+    this.activePageKeysCache = null
+    this.treeService.invalidateIndex()
     this.refreshing = true
     this.render()
+    try {
+      await this.syncLocale()
+    } catch {
+      // Ignore locale refresh failures during manual refresh cycles.
+    }
 
     try {
-      this.rootFavorites = this.applySortOrder(await this.treeService.loadFavoriteRoots(), ROOT_SORT_KEY)
-      this.treeService.invalidateIndex()
+      this.rootFavorites = await this.treeService.loadFavoriteRoots()
       await this.syncDerivedTreeState()
 
       this.lastRefreshAt = Date.now()
       this.lastRefreshReason = reason
       this.lastRefreshError = null
+      this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
     } catch (error) {
       const message = error instanceof Error ? error.message : this.i18n.t('refreshReasonDefault')
       this.lastRefreshAt = Date.now()
       this.lastRefreshReason = reason
       this.lastRefreshError = message
+      this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
       logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
     } finally {
       this.refreshing = false
@@ -637,7 +851,8 @@ export class FavoriteTreePlugin {
 
   private async updateCurrentPage(): Promise<void> {
     const current = await logseq.Editor.getCurrentPage()
-    this.currentPageName = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    const currentTitle = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+    this.currentPageName = await this.resolveExistingCurrentPageTitle(currentTitle)
     const currentPageKey = normalizeTitle(this.currentPageName)
     if (this.lastLocatedNodeKey && this.lastLocatedNodeKey !== currentPageKey) {
       this.lastLocatedNodeKey = null
@@ -648,6 +863,7 @@ export class FavoriteTreePlugin {
   }
 
   private render(): void {
+    const renderStartedAt = performance.now()
     this.captureBodyScrollTop()
     const activeElement = document.activeElement
     const shouldRestoreSearchFocus =
@@ -655,38 +871,71 @@ export class FavoriteTreePlugin {
     const selectionStart = shouldRestoreSearchFocus ? activeElement.selectionStart ?? this.searchQuery.length : null
     const selectionEnd = shouldRestoreSearchFocus ? activeElement.selectionEnd ?? this.searchQuery.length : null
 
-    this.root.innerHTML = renderFavoriteTree(
-      this.getRenderState(),
-      {
-        getChildrenFor: (title) => this.getOrderedChildrenFor(title),
-      },
-      this.i18n,
-    )
+    const shouldRenderMainPanel = this.displayMode !== 'sidebar' && this.panelVisible
+    if (shouldRenderMainPanel) {
+      this.root.innerHTML = renderFavoriteTree(
+        this.getRenderState(),
+        {
+          getChildrenFor: (title) => this.getOrderedChildrenFor(title),
+        },
+        this.i18n,
+      )
+    } else {
+      this.root.innerHTML = ''
+    }
     void this.renderSidebarTreeUI()
 
-    const body = this.getBodyElement()
-    if (body) {
-      body.scrollTop = this.bodyScrollTop
-      body.addEventListener('scroll', this.handleBodyScroll, { passive: true })
-    }
+    if (shouldRenderMainPanel) {
+      const body = this.getBodyElement()
+      if (body) {
+        body.scrollTop = this.bodyScrollTop
+        body.addEventListener('scroll', this.handleBodyScroll, { passive: true })
+      }
 
-    if (shouldRestoreSearchFocus) {
-      const nextInput = this.root.querySelector<HTMLInputElement>('[data-role="search-input"]')
-      if (nextInput) {
-        nextInput.focus({ preventScroll: true })
-        nextInput.setSelectionRange(selectionStart, selectionEnd)
+      if (shouldRestoreSearchFocus) {
+        const nextInput = this.root.querySelector<HTMLInputElement>('[data-role="search-input"]')
+        if (nextInput) {
+          nextInput.focus({ preventScroll: true })
+          nextInput.setSelectionRange(selectionStart, selectionEnd)
+        }
       }
     }
+
+    this.restoreCreateChildInputFocus()
+    this.lastRenderMs = Math.max(0, Math.round(performance.now() - renderStartedAt))
   }
 
   private getRenderState(): TreeStateSnapshot {
+    const indexMs = this.treeService.getLastIndexBuildMs()
+    const pages = this.treeService.getLastIndexBuildPageCount()
+    const perfSummary =
+      this.lastRefreshMs !== null && this.lastRenderMs !== null
+        ? this.i18n.t('perfSummary', {
+            refreshMs: this.lastRefreshMs,
+            renderMs: this.lastRenderMs,
+            indexMs: indexMs ?? '-',
+            roots: this.rootFavorites.length,
+            expanded: this.expandedKeys.size,
+            pages: pages ?? '-',
+          })
+        : null
+
     return {
-      rootFavorites: this.rootFavorites,
+      rootFavorites: this.getOrderedTitlesForParent(ROOT_SORT_KEY),
+      sortOrders: this.sortOrders,
+      sortModes: this.sortModes,
+      createChildDraftParent: this.createChildDraftParent,
+      createChildDraftTitle: this.createChildDraftTitle,
+      perfSummary,
       expandedKeys: this.expandedKeys,
       searchCollapsedKeys: this.searchCollapsedKeys,
       loadedKeys: this.loadedKeys,
       loadStates: this.loadStates,
       loadErrors: this.loadErrors,
+      searchError: this.searchError,
+      currentSearchMatchKey: this.activeSearchMatchKey,
+      currentSearchMatchNumber: this.getCurrentSearchMatchNumber(),
+      searchMatchCount: this.searchMatchKeys.length,
       currentPageName: this.currentPageName,
       currentPagePath: this.currentPagePath,
       lastLocatedNodeKey: this.lastLocatedNodeKey,
@@ -694,6 +943,8 @@ export class FavoriteTreePlugin {
       refreshing: this.refreshing,
       searching: this.searching,
       searchQuery: this.searchQuery,
+      lastRefreshError: this.lastRefreshError,
+      hasHierarchyRelations: this.hasHierarchyRelations(),
       autoRefreshPaused: this.autoRefreshPaused,
       pollIntervalSeconds: this.settings.getPollIntervalSeconds(),
       hierarchyProperty: this.settings.getHierarchyProperty(),
@@ -702,6 +953,8 @@ export class FavoriteTreePlugin {
       displayMode: this.displayMode,
       canSwitchDisplayMode: this.canSwitchDisplayMode(),
       controlsCollapsed: this.controlsCollapsed,
+      rootSortHasCustomOrder: this.hasCustomSortOrder(ROOT_SORT_KEY),
+      rootSortMode: this.getSortModeForParent(ROOT_SORT_KEY),
     }
   }
 
@@ -784,9 +1037,7 @@ export class FavoriteTreePlugin {
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        const selector = `[data-node-key="${escapeSelectorValue(nodeKey)}"]`
-        const element = this.root.querySelector<HTMLElement>(selector)
-        element?.scrollIntoView({
+        this.findRenderedNodeElement(nodeKey)?.scrollIntoView({
           block: 'center',
           behavior: 'smooth',
         })
@@ -805,6 +1056,7 @@ export class FavoriteTreePlugin {
       viewMode: this.viewMode,
       controlsCollapsed: this.controlsCollapsed,
       sortOrders: this.sortOrders,
+      sortModes: this.sortModes,
       layout: this.layout.getPositions(),
       panelSize: this.layout.getPanelSize(),
     })
@@ -874,6 +1126,36 @@ export class FavoriteTreePlugin {
           this.openPage(page)
         }
       },
+      sidebarTreeCreateChildPage: (event: { dataset?: Record<string, string> }) => {
+        const page = event.dataset?.page
+        if (page) {
+          void this.createChildPage(page)
+        }
+      },
+      sidebarTreeSubmitCreateChild: () => {
+        void this.submitCreateChildPage()
+      },
+      sidebarTreeCancelCreateChild: () => {
+        this.cancelCreateChildPage()
+      },
+      sidebarTreeOpenPageInSidebar: (event: { dataset?: Record<string, string> }) => {
+        const page = event.dataset?.page
+        if (page) {
+          void this.openPageInRightSidebar(page)
+        }
+      },
+      sidebarTreeToggleSortMode: (event: { dataset?: Record<string, string> }) => {
+        const parentKey = event.dataset?.parentKey
+        if (parentKey) {
+          this.toggleSortModeForParent(parentKey)
+        }
+      },
+      sidebarTreeClearCustomSort: (event: { dataset?: Record<string, string> }) => {
+        const parentKey = event.dataset?.parentKey
+        if (parentKey) {
+          this.clearCustomSortForParent(parentKey)
+        }
+      },
       sidebarTreeShowFloating: () => {
         void this.switchToFloatingMode('panel')
       },
@@ -894,6 +1176,18 @@ export class FavoriteTreePlugin {
       },
       sidebarTreeLocateCurrent: () => {
         void this.locateCurrentPage()
+      },
+      sidebarTreeFocusCurrentPath: () => {
+        void this.focusCurrentPath()
+      },
+      sidebarTreeCollapseOtherBranches: () => {
+        void this.collapseOtherBranches()
+      },
+      sidebarTreeFocusPreviousSearchMatch: () => {
+        this.focusPreviousSearchMatch()
+      },
+      sidebarTreeFocusNextSearchMatch: () => {
+        this.focusNextSearchMatch()
       },
       sidebarTreeResetPanelSize: () => {
         this.resetPanelSize()
@@ -967,6 +1261,21 @@ export class FavoriteTreePlugin {
     }
   }
 
+  private async syncSidebarTreeVisibility(): Promise<void> {
+    if (this.displayMode !== 'sidebar') {
+      this.clearSidebarTreeUI()
+      return
+    }
+
+    const path = await this.resolveSidebarTreePath()
+    if (path) {
+      await this.renderSidebarTreeUI()
+      return
+    }
+
+    this.clearSidebarTreeUI()
+  }
+
   private clearSidebarTreeUI(targetPath?: string): void {
     const paths = targetPath ? [targetPath] : this.sidebarTreePath ? [this.sidebarTreePath] : []
     this.sidebarRenderVersion += 1
@@ -1022,6 +1331,18 @@ export class FavoriteTreePlugin {
     return document
   }
 
+  private getHostWindow(): Window {
+    try {
+      if (window.top) {
+        return window.top
+      }
+    } catch {
+      // Ignore cross-frame access failures and fall back to the plugin iframe window.
+    }
+
+    return window
+  }
+
   private asSidebarSearchInput(target: EventTarget | null): HTMLInputElement | null {
     if (!target || typeof target !== 'object') {
       return null
@@ -1043,6 +1364,54 @@ export class FavoriteTreePlugin {
     return target as HTMLInputElement
   }
 
+  private asCreateChildInput(target: EventTarget | null): HTMLInputElement | null {
+    if (!target || typeof target !== 'object') {
+      return null
+    }
+
+    const candidate = target as Partial<HTMLInputElement> & {
+      getAttribute?: (name: string) => string | null
+      tagName?: string
+    }
+
+    if (candidate.getAttribute?.('data-role') !== 'create-child-input') {
+      return null
+    }
+
+    if (typeof candidate.tagName !== 'string' || candidate.tagName.toUpperCase() !== 'INPUT') {
+      return null
+    }
+
+    return target as HTMLInputElement
+  }
+
+  private restoreCreateChildInputFocus(): void {
+    if (!this.shouldFocusCreateChildInput) {
+      return
+    }
+
+    this.shouldFocusCreateChildInput = false
+    const focus = (): void => {
+      const selector = '[data-role="create-child-input"]'
+      const target =
+        this.displayMode === 'sidebar'
+          ? this.getHostDocument().querySelector<HTMLInputElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+          : this.root.querySelector<HTMLInputElement>(selector)
+
+      if (!target) {
+        return
+      }
+
+      target.focus({ preventScroll: false })
+      const length = target.value.length
+      target.setSelectionRange(length, length)
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(focus)
+    })
+  }
+
   private readonly handleBodyScroll = (): void => {
     const body = this.getBodyElement()
     if (body) {
@@ -1060,12 +1429,34 @@ export class FavoriteTreePlugin {
   }
 
   private readonly handleSidebarSearchInput = (event: Event): void => {
-    const target = this.asSidebarSearchInput(event.target)
+    const sidebarSearchInput = this.asSidebarSearchInput(event.target)
+    if (sidebarSearchInput) {
+      void this.setSearchQuery(sidebarSearchInput.value)
+      return
+    }
+
+    const createChildInput = this.asCreateChildInput(event.target)
+    if (createChildInput) {
+      this.setCreateChildDraftTitle(createChildInput.value)
+    }
+  }
+
+  private readonly handleSidebarKeydown = (event: KeyboardEvent): void => {
+    const target = this.asCreateChildInput(event.target)
     if (!target) {
       return
     }
 
-    void this.setSearchQuery(target.value)
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void this.submitCreateChildPage()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      this.cancelCreateChildPage()
+    }
   }
 
   private readonly handleVisibilityChange = (): void => {
@@ -1104,11 +1495,17 @@ export class FavoriteTreePlugin {
     this.viewMode = restored.viewMode
     this.controlsCollapsed = restored.controlsCollapsed
     this.sortOrders = restored.sortOrders
+    this.sortModes = restored.sortModes
     this.searchQuery = ''
     this.searching = false
+    this.searchError = null
+    this.clearSearchMatchState()
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
     this.sortDragItem = null
+    this.lastRefreshAt = null
+    this.lastRefreshReason = null
+    this.lastRefreshError = null
 
     this.expandedKeys.clear()
     this.loadedKeys.clear()
@@ -1197,6 +1594,8 @@ export class FavoriteTreePlugin {
     if (!shouldBuildIndex) {
       this.currentPagePath = []
       this.searching = false
+      this.searchError = null
+      this.clearSearchMatchState()
       return
     }
 
@@ -1205,9 +1604,11 @@ export class FavoriteTreePlugin {
     }
 
     await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    this.searchError = null
     this.syncExpandedLoadState()
     await this.syncCurrentPagePath()
     this.searching = false
+    this.syncSearchMatchState()
   }
 
   private syncExpandedLoadState(): void {
@@ -1232,22 +1633,272 @@ export class FavoriteTreePlugin {
     this.currentPagePath = this.treeService.findPathToPage(this.rootFavorites, this.currentPageName) ?? []
   }
 
+  private async resolveExistingCurrentPageTitle(currentTitle: string | null): Promise<string | null> {
+    if (!currentTitle) {
+      return null
+    }
+
+    return (await this.isPageActive(currentTitle)) ? currentTitle : null
+  }
+
+  private async isPageActive(title: string): Promise<boolean> {
+    const key = normalizeTitle(title)
+    if (!key) {
+      return false
+    }
+
+    try {
+      const keys = await this.getActivePageKeys()
+      return keys.has(key)
+    } catch {
+      try {
+        return Boolean(await logseq.Editor.getPage(title))
+      } catch {
+        return false
+      }
+    }
+  }
+
+  private async getActivePageKeys(): Promise<Set<string>> {
+    const now = Date.now()
+    const cached = this.activePageKeysCache
+    if (cached && now - cached.at < 1500) {
+      return cached.keys
+    }
+
+    const pages = (await logseq.Editor.getAllPages()) ?? []
+    const keys = new Set<string>()
+    for (const page of pages) {
+      if (this.isPageDeletedLike(page as Record<string, unknown>)) {
+        continue
+      }
+      const title = pageTitle(page)
+      const normalized = normalizeTitle(title)
+      if (normalized) {
+        keys.add(normalized)
+      }
+    }
+
+    this.activePageKeysCache = { at: now, keys }
+    return keys
+  }
+
+  private isPageDeletedLike(page: Record<string, unknown>): boolean {
+    const flags = [
+      'deleted',
+      'deleted?',
+      'isDeleted',
+      'is-deleted',
+      'trashed',
+      'trash',
+      'inTrash',
+      'in-trash',
+      'archived',
+      'archived?',
+      'isArchived',
+      'is-archived',
+    ]
+
+    for (const key of flags) {
+      if (page[key] === true) {
+        return true
+      }
+    }
+
+    const properties = page.properties
+    if (properties && typeof properties === 'object') {
+      const record = properties as Record<string, unknown>
+      for (const key of flags) {
+        if (record[key] === true) {
+          return true
+        }
+        if (record[`:${key}`] === true) {
+          return true
+        }
+      }
+    }
+
+    return false
+  }
+
+  private async resolveCurrentPagePathOrWarn(): Promise<string[] | null> {
+    await this.updateCurrentPage()
+
+    if (!this.currentPageName) {
+      logseq.UI.showMsg(this.i18n.t('locateNoCurrentPage'), 'warning')
+      return null
+    }
+
+    if (!this.currentPagePath.length) {
+      logseq.UI.showMsg(this.i18n.t('locatePageNotInTree'), 'warning')
+      return null
+    }
+
+    return [...this.currentPagePath]
+  }
+
+  private revealPath(path: string[], mode: 'merge' | 'replace'): void {
+    if (mode === 'replace') {
+      this.expandedKeys.clear()
+    }
+
+    for (const title of path.slice(0, -1)) {
+      const key = normalizeTitle(title)
+      if (!key) {
+        continue
+      }
+
+      this.expandedKeys.add(key)
+      this.loadedKeys.add(key)
+      this.loadStates.set(key, 'loaded')
+      this.loadErrors.delete(key)
+    }
+
+    this.persistInternalState()
+  }
+
+  private clearSearchMatchState(): void {
+    this.activeSearchMatchKey = null
+    this.searchMatchKeys = []
+  }
+
+  private syncSearchMatchState(preferFirstMatch = false): void {
+    const nextMatchKeys = this.collectVisibleSearchMatchKeys()
+    this.searchMatchKeys = nextMatchKeys
+
+    if (!nextMatchKeys.length) {
+      this.activeSearchMatchKey = null
+      return
+    }
+
+    if (this.activeSearchMatchKey && nextMatchKeys.includes(this.activeSearchMatchKey) && !preferFirstMatch) {
+      return
+    }
+
+    this.activeSearchMatchKey = nextMatchKeys[0]
+  }
+
+  private collectVisibleSearchMatchKeys(): string[] {
+    const normalizedQuery = normalizeTitle(this.searchQuery)
+    if (!normalizedQuery) {
+      return []
+    }
+
+    const matchKeys: string[] = []
+    for (const title of this.rootFavorites) {
+      this.collectVisibleSearchMatchKeysForNode(title, normalizedQuery, [], false, matchKeys)
+    }
+    return matchKeys
+  }
+
+  private collectVisibleSearchMatchKeysForNode(
+    title: string,
+    normalizedQuery: string,
+    ancestors: string[],
+    hiddenByCollapsedAncestor: boolean,
+    matchKeys: string[],
+  ): boolean {
+    const key = normalizeTitle(title)
+    if (!key || ancestors.includes(key)) {
+      return false
+    }
+
+    const selfMatches = key.includes(normalizedQuery)
+    if (selfMatches && !hiddenByCollapsedAncestor) {
+      matchKeys.push(key)
+    }
+
+    const nextAncestors = [...ancestors, key]
+    const hideChildren = hiddenByCollapsedAncestor || this.searchCollapsedKeys.has(key)
+    let descendantMatches = false
+    for (const childTitle of this.getOrderedChildrenFor(title)) {
+      descendantMatches =
+        this.collectVisibleSearchMatchKeysForNode(childTitle, normalizedQuery, nextAncestors, hideChildren, matchKeys) ||
+        descendantMatches
+    }
+
+    return selfMatches || descendantMatches
+  }
+
+  private getCurrentSearchMatchNumber(): number {
+    if (!this.activeSearchMatchKey) {
+      return 0
+    }
+
+    const index = this.searchMatchKeys.indexOf(this.activeSearchMatchKey)
+    return index >= 0 ? index + 1 : 0
+  }
+
+  private moveActiveSearchMatch(step: -1 | 1): void {
+    if (!this.searchQuery) {
+      return
+    }
+
+    this.syncSearchMatchState()
+    if (!this.searchMatchKeys.length) {
+      return
+    }
+
+    const currentIndex = this.activeSearchMatchKey ? this.searchMatchKeys.indexOf(this.activeSearchMatchKey) : -1
+    const baseIndex = currentIndex >= 0 ? currentIndex : 0
+    const nextIndex = (baseIndex + step + this.searchMatchKeys.length) % this.searchMatchKeys.length
+    this.activeSearchMatchKey = this.searchMatchKeys[nextIndex]
+    this.render()
+    this.scrollActiveSearchMatchIntoView()
+  }
+
+  private scrollActiveSearchMatchIntoView(): void {
+    const nodeKey = this.activeSearchMatchKey
+    if (!nodeKey) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        this.findRenderedNodeElement(nodeKey)?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        })
+      })
+    })
+  }
+
+  private findRenderedNodeElement(nodeKey: string): HTMLElement | null {
+    const selector = `[data-node-key="${escapeSelectorValue(nodeKey)}"]`
+    if (this.displayMode === 'sidebar') {
+      return this.getHostDocument().querySelector<HTMLElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+    }
+
+    return (
+      this.root.querySelector<HTMLElement>(selector) ??
+      this.getHostDocument().querySelector<HTMLElement>(`[data-favorite-sidebar-tree="true"] ${selector}`)
+    )
+  }
+
   private getOrderedChildrenFor(parentTitle: string): string[] {
     return this.applySortOrder(this.treeService.getChildrenFor(parentTitle), normalizeTitle(parentTitle))
   }
 
   private getOrderedTitlesForParent(parentKey: string): string[] {
-    return parentKey === ROOT_SORT_KEY ? [...this.rootFavorites] : this.getOrderedChildrenFor(parentKey)
+    return parentKey === ROOT_SORT_KEY ? this.applySortOrder(this.rootFavorites, ROOT_SORT_KEY) : this.getOrderedChildrenFor(parentKey)
+  }
+
+  private hasHierarchyRelations(): boolean {
+    if (!this.rootFavorites.length || !this.treeService.hasChildIndex()) {
+      return false
+    }
+
+    return this.rootFavorites.some((title) => this.treeService.getChildrenFor(title).length > 0)
   }
 
   private applySortOrder(titles: string[], parentKey: string): string[] {
-    const key = parentKey.trim()
+    const key = this.normalizeSortParentKey(parentKey)
     if (!key) {
       return [...titles]
     }
 
     const customOrder = this.sortOrders[key]
-    if (!customOrder?.length) {
+    if (!customOrder?.length || this.getSortModeForParent(key) !== 'custom') {
       return [...titles]
     }
 
@@ -1264,7 +1915,7 @@ export class FavoriteTreePlugin {
   }
 
   private applyCustomSortOrderForParent(parentKey: string, titles: string[]): void {
-    const key = parentKey.trim()
+    const key = this.normalizeSortParentKey(parentKey)
     if (!key) {
       return
     }
@@ -1273,10 +1924,28 @@ export class FavoriteTreePlugin {
       ...this.sortOrders,
       [key]: [...titles],
     }
-
-    if (key === ROOT_SORT_KEY) {
-      this.rootFavorites = [...titles]
+    this.sortModes = {
+      ...this.sortModes,
+      [key]: 'custom',
     }
+  }
+
+  private normalizeSortParentKey(parentKey: string): string {
+    const trimmed = parentKey.trim()
+    return trimmed || ''
+  }
+
+  private hasCustomSortOrder(parentKey: string): boolean {
+    const key = this.normalizeSortParentKey(parentKey)
+    return Boolean(key && this.sortOrders[key]?.length)
+  }
+
+  private getSortModeForParent(parentKey: string): SortMode {
+    const key = this.normalizeSortParentKey(parentKey)
+    if (!key || !this.hasCustomSortOrder(key)) {
+      return 'default'
+    }
+    return this.sortModes[key] === 'default' ? 'default' : 'custom'
   }
 
   private moveTitleWithinSiblings(

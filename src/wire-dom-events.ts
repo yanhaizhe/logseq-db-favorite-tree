@@ -1,9 +1,11 @@
 import type { DragKind, SortDropTarget, SortableItem } from './types'
+import { escapeSelectorValue } from './utils'
 
 export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
   onHeaderDoubleClick: () => void
   onSearchQueryChange: (value: string) => void
+  onCreateChildDraftChange: (value: string) => void
   onToggleControls: () => void
   onSwitchDisplayMode: () => void
   onResetPanelSize: () => void
@@ -11,12 +13,22 @@ export type FavoriteTreeDOMHandlers = {
   onToggleAutoRefresh: () => void
   onToggleExpandAll: () => void
   onLocateCurrent: () => void
+  onFocusCurrentPath: () => void
+  onCollapseOtherBranches: () => void
+  onFocusPreviousSearchMatch: () => void
+  onFocusNextSearchMatch: () => void
   onOpenSettings: () => void
   onCollapseToBubble: () => void
   onExpandPanel: () => void
   onClose: () => void
   onToggleNode: (key: string) => void
   onOpenPage: (page: string) => void
+  onCreateChildPage: (page: string) => void
+  onSubmitCreateChild: () => void
+  onCancelCreateChild: () => void
+  onOpenPageInSidebar: (page: string) => void
+  onToggleSortMode: (parentKey: string) => void
+  onClearCustomSort: (parentKey: string) => void
   onStartSortDrag: (item: SortableItem) => void
   onMoveSortDropTarget: (target: SortDropTarget) => boolean
   onFinishSortDrop: (target: SortDropTarget) => boolean
@@ -26,6 +38,7 @@ export type FavoriteTreeDOMHandlers = {
 
 export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
   let activeSortMarker: HTMLElement | null = null
+  let activeSortDragSource: HTMLElement | null = null
 
   const clearSortMarker = (): void => {
     if (!activeSortMarker) {
@@ -33,6 +46,14 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
     activeSortMarker.classList.remove('is-sort-before', 'is-sort-after')
     activeSortMarker = null
+  }
+
+  const clearSortDragSource = (): void => {
+    if (!activeSortDragSource) {
+      return
+    }
+    activeSortDragSource.classList.remove('is-sort-dragging')
+    activeSortDragSource = null
   }
 
   const readSortableItem = (element: HTMLElement | null): SortableItem | null => {
@@ -109,11 +130,18 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
 
   root.addEventListener('input', (event) => {
     const target = event.target as HTMLInputElement | null
-    if (!target || target.dataset.role !== 'search-input') {
+    if (!target) {
       return
     }
 
-    handlers.onSearchQueryChange(target.value)
+    if (target.dataset.role === 'search-input') {
+      handlers.onSearchQueryChange(target.value)
+      return
+    }
+
+    if (target.dataset.role === 'create-child-input') {
+      handlers.onCreateChildDraftChange(target.value)
+    }
   })
 
   root.addEventListener('click', (event) => {
@@ -151,6 +179,22 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       handlers.onLocateCurrent()
       return
     }
+    if (action === 'focus-current-path') {
+      handlers.onFocusCurrentPath()
+      return
+    }
+    if (action === 'collapse-other-branches') {
+      handlers.onCollapseOtherBranches()
+      return
+    }
+    if (action === 'search-prev-match') {
+      handlers.onFocusPreviousSearchMatch()
+      return
+    }
+    if (action === 'search-next-match') {
+      handlers.onFocusNextSearchMatch()
+      return
+    }
     if (action === 'settings') {
       handlers.onOpenSettings()
       return
@@ -182,6 +226,42 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       if (page) {
         handlers.onOpenPage(page)
       }
+      return
+    }
+    if (action === 'create-child-page') {
+      const page = target.dataset.page
+      if (page) {
+        handlers.onCreateChildPage(page)
+      }
+      return
+    }
+    if (action === 'submit-create-child') {
+      handlers.onSubmitCreateChild()
+      return
+    }
+    if (action === 'cancel-create-child') {
+      handlers.onCancelCreateChild()
+      return
+    }
+    if (action === 'open-page-in-sidebar') {
+      const page = target.dataset.page
+      if (page) {
+        handlers.onOpenPageInSidebar(page)
+      }
+      return
+    }
+    if (action === 'toggle-sort-mode') {
+      const parentKey = target.dataset.parentKey
+      if (parentKey) {
+        handlers.onToggleSortMode(parentKey)
+      }
+      return
+    }
+    if (action === 'clear-custom-sort') {
+      const parentKey = target.dataset.parentKey
+      if (parentKey) {
+        handlers.onClearCustomSort(parentKey)
+      }
     }
   })
 
@@ -192,10 +272,29 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       return
     }
 
-    event.dataTransfer?.setData('text/plain', item.itemId)
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
+    const row = handle.closest<HTMLElement>('[data-sort-item-id]')
+    if (row) {
+      clearSortDragSource()
+      activeSortDragSource = row
+      row.classList.add('is-sort-dragging')
     }
+
+    if (event.dataTransfer) {
+      event.dataTransfer.setData('text/plain', item.itemId)
+      event.dataTransfer.effectAllowed = 'move'
+
+      if (row) {
+        const ghost = row.cloneNode(true) as HTMLElement
+        ghost.style.opacity = '0.6'
+        ghost.style.position = 'absolute'
+        ghost.style.top = '-9999px'
+        ghost.style.width = `${row.offsetWidth}px`
+        document.body.appendChild(ghost)
+        event.dataTransfer.setDragImage(ghost, event.offsetX, event.offsetY)
+        ghost.remove()
+      }
+    }
+
     handlers.onStartSortDrag(item)
   })
 
@@ -225,22 +324,59 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     const drop = readDropTarget(event)
     clearSortMarker()
     if (!drop) {
+      clearSortDragSource()
       handlers.onEndSortDrag()
       return
     }
 
     event.preventDefault()
+    const targetItemId = drop.target.itemId
     if (!handlers.onFinishSortDrop(drop.target)) {
+      clearSortDragSource()
       handlers.onEndSortDrag()
+      return
     }
+
+    clearSortDragSource()
+
+    requestAnimationFrame(() => {
+      const newRow = root.querySelector<HTMLElement>(
+        `[data-sort-item-id="${escapeSelectorValue(targetItemId)}"]`,
+      )
+      if (newRow) {
+        newRow.classList.add('is-sort-flash')
+        newRow.addEventListener(
+          'animationend',
+          () => {
+            newRow.classList.remove('is-sort-flash')
+          },
+          { once: true },
+        )
+      }
+    })
   })
 
   root.addEventListener('dragend', () => {
     clearSortMarker()
+    clearSortDragSource()
     handlers.onEndSortDrag()
   })
 
   root.addEventListener('keydown', (event) => {
+    const createChildInput = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-role="create-child-input"]')
+    if (createChildInput) {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        handlers.onSubmitCreateChild()
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handlers.onCancelCreateChild()
+        return
+      }
+    }
+
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action="expand-panel"]')
     if (!target) {
       return

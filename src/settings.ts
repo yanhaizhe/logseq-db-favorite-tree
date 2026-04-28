@@ -9,6 +9,7 @@ import type {
   PluginSettings,
   RestoredPluginState,
   SidebarPosition,
+  SortModeMap,
   SortOrderMap,
   ViewMode,
 } from './types'
@@ -67,6 +68,7 @@ export class FavoriteTreeSettingsStore {
       viewMode: graphState.viewMode,
       controlsCollapsed: graphState.controlsCollapsed,
       sortOrders: graphState.sortOrders,
+      sortModes: graphState.sortModes,
       layout: graphState.layout,
       panelSize: graphState.panelSize,
     }
@@ -141,6 +143,7 @@ export class FavoriteTreeSettingsStore {
       viewMode: this.getViewMode(),
       controlsCollapsed: false,
       sortOrders: {},
+      sortModes: {},
       layout: {
         panelX: this.getNumber(INTERNAL_SETTINGS.panelX, 0),
         panelY: this.getNumber(INTERNAL_SETTINGS.panelY, 0),
@@ -166,6 +169,7 @@ export class FavoriteTreeSettingsStore {
       viewMode: value.viewMode === 'bubble' ? 'bubble' : 'panel',
       controlsCollapsed: Boolean(value.controlsCollapsed),
       sortOrders: this.normalizeSortOrders(value.sortOrders),
+      sortModes: this.normalizeSortModes(value.sortModes),
       layout: {
         panelX: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelX, 0),
         panelY: this.toFiniteNumber((value.layout as Record<string, unknown> | undefined)?.panelY, 0),
@@ -184,6 +188,7 @@ export class FavoriteTreeSettingsStore {
       viewMode: state.viewMode,
       controlsCollapsed: state.controlsCollapsed,
       sortOrders: this.normalizeSortOrders(state.sortOrders),
+      sortModes: this.normalizeSortModes(state.sortModes),
       layout: {
         panelX: Math.round(state.layout.panelX),
         panelY: Math.round(state.layout.panelY),
@@ -218,6 +223,23 @@ export class FavoriteTreeSettingsStore {
       const normalized = candidate.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
       if (normalized.length > 0) {
         result[key] = normalized
+      }
+    }
+    return result
+  }
+
+  private normalizeSortModes(value: unknown): SortModeMap {
+    if (!value || typeof value !== 'object') {
+      return {}
+    }
+
+    const result: SortModeMap = {}
+    for (const [key, candidate] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof key !== 'string' || !key.trim()) {
+        continue
+      }
+      if (candidate === 'default' || candidate === 'custom') {
+        result[key] = candidate
       }
     }
     return result

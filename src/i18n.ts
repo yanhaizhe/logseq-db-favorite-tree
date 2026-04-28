@@ -50,16 +50,31 @@ type Messages = {
   expandControlsTitle: TranslationValue
   collapseControlsTitle: TranslationValue
   infoTooltip: TranslationValue
+  perfSummary: TranslationValue
   searchPlaceholder: TranslationValue
   locateLabel: TranslationValue
   locateTitle: TranslationValue
+  focusCurrentPathLabel: TranslationValue
+  focusCurrentPathTitle: TranslationValue
+  collapseOtherBranchesLabel: TranslationValue
+  collapseOtherBranchesTitle: TranslationValue
   resetPanelSizeLabel: TranslationValue
   resetPanelSizeTitle: TranslationValue
   autoRefreshLabel: TranslationValue
   searchIndexing: TranslationValue
+  searchPrevMatch: TranslationValue
+  searchNextMatch: TranslationValue
+  searchMatchPosition: TranslationValue
   loadingFavorites: TranslationValue
   noMatches: TranslationValue
+  noMatchesTitle: TranslationValue
+  noMatchesHint: TranslationValue
   noFavorites: TranslationValue
+  noFavoritesTitle: TranslationValue
+  noFavoritesHint: TranslationValue
+  noHierarchyTitle: TranslationValue
+  noHierarchyBody: TranslationValue
+  noHierarchyHint: TranslationValue
   panelHeaderTitle: TranslationValue
   panelTitle: TranslationValue
   panelInfoAria: TranslationValue
@@ -73,8 +88,31 @@ type Messages = {
   rootCount: TranslationValue
   resizePanel: TranslationValue
   dragSort: TranslationValue
+  sortModeDefaultLabel: TranslationValue
+  sortModeCustomLabel: TranslationValue
+  sortSwitchToDefault: TranslationValue
+  sortSwitchToCustom: TranslationValue
+  clearCustomSort: TranslationValue
+  clearCustomSortConfirm: TranslationValue
+  sortStateCustomActive: TranslationValue
+  sortStateCustomSaved: TranslationValue
   toggleNode: TranslationValue
   openPage: TranslationValue
+  createChildPage: TranslationValue
+  createChildPageForParent: TranslationValue
+  createChildPrompt: TranslationValue
+  createChildInputHint: TranslationValue
+  createChildInputPlaceholder: TranslationValue
+  createChildSubmit: TranslationValue
+  createChildCancel: TranslationValue
+  createChildEmpty: TranslationValue
+  createChildDuplicate: TranslationValue
+  createChildSelfParent: TranslationValue
+  createChildSuccess: TranslationValue
+  createChildFailedRolledBack: TranslationValue
+  createChildFailedNeedsCleanup: TranslationValue
+  openInRightSidebar: TranslationValue
+  openInRightSidebarFailed: TranslationValue
   badgeCurrent: TranslationValue
   badgeLocated: TranslationValue
   badgeMatch: TranslationValue
@@ -82,12 +120,17 @@ type Messages = {
   cycleHint: TranslationValue
   loadingChildren: TranslationValue
   loadChildrenFailed: TranslationValue
+  searchFailedTitle: TranslationValue
+  searchFailedBody: TranslationValue
+  searchFailedHint: TranslationValue
   noDirectChildren: TranslationValue
   currentPageNotInTree: TranslationValue
   notRefreshedYet: TranslationValue
   locateNoCurrentPage: TranslationValue
   locatePageNotInTree: TranslationValue
   refreshFailed: TranslationValue
+  refreshFailedTitle: TranslationValue
+  refreshFailedHint: TranslationValue
   refreshToastFailed: TranslationValue
   refreshReasonStartup: TranslationValue
   refreshReasonPanelOpen: TranslationValue
@@ -141,17 +184,34 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     collapseControlsTitle: 'Collapse controls',
     infoTooltip: ({ property }) =>
       `Drag the header to move, double-click to collapse into a bubble; hierarchy property: ${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `Perf: refresh ${refreshMs}ms · render ${renderMs}ms · index ${indexMs ?? '-'}ms · roots ${roots} · expanded ${expanded} · pages ${pages ?? '-'}`,
     searchPlaceholder: 'Search page titles',
-    locateLabel: 'Locate',
-    locateTitle: 'Locate the current page',
+    locateLabel: 'Find current',
+    locateTitle: 'Expand the current page path and scroll to the current page',
+    focusCurrentPathLabel: 'Focus path',
+    focusCurrentPathTitle: 'Keep only the current page path expanded and scroll to it',
+    collapseOtherBranchesLabel: 'Collapse others',
+    collapseOtherBranchesTitle: 'Collapse all branches outside the current page path',
     resetPanelSizeLabel: 'Default size',
     resetPanelSizeTitle: 'Restore the default panel size',
     autoRefreshLabel: 'Auto refresh',
     searchIndexing: 'Building search index...',
+    searchPrevMatch: 'Previous match',
+    searchNextMatch: 'Next match',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: 'Loading favorite tree...',
     noMatches: 'No matching pages. Try a shorter keyword.',
+    noMatchesTitle: 'No search results',
+    noMatchesHint: 'Try a shorter keyword, check spelling, or refresh after the graph updates.',
     noFavorites:
       'There are no favorite pages yet. Add pages to Logseq favorites first so the plugin can use them as tree roots.',
+    noFavoritesTitle: 'No favorite roots yet',
+    noFavoritesHint: 'Add one or more pages to Logseq favorites, then refresh here if the list does not update immediately.',
+    noHierarchyTitle: 'Favorite roots found, but no hierarchy yet',
+    noHierarchyBody: ({ property }) =>
+      `Favorite roots are loaded, but no child pages were found through the "${property}" property.`,
+    noHierarchyHint: 'Add parent-child relations with the configured property, or change the hierarchy property in settings.',
     panelHeaderTitle: 'Drag to move, double-click to collapse into a bubble',
     panelTitle: 'Favorite Tree',
     panelInfoAria: 'Show info',
@@ -165,8 +225,32 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} root${Number(count) === 1 ? '' : 's'}`,
     resizePanel: 'Drag to resize the panel',
     dragSort: 'Drag to customize order',
+    sortModeDefaultLabel: 'Default',
+    sortModeCustomLabel: 'Custom',
+    sortSwitchToDefault: 'Switch to default order',
+    sortSwitchToCustom: 'Restore custom order',
+    clearCustomSort: 'Clear custom order',
+    clearCustomSortConfirm: 'Clear the saved custom order for this level? This action cannot be undone.',
+    sortStateCustomActive: 'Custom order active',
+    sortStateCustomSaved: 'Custom order saved',
     toggleNode: 'Expand or collapse',
     openPage: ({ title }) => `Open page ${title}`,
+    createChildPage: 'New child',
+    createChildPageForParent: ({ title }) => `Create a child page under ${title}`,
+    createChildPrompt: ({ parent, property }) => `New child page under ${parent}\nHierarchy property: ${property}\n\nEnter the child page title:`,
+    createChildInputHint: ({ parent }) => `Create a child page under ${parent}. Press Enter to submit or Esc to cancel.`,
+    createChildInputPlaceholder: 'Enter the child page title',
+    createChildSubmit: 'Create',
+    createChildCancel: 'Cancel',
+    createChildEmpty: 'Please enter a child page title.',
+    createChildDuplicate: ({ title }) => `${title} already exists. Choose a different page title.`,
+    createChildSelfParent: 'A page cannot be created as its own child.',
+    createChildSuccess: ({ title, parent }) => `Created ${title} under ${parent}.`,
+    createChildFailedRolledBack: ({ message }) => `Creating the child page failed and has been rolled back: ${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) =>
+      `${title} was created, but writing the parent relation failed: ${message}. Please check it manually.`,
+    openInRightSidebar: ({ title }) => `Open ${title} in the right sidebar`,
+    openInRightSidebarFailed: ({ title }) => `Failed to open ${title} in the right sidebar.`,
     badgeCurrent: 'Current',
     badgeLocated: 'Located',
     badgeMatch: 'Match',
@@ -174,12 +258,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: 'Cycle detected. Recursion stops here.',
     loadingChildren: 'Loading child pages from property relations on first expansion...',
     loadChildrenFailed: 'Failed to load child pages',
+    searchFailedTitle: 'Search is temporarily unavailable',
+    searchFailedBody: ({ message }) => `The tree index could not be built: ${message}`,
+    searchFailedHint: 'Refresh the tree or verify the hierarchy property setting, then try the search again.',
     noDirectChildren: 'No direct child pages found.',
     currentPageNotInTree: 'The current page is not in the favorite tree',
     notRefreshedYet: 'Not refreshed yet',
     locateNoCurrentPage: 'There is no current page to locate.',
     locatePageNotInTree: 'The current page is not in the favorite tree.',
     refreshFailed: ({ message }) => `Refresh failed: ${message}`,
+    refreshFailedTitle: 'Failed to load the favorite tree',
+    refreshFailedHint: 'Try refreshing again. If the issue persists, check graph data and the hierarchy property setting.',
     refreshToastFailed: ({ message }) => `DB Favorite Tree refresh failed: ${message}`,
     refreshReasonStartup: 'Startup',
     refreshReasonPanelOpen: 'Panel opened',
@@ -729,16 +818,32 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     expandControlsTitle: '展开功能区',
     collapseControlsTitle: '收起功能区',
     infoTooltip: ({ property }) => `拖动标题栏移动，双击收回为悬浮球；当前层级属性：${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `性能：刷新 ${refreshMs}ms · 渲染 ${renderMs}ms · 索引 ${indexMs ?? '-'}ms · 根 ${roots} · 展开 ${expanded} · 页 ${pages ?? '-'}`,
     searchPlaceholder: '搜索页面标题',
-    locateLabel: '定位',
-    locateTitle: '快速定位当前页',
+    locateLabel: '找到当前页',
+    locateTitle: '展开当前页路径并滚动到当前页',
+    focusCurrentPathLabel: '聚焦当前路径',
+    focusCurrentPathTitle: '只保留当前页路径展开，并滚动到该路径',
+    collapseOtherBranchesLabel: '收起其他分支',
+    collapseOtherBranchesTitle: '收起当前页路径之外的所有分支',
     resetPanelSizeLabel: '默认尺寸',
     resetPanelSizeTitle: '恢复面板默认宽高',
     autoRefreshLabel: '自动刷新',
     searchIndexing: '正在建立搜索索引...',
+    searchPrevMatch: '上一条命中',
+    searchNextMatch: '下一条命中',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: '正在加载收藏树...',
     noMatches: '没有匹配的页面，试试更短的关键词。',
+    noMatchesTitle: '没有搜索结果',
+    noMatchesHint: '可以尝试更短的关键词、检查拼写，或在图谱更新后重新刷新。',
     noFavorites: '当前没有收藏页面。先把页面加入 Logseq 收藏夹，插件才会把它们作为树根显示。',
+    noFavoritesTitle: '还没有收藏树根节点',
+    noFavoritesHint: '先把一个或多个页面加入 Logseq 收藏夹；如果没有立即显示，再点一次手动刷新。',
+    noHierarchyTitle: '已识别收藏根节点，但还没有层级关系',
+    noHierarchyBody: ({ property }) => `当前已加载收藏根节点，但没有通过属性 “${property}” 找到任何子节点。`,
+    noHierarchyHint: '请先为页面补充父子属性关系，或到设置里改成你实际使用的层级属性名。',
     panelHeaderTitle: '拖动可移动，双击可收回为悬浮球',
     panelTitle: '收藏夹树',
     panelInfoAria: '查看说明',
@@ -752,8 +857,31 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 个根节点`,
     resizePanel: '拖动调整面板大小',
     dragSort: '拖动自定义排序',
+    sortModeDefaultLabel: '默认排序',
+    sortModeCustomLabel: '自定义排序',
+    sortSwitchToDefault: '切换到默认排序',
+    sortSwitchToCustom: '切回自定义排序',
+    clearCustomSort: '清除自定义排序',
+    clearCustomSortConfirm: '确认清除当前层的自定义排序吗？此操作不可撤销。',
+    sortStateCustomActive: '自定义排序中',
+    sortStateCustomSaved: '已保存自定义排序',
     toggleNode: '展开或折叠',
     openPage: ({ title }) => `打开页面 ${title}`,
+    createChildPage: '新建子页',
+    createChildPageForParent: ({ title }) => `在 ${title} 下新建子页面`,
+    createChildPrompt: ({ parent, property }) => `在 ${parent} 下新建子页面\n层级属性：${property}\n\n请输入子页面标题：`,
+    createChildInputHint: ({ parent }) => `在 ${parent} 下新建子页面。按 Enter 提交，按 Esc 取消。`,
+    createChildInputPlaceholder: '请输入子页面标题',
+    createChildSubmit: '创建',
+    createChildCancel: '取消',
+    createChildEmpty: '请输入子页面标题。',
+    createChildDuplicate: ({ title }) => `${title} 已存在，请使用其他页面标题。`,
+    createChildSelfParent: '不能把页面创建为自己的子页面。',
+    createChildSuccess: ({ title, parent }) => `已在 ${parent} 下创建 ${title}。`,
+    createChildFailedRolledBack: ({ message }) => `创建子页面失败，已自动回滚：${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已创建，但写入父子关系失败：${message}。请手动检查。`,
+    openInRightSidebar: ({ title }) => `在右侧边栏打开 ${title}`,
+    openInRightSidebarFailed: ({ title }) => `无法在右侧边栏打开 ${title}。`,
     badgeCurrent: '当前页',
     badgeLocated: '定位',
     badgeMatch: '匹配',
@@ -761,12 +889,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: '检测到循环引用，已停止继续向下递归。',
     loadingChildren: '首次展开时正在按属性关系加载子节点...',
     loadChildrenFailed: '子节点加载失败',
+    searchFailedTitle: '搜索暂时不可用',
+    searchFailedBody: ({ message }) => `搜索索引构建失败：${message}`,
+    searchFailedHint: '可以先手动刷新，或检查层级属性设置后再重试搜索。',
     noDirectChildren: '未发现直接子页面。',
     currentPageNotInTree: '当前页不在收藏树中',
     notRefreshedYet: '尚未刷新',
     locateNoCurrentPage: '当前没有可定位的页面。',
     locatePageNotInTree: '当前页不在收藏树中。',
     refreshFailed: ({ message }) => `刷新失败: ${message}`,
+    refreshFailedTitle: '收藏树加载失败',
+    refreshFailedHint: '请先重试刷新；如果仍失败，再检查图谱数据和层级属性设置。',
     refreshToastFailed: ({ message }) => `DB Favorite Tree 刷新失败: ${message}`,
     refreshReasonStartup: '启动初始化',
     refreshReasonPanelOpen: '打开面板',
@@ -806,16 +939,32 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     expandControlsTitle: '展開功能區',
     collapseControlsTitle: '收起功能區',
     infoTooltip: ({ property }) => `拖曳標題列可移動，雙擊可收回為浮動球；目前層級屬性：${property}`,
+    perfSummary: ({ refreshMs, renderMs, indexMs, roots, expanded, pages }) =>
+      `效能：刷新 ${refreshMs}ms · 渲染 ${renderMs}ms · 索引 ${indexMs ?? '-'}ms · 根 ${roots} · 展開 ${expanded} · 頁 ${pages ?? '-'}`,
     searchPlaceholder: '搜尋頁面標題',
-    locateLabel: '定位',
-    locateTitle: '快速定位目前頁面',
+    locateLabel: '找到目前頁',
+    locateTitle: '展開目前頁路徑並捲動到目前頁',
+    focusCurrentPathLabel: '聚焦目前路徑',
+    focusCurrentPathTitle: '只保留目前頁路徑展開，並捲動到該路徑',
+    collapseOtherBranchesLabel: '收起其他分支',
+    collapseOtherBranchesTitle: '收起目前頁路徑之外的所有分支',
     resetPanelSizeLabel: '預設尺寸',
     resetPanelSizeTitle: '恢復面板預設寬高',
     autoRefreshLabel: '自動重新整理',
     searchIndexing: '正在建立搜尋索引...',
+    searchPrevMatch: '上一筆命中',
+    searchNextMatch: '下一筆命中',
+    searchMatchPosition: ({ current, total }) => `${current}/${total}`,
     loadingFavorites: '正在載入收藏樹...',
     noMatches: '找不到匹配頁面，試試更短的關鍵字。',
+    noMatchesTitle: '沒有搜尋結果',
+    noMatchesHint: '可以嘗試更短的關鍵字、檢查拼寫，或在圖譜更新後重新整理。',
     noFavorites: '目前沒有收藏頁面。請先把頁面加入 Logseq 收藏夾，外掛才會把它們作為樹根顯示。',
+    noFavoritesTitle: '還沒有收藏樹根節點',
+    noFavoritesHint: '先把一個或多個頁面加入 Logseq 收藏夾；如果沒有立即顯示，再點一次手動重新整理。',
+    noHierarchyTitle: '已識別收藏根節點，但還沒有層級關係',
+    noHierarchyBody: ({ property }) => `目前已載入收藏根節點，但沒有透過屬性「${property}」找到任何子節點。`,
+    noHierarchyHint: '請先為頁面補充父子屬性關係，或到設定裡改成你實際使用的層級屬性名稱。',
     panelHeaderTitle: '拖曳可移動，雙擊可收回為浮動球',
     panelTitle: '收藏樹',
     panelInfoAria: '查看說明',
@@ -829,8 +978,31 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     rootCount: ({ count }) => `${count} 個根節點`,
     resizePanel: '拖曳調整面板大小',
     dragSort: '拖曳自訂排序',
+    sortModeDefaultLabel: '預設排序',
+    sortModeCustomLabel: '自訂排序',
+    sortSwitchToDefault: '切換到預設排序',
+    sortSwitchToCustom: '切回自訂排序',
+    clearCustomSort: '清除自訂排序',
+    clearCustomSortConfirm: '確認清除目前層級的自訂排序嗎？此操作不可復原。',
+    sortStateCustomActive: '自訂排序中',
+    sortStateCustomSaved: '已儲存自訂排序',
     toggleNode: '展開或摺疊',
     openPage: ({ title }) => `開啟頁面 ${title}`,
+    createChildPage: '新建子頁',
+    createChildPageForParent: ({ title }) => `在 ${title} 下新建子頁面`,
+    createChildPrompt: ({ parent, property }) => `在 ${parent} 下新建子頁面\n層級屬性：${property}\n\n請輸入子頁面標題：`,
+    createChildInputHint: ({ parent }) => `在 ${parent} 下新建子頁面。按 Enter 送出，按 Esc 取消。`,
+    createChildInputPlaceholder: '請輸入子頁面標題',
+    createChildSubmit: '建立',
+    createChildCancel: '取消',
+    createChildEmpty: '請輸入子頁面標題。',
+    createChildDuplicate: ({ title }) => `${title} 已存在，請使用其他頁面標題。`,
+    createChildSelfParent: '不能把頁面建立為自己的子頁面。',
+    createChildSuccess: ({ title, parent }) => `已在 ${parent} 下建立 ${title}。`,
+    createChildFailedRolledBack: ({ message }) => `建立子頁面失敗，已自動回滾：${message}`,
+    createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已建立，但寫入父子關係失敗：${message}。請手動檢查。`,
+    openInRightSidebar: ({ title }) => `在右側邊欄開啟 ${title}`,
+    openInRightSidebarFailed: ({ title }) => `無法在右側邊欄開啟 ${title}。`,
     badgeCurrent: '目前頁',
     badgeLocated: '定位',
     badgeMatch: '匹配',
@@ -838,12 +1010,17 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     cycleHint: '偵測到循環引用，已停止繼續向下遞迴。',
     loadingChildren: '首次展開時正在依屬性關係載入子節點...',
     loadChildrenFailed: '子節點載入失敗',
+    searchFailedTitle: '搜尋暫時不可用',
+    searchFailedBody: ({ message }) => `搜尋索引建立失敗：${message}`,
+    searchFailedHint: '可以先手動重新整理，或檢查層級屬性設定後再重試搜尋。',
     noDirectChildren: '未發現直接子頁面。',
     currentPageNotInTree: '目前頁面不在收藏樹中',
     notRefreshedYet: '尚未重新整理',
     locateNoCurrentPage: '目前沒有可定位的頁面。',
     locatePageNotInTree: '目前頁不在收藏樹中。',
     refreshFailed: ({ message }) => `重新整理失敗: ${message}`,
+    refreshFailedTitle: '收藏樹載入失敗',
+    refreshFailedHint: '請先重試重新整理；如果仍失敗，再檢查圖譜資料和層級屬性設定。',
     refreshToastFailed: ({ message }) => `DB Favorite Tree 重新整理失敗: ${message}`,
     refreshReasonStartup: '啟動初始化',
     refreshReasonPanelOpen: '開啟面板',

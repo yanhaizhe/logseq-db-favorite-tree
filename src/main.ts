@@ -24,6 +24,7 @@ async function main(): Promise<void> {
     onSearchQueryChange: (value) => {
       void plugin.setSearchQuery(value)
     },
+    onCreateChildDraftChange: plugin.setCreateChildDraftTitle,
     onToggleControls: plugin.toggleControlsCollapsed,
     onSwitchDisplayMode: () => {
       void plugin.switchDisplayMode()
@@ -39,6 +40,14 @@ async function main(): Promise<void> {
     onLocateCurrent: () => {
       void plugin.locateCurrentPage()
     },
+    onFocusCurrentPath: () => {
+      void plugin.focusCurrentPath()
+    },
+    onCollapseOtherBranches: () => {
+      void plugin.collapseOtherBranches()
+    },
+    onFocusPreviousSearchMatch: plugin.focusPreviousSearchMatch,
+    onFocusNextSearchMatch: plugin.focusNextSearchMatch,
     onOpenSettings: plugin.openSettings,
     onCollapseToBubble: () => {
       void plugin.collapseToBubble()
@@ -51,6 +60,18 @@ async function main(): Promise<void> {
       void plugin.onNodeToggle(key)
     },
     onOpenPage: plugin.openPage,
+    onCreateChildPage: (page) => {
+      void plugin.createChildPage(page)
+    },
+    onSubmitCreateChild: () => {
+      void plugin.submitCreateChildPage()
+    },
+    onCancelCreateChild: plugin.cancelCreateChildPage,
+    onOpenPageInSidebar: (page) => {
+      void plugin.openPageInRightSidebar(page)
+    },
+    onToggleSortMode: plugin.toggleSortModeForParent,
+    onClearCustomSort: plugin.clearCustomSortForParent,
     onStartSortDrag: plugin.startSortDrag,
     onMoveSortDropTarget: plugin.moveSortDropTarget,
     onFinishSortDrop: plugin.finishSortDrop,

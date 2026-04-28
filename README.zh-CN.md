@@ -133,6 +133,7 @@ npm run build
 - [发布指南](./docs/publish-guide.md)
 - [详细功能清单](./docs/feature-list.md)
 - [产品路线图 PRD](./docs/product-roadmap-prd.md)
+- [UI/UX 优化计划](./docs/ux-optimization-plan.md)
 - [技术方案文档](./docs/technical-design.md)
 - [版本更新记录](./CHANGELOG.md)
 - [Release 升级说明模板](./docs/release-notes-template.md)

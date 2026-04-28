@@ -132,6 +132,7 @@ Notes:
 - [Publish Guide](./docs/publish-guide.md)
 - [Feature List](./docs/feature-list.md)
 - [Product Roadmap PRD](./docs/product-roadmap-prd.md)
+- [UI/UX Optimization Plan](./docs/ux-optimization-plan.md)
 - [Technical Design](./docs/technical-design.md)
 - [Changelog](./CHANGELOG.md)
 - [Release Notes Template](./docs/release-notes-template.md)
