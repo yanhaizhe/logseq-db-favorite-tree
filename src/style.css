@@ -653,6 +653,7 @@ body.is-dragging * {
 }
 
 .tree-node__row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -669,6 +670,42 @@ body.is-dragging * {
 
 .tree-node__row.is-sort-after {
   box-shadow: inset 0 -2px 0 var(--ft-accent);
+}
+
+.tree-node__children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tree-node__children::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 6px;
+  border-left: 1px solid color-mix(in srgb, var(--ft-border) 68%, transparent 32%);
+}
+
+.tree-node__children .tree-node__row::before {
+  content: "";
+  position: absolute;
+  left: calc(6px - var(--depth, 0) * 14px);
+  top: 50%;
+  width: calc(var(--depth, 0) * 14px - 6px);
+  border-top: 1px solid color-mix(in srgb, var(--ft-border) 68%, transparent 32%);
+  transform: translateY(-0.5px);
+}
+
+.tree-node__children .tree-node__row:hover::before {
+  border-color: color-mix(in srgb, var(--ft-accent) 28%, var(--ft-border) 72%);
+}
+
+.tree-node__children .tree-node__row.is-current::before,
+.tree-node__children .tree-node__row.is-located::before,
+.tree-node__children .tree-node__row.is-search-match-current::before {
+  border-color: color-mix(in srgb, var(--ft-accent) 30%, var(--ft-border) 70%);
 }
 
 .tree-node__row:hover {
@@ -863,12 +900,6 @@ body.is-dragging * {
   color: var(--ft-accent);
   border-color: color-mix(in srgb, var(--ft-accent) 45%, var(--ft-border) 55%);
   background: color-mix(in srgb, var(--ft-accent) 10%, var(--ft-bg) 90%);
-}
-
-.tree-node__children {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .tree-node__hint {
