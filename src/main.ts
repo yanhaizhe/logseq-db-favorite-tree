@@ -78,9 +78,8 @@ async function main(): Promise<void> {
     onEndSortDrag: plugin.endSortDrag,
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
-  registerToolbar(plugin.togglePanel, i18n)
-
   await plugin.init()
+  registerToolbar(plugin.togglePanel, i18n)
 }
 
 logseq.ready(main).catch(async (error) => {
