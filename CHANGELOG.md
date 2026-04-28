@@ -6,6 +6,25 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 
 ## [Unreleased]
 
+### Added
+
+- Sort mode toggle: switch between default and custom order per level without losing saved custom order
+- Clear custom sort per level with confirmation dialog
+- Visual indicator for levels with active or saved custom sort orders
+- Focus current path action: keep only the current page path expanded
+- Collapse other branches action: collapse all branches outside the current page path
+- Search match navigation: previous/next match cycling with position display (N/M)
+- Create child page: inline input under any node with auto parent-property wiring
+- Duplicate page name prevention on child page creation
+- Automatic rollback of created page when parent-property write fails
+- Open page in right sidebar from tree nodes
+- All new actions available in both sidebar and floating panel modes
+
+### Changed
+
+- Expand/collapse all in search mode now operates on visible matched branches only
+- Updated feature-list.md and product-roadmap-prd.md to reflect current implementation state
+
 ## [1.1.1] - 2026-04-27
 
 ### Added
