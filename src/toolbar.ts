@@ -1,14 +1,7 @@
 import type { FavoriteTreeI18n } from './i18n'
 import toolbarIconSvg from './toolbar-icon.svg?raw'
 
-let toolbarRegistered = false
-
 export function registerToolbar(toggleFavoriteTree: () => Promise<void>, i18n: FavoriteTreeI18n): void {
-  if (toolbarRegistered) {
-    return
-  }
-  toolbarRegistered = true
-
   logseq.provideModel({
     toggleFavoriteTree,
   })
