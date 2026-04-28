@@ -8,10 +8,6 @@ export function registerToolbar(toggleFavoriteTree: () => Promise<void>, i18n: F
 
   logseq.App.registerUIItem('toolbar', {
     key: 'db-favorite-tree',
-    template: `
-      <a class="button" data-on-click="toggleFavoriteTree" title="${i18n.t('toolbarTitle')}" aria-label="${i18n.t('toolbarTitle')}">
-        ${toolbarIconSvg}
-      </a>
-    `,
+    template: `<a class="button" data-on-click="toggleFavoriteTree" title="\${i18n.t('toolbarTitle')}" aria-label="\${i18n.t('toolbarTitle')}">\${toolbarIconSvg}</a>`,
   })
 }

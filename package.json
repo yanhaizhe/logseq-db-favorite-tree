@@ -17,10 +17,7 @@
   ],
   "author": "yanhaizhe",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yanhaizhe/logseq-db-favorite-tree.git"
-  },
+  "repository": "yanhaizhe/logseq-db-favorite-tree",
   "homepage": "https://github.com/yanhaizhe/logseq-db-favorite-tree",
   "bugs": {
     "url": "https://github.com/yanhaizhe/logseq-db-favorite-tree/issues"
