@@ -1,4 +1,5 @@
 import type { DragKind, SortDropTarget, SortableItem } from './types'
+import { escapeSelectorValue } from './utils'
 
 export type FavoriteTreeDOMHandlers = {
   onStartDrag: (kind: DragKind, event: PointerEvent, handleElement: HTMLElement | null) => void
@@ -37,6 +38,7 @@ export type FavoriteTreeDOMHandlers = {
 
 export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
   let activeSortMarker: HTMLElement | null = null
+  let activeSortDragSource: HTMLElement | null = null
 
   const clearSortMarker = (): void => {
     if (!activeSortMarker) {
@@ -44,6 +46,14 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
     activeSortMarker.classList.remove('is-sort-before', 'is-sort-after')
     activeSortMarker = null
+  }
+
+  const clearSortDragSource = (): void => {
+    if (!activeSortDragSource) {
+      return
+    }
+    activeSortDragSource.classList.remove('is-sort-dragging')
+    activeSortDragSource = null
   }
 
   const readSortableItem = (element: HTMLElement | null): SortableItem | null => {
@@ -262,10 +272,29 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
       return
     }
 
-    event.dataTransfer?.setData('text/plain', item.itemId)
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
+    const row = handle.closest<HTMLElement>('[data-sort-item-id]')
+    if (row) {
+      clearSortDragSource()
+      activeSortDragSource = row
+      row.classList.add('is-sort-dragging')
     }
+
+    if (event.dataTransfer) {
+      event.dataTransfer.setData('text/plain', item.itemId)
+      event.dataTransfer.effectAllowed = 'move'
+
+      if (row) {
+        const ghost = row.cloneNode(true) as HTMLElement
+        ghost.style.opacity = '0.6'
+        ghost.style.position = 'absolute'
+        ghost.style.top = '-9999px'
+        ghost.style.width = `${row.offsetWidth}px`
+        document.body.appendChild(ghost)
+        event.dataTransfer.setDragImage(ghost, event.offsetX, event.offsetY)
+        ghost.remove()
+      }
+    }
+
     handlers.onStartSortDrag(item)
   })
 
@@ -295,18 +324,41 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     const drop = readDropTarget(event)
     clearSortMarker()
     if (!drop) {
+      clearSortDragSource()
       handlers.onEndSortDrag()
       return
     }
 
     event.preventDefault()
+    const targetItemId = drop.target.itemId
     if (!handlers.onFinishSortDrop(drop.target)) {
+      clearSortDragSource()
       handlers.onEndSortDrag()
+      return
     }
+
+    clearSortDragSource()
+
+    requestAnimationFrame(() => {
+      const newRow = root.querySelector<HTMLElement>(
+        `[data-sort-item-id="${escapeSelectorValue(targetItemId)}"]`,
+      )
+      if (newRow) {
+        newRow.classList.add('is-sort-flash')
+        newRow.addEventListener(
+          'animationend',
+          () => {
+            newRow.classList.remove('is-sort-flash')
+          },
+          { once: true },
+        )
+      }
+    })
   })
 
   root.addEventListener('dragend', () => {
     clearSortMarker()
+    clearSortDragSource()
     handlers.onEndSortDrag()
   })
 
