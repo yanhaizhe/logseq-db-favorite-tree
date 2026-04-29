@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
 
-  registerToolbar(plugin.togglePanel, i18n)
+  registerToolbar(i18n)
   await plugin.init()
 
   logseq.beforeunload(async () => {

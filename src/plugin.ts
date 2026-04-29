@@ -1121,6 +1121,9 @@ export class FavoriteTreePlugin {
 
   private registerInjectedModels(): void {
     logseq.provideModel({
+      toggleFavoriteTree: () => {
+        void this.togglePanel()
+      },
       sidebarTreeToggle: (event: { dataset?: Record<string, string> }) => {
         const key = event.dataset?.key
         if (key) {
