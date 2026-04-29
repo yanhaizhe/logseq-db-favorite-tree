@@ -1121,9 +1121,6 @@ export class FavoriteTreePlugin {
 
   private registerInjectedModels(): void {
     logseq.provideModel({
-      toggleFavoriteTree: () => {
-        void this.togglePanel()
-      },
       sidebarTreeToggle: (event: { dataset?: Record<string, string> }) => {
         const key = event.dataset?.key
         if (key) {
@@ -1307,34 +1304,14 @@ export class FavoriteTreePlugin {
   }
 
   private async resolveSidebarTreePath(): Promise<string | null> {
-    const hostDoc = this.getHostDocument()
-    const isSameOrigin = hostDoc !== document
-
     for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
-      try {
-        const element = hostDoc.querySelector<HTMLElement>(path)
-        if (!element) {
-          continue
-        }
+      if (!this.hasSidebarTarget(path)) {
+        continue
+      }
 
-        // If we have direct access to the host document (typical for desktop),
-        // we can check visibility and rect directly without triggering Logseq's internal resolver errors.
-        if (isSameOrigin) {
-          const rect = element.getBoundingClientRect()
-          if (rect.width > 0 && rect.height > 0) {
-            return path
-          }
-          continue
-        }
-
-        // Fallback to Logseq's bridge if cross-origin (unlikely on desktop)
-        const rect = await logseq.UI.queryElementRect(path)
-        if (rect) {
-          return path
-        }
-      } catch (error) {
-        // Suppress individual resolution errors to avoid console noise during startup/layout shifts
-        console.debug(`[Favorite Tree] Sidebar path resolution failed for ${path}:`, error)
+      const rect = await logseq.UI.queryElementRect(path)
+      if (rect) {
+        return path
       }
     }
 
