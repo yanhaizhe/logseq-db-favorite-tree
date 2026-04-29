@@ -61,6 +61,7 @@ export class FavoriteTreePlugin {
   private bodyScrollTop = 0
   private lastLocatedNodeKey: string | null = null
   private flashLocatedNodeKey: string | null = null
+  private internalNavigationPageName: string | null = null
   private suppressBubbleClick = false
   private sortDragItem: SortableItem | null = null
   private readonly expandedKeys = new Set<string>()
@@ -477,6 +478,7 @@ export class FavoriteTreePlugin {
   }
 
   openPage = (pageName: string): void => {
+    this.internalNavigationPageName = pageName
     logseq.App.pushState('page', { name: pageName })
   }
 
@@ -714,6 +716,11 @@ export class FavoriteTreePlugin {
 
     this.offHooks.push(
       logseq.App.onRouteChanged(() => {
+        if (this.internalNavigationPageName !== null) {
+          this.currentPageName = this.internalNavigationPageName
+          this.internalNavigationPageName = null
+          return
+        }
         if (this.routeTimerId !== null) {
           window.clearTimeout(this.routeTimerId)
         }
