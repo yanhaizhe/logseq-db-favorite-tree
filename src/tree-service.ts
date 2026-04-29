@@ -1,5 +1,5 @@
 import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
-import { findPropertyValue, normalizeFavoriteSeed, normalizeFavoriteSeeds, normalizeTitle, pageTitle, uniqueTitlesFromValues } from './utils'
+import { findPropertyValue, isPageDeletedLike, normalizeFavoriteSeed, normalizeFavoriteSeeds, normalizeTitle, pageTitle, uniqueTitlesFromValues } from './utils'
 
 export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
@@ -282,42 +282,4 @@ export class FavoriteTreeTreeService {
       this.collectPathsFromNode(child, targetKey, nextPath, matches)
     }
   }
-}
-
-function isPageDeletedLike(page: Record<string, unknown>): boolean {
-  const flags = [
-    'deleted',
-    'deleted?',
-    'isDeleted',
-    'is-deleted',
-    'trashed',
-    'trash',
-    'inTrash',
-    'in-trash',
-    'archived',
-    'archived?',
-    'isArchived',
-    'is-archived',
-  ]
-
-  for (const key of flags) {
-    if (page[key] === true) {
-      return true
-    }
-  }
-
-  const properties = page.properties
-  if (properties && typeof properties === 'object') {
-    const record = properties as Record<string, unknown>
-    for (const key of flags) {
-      if (record[key] === true) {
-        return true
-      }
-      if (record[`:${key}`] === true) {
-        return true
-      }
-    }
-  }
-
-  return false
 }

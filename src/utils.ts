@@ -200,3 +200,41 @@ export function escapeSelectorValue(value: string | null | undefined): string {
 
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
+
+const PAGE_DELETED_FLAGS = [
+  'deleted',
+  'deleted?',
+  'isDeleted',
+  'is-deleted',
+  'trashed',
+  'trash',
+  'inTrash',
+  'in-trash',
+  'archived',
+  'archived?',
+  'isArchived',
+  'is-archived',
+] as const
+
+export function isPageDeletedLike(page: Record<string, unknown>): boolean {
+  for (const key of PAGE_DELETED_FLAGS) {
+    if (page[key] === true) {
+      return true
+    }
+  }
+
+  const properties = page.properties
+  if (properties && typeof properties === 'object') {
+    const record = properties as Record<string, unknown>
+    for (const key of PAGE_DELETED_FLAGS) {
+      if (record[key] === true) {
+        return true
+      }
+      if (record[`:${key}`] === true) {
+        return true
+      }
+    }
+  }
+
+  return false
+}

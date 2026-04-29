@@ -81,6 +81,10 @@ async function main(): Promise<void> {
 
   registerToolbar(plugin.togglePanel, i18n)
   await plugin.init()
+
+  logseq.beforeunload(async () => {
+    plugin.destroy()
+  })
 }
 
 logseq.ready(main).catch(async (error) => {
