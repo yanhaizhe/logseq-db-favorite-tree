@@ -22,6 +22,21 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || github.ref }}
 
+      - name: Validate version consistency
+        run: |
+          # Strip leading 'v' from tag name (e.g. v1.1.0 → 1.1.0)
+          TAG_VERSION="${{ github.event.release.tag_name || '' }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Tag version : ${TAG_VERSION}"
+          echo "Package version: ${PKG_VERSION}"
+
+          if [ -n "${TAG_VERSION}" ] && [ "${TAG_VERSION}" != "${PKG_VERSION}" ]; then
+            echo "::error::Version mismatch! Tag='${TAG_VERSION}' but package.json='${PKG_VERSION}'. Aborting release."
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,18 +54,26 @@ jobs:
           # Create a staging directory for the clean release
           STAGING="release/${PLUGIN_NAME}"
           mkdir -p "${STAGING}"
-          
+
           # Copy only necessary assets to the root of the staging folder
           cp README.md icon.svg package.json "${STAGING}/"
           cp -R dist/* "${STAGING}/"
-          
+
           # Update package.json to point to index.html at the root (flattened)
           # We use sed to remove "dist/" prefix from the "main" and "logseq.main" fields
           sed -i 's/"dist\/index.html"/"index.html"/g' "${STAGING}/package.json"
-          
+
           # Zip the plugin folder
           cd release
           zip -r "${PLUGIN_NAME}.zip" "${PLUGIN_NAME}"
+
+      - name: Verify release package
+        run: |
+          echo "=== Package contents ==="
+          unzip -l "release/${PLUGIN_NAME}.zip"
+          echo ""
+          echo "=== package.json in zip ==="
+          unzip -p "release/${PLUGIN_NAME}.zip" "${PLUGIN_NAME}/package.json"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
