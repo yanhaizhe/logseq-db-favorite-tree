@@ -124,7 +124,10 @@ export function findPropertyValue(properties: Record<string, unknown>, propertyN
   return undefined
 }
 
-export function normalizePropertyLookupKey(value: string): string {
+export function normalizePropertyLookupKey(value: string | null | undefined): string {
+  if (value == null) {
+    return ''
+  }
   return value.trim().replace(/^:/, '').toLocaleLowerCase()
 }
 
@@ -175,7 +178,10 @@ export function normalizePropertyReferences(value: unknown): string[] {
   return []
 }
 
-export function escapeHtml(value: string): string {
+export function escapeHtml(value: string | null | undefined): string {
+  if (value == null) {
+    return ''
+  }
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -184,7 +190,10 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function escapeSelectorValue(value: string): string {
+export function escapeSelectorValue(value: string | null | undefined): string {
+  if (value == null) {
+    return ''
+  }
   if (window.CSS?.escape) {
     return window.CSS.escape(value)
   }

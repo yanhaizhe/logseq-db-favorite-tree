@@ -517,6 +517,9 @@ function renderNode(
   i18n: FavoriteTreeI18n,
 ): string {
   const key = normalizeTitle(title)
+  if (!key) {
+    return ''
+  }
   const isCurrent = key === normalizeTitle(state.currentPageName)
   const isLocated = key === state.lastLocatedNodeKey
   const isFlashing = key === state.flashLocatedNodeKey
@@ -801,7 +804,10 @@ function isNodeVisible(
   return accessors.getChildrenFor(title).some((childTitle) => isNodeVisible(childTitle, normalizedQuery, accessors, nextAncestors))
 }
 
-function renderHighlightedTitle(title: string, normalizedQuery: string): string {
+function renderHighlightedTitle(title: string | null | undefined, normalizedQuery: string): string {
+  if (title == null) {
+    return ''
+  }
   if (!normalizedQuery) {
     return escapeHtml(title)
   }
