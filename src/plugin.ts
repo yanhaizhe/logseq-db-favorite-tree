@@ -22,7 +22,7 @@ import type {
   ViewMode,
 } from './types'
 import { applyTheme } from './theme'
-import { escapeSelectorValue, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
+import { escapeSelectorValue, isPageDeletedLike, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -92,10 +92,10 @@ export class FavoriteTreePlugin {
 
   constructor(private readonly root: HTMLElement, initialI18n: FavoriteTreeI18n = createFavoriteTreeI18n('en')) {
     this.i18n = initialI18n
-    this.registerInjectedModels()
   }
 
   async init(): Promise<void> {
+    this.registerInjectedModels()
     await this.initializeGraphContext()
     await this.syncLocale()
     const hostDocument = this.getHostDocument()
@@ -1676,7 +1676,7 @@ export class FavoriteTreePlugin {
     const pages = (await logseq.Editor.getAllPages()) ?? []
     const keys = new Set<string>()
     for (const page of pages) {
-      if (this.isPageDeletedLike(page as Record<string, unknown>)) {
+      if (isPageDeletedLike(page as Record<string, unknown>)) {
         continue
       }
       const title = pageTitle(page)
@@ -1690,43 +1690,7 @@ export class FavoriteTreePlugin {
     return keys
   }
 
-  private isPageDeletedLike(page: Record<string, unknown>): boolean {
-    const flags = [
-      'deleted',
-      'deleted?',
-      'isDeleted',
-      'is-deleted',
-      'trashed',
-      'trash',
-      'inTrash',
-      'in-trash',
-      'archived',
-      'archived?',
-      'isArchived',
-      'is-archived',
-    ]
 
-    for (const key of flags) {
-      if (page[key] === true) {
-        return true
-      }
-    }
-
-    const properties = page.properties
-    if (properties && typeof properties === 'object') {
-      const record = properties as Record<string, unknown>
-      for (const key of flags) {
-        if (record[key] === true) {
-          return true
-        }
-        if (record[`:${key}`] === true) {
-          return true
-        }
-      }
-    }
-
-    return false
-  }
 
   private async resolveCurrentPagePathOrWarn(): Promise<string[] | null> {
     await this.updateCurrentPage()
