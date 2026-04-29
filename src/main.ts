@@ -79,8 +79,8 @@ async function main(): Promise<void> {
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
 
-  await plugin.init()
   registerToolbar(plugin.togglePanel, i18n)
+  await plugin.init()
 }
 
 logseq.ready(main).catch(async (error) => {
