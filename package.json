@@ -1,6 +1,6 @@
 {
   "name": "logseq-db-favorite-tree",
-  "version": "1.2.2",
+  "version": "1.1.0",
   "description": "A Logseq plugin that renders favorite pages as roots in a property-driven tree for DB graphs.",
   "type": "module",
   "main": "dist/index.html",
@@ -23,11 +23,11 @@
     "url": "https://github.com/yanhaizhe/logseq-db-favorite-tree/issues"
   },
   "dependencies": {
-    "@logseq/libs": "^0.0.17"
+    "@logseq/libs": "^0.3.3"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
   },
   "logseq": {
     "id": "logseq-db-favorite-tree",
