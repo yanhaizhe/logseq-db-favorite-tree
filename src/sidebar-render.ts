@@ -907,6 +907,9 @@ function renderSidebarNode(
   normalizedQuery: string,
 ): string {
   const key = normalizeTitle(title)
+  if (!key) {
+    return ''
+  }
   const isCurrent = key === normalizeTitle(state.currentPageName)
   const isActiveSearchMatch = key === state.currentSearchMatchKey
   const children = accessors.getChildrenFor(title)
@@ -1078,7 +1081,10 @@ function isSidebarNodeVisible(
   return accessors.getChildrenFor(title).some((childTitle) => isSidebarNodeVisible(childTitle, normalizedQuery, accessors, nextAncestors))
 }
 
-function renderSidebarHighlightedTitle(title: string, normalizedQuery: string): string {
+function renderSidebarHighlightedTitle(title: string | null | undefined, normalizedQuery: string): string {
+  if (title == null) {
+    return ''
+  }
   if (!normalizedQuery) {
     return escapeHtml(title)
   }
