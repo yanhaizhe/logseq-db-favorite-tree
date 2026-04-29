@@ -80,10 +80,15 @@ async function main(): Promise<void> {
   })
 
   registerToolbar(plugin.togglePanel, i18n)
-  await plugin.init()
 
-  logseq.beforeunload(async () => {
-    plugin.destroy()
+  // Use requestAnimationFrame to give Logseq's UI thread a chance to process the toolbar registration
+  // before we start the potentially heavy plugin initialization and initial render.
+  window.requestAnimationFrame(async () => {
+    await plugin.init()
+
+    logseq.beforeunload(async () => {
+      plugin.destroy()
+    })
   })
 }
 
