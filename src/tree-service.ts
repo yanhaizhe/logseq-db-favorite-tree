@@ -210,31 +210,43 @@ export class FavoriteTreeTreeService {
       page.properties && typeof page.properties === 'object'
         ? (page.properties as Record<string, unknown>)
         : null
-    const rawFromPage = properties ? findPropertyValue(properties, propertyName) : undefined
-    const rawFromTopLevel = (page as Record<string, unknown>)[propertyName]
-    let rawFromApi: unknown = undefined
-    let rawFromAllProps: unknown = undefined
 
-    if (rawFromPage == null && rawFromTopLevel == null) {
-      try {
-        rawFromApi = await logseq.Editor.getBlockProperty(page.uuid, propertyName)
-      } catch {
-        rawFromApi = undefined
-      }
-    }
+    const targetProps = Array.from(new Set([propertyName, 'tags', 'page tags', 'page-tags'])).filter(Boolean)
+    const allValues: unknown[] = []
+    let fetchedAllProps: Record<string, unknown> | null | undefined = undefined
 
-    if (rawFromPage == null && rawFromTopLevel == null && rawFromApi == null) {
-      try {
-        const allProps = await logseq.Editor.getBlockProperties(page.uuid)
-        if (allProps && typeof allProps === 'object') {
-          rawFromAllProps = findPropertyValue(allProps as Record<string, unknown>, propertyName)
+    for (const propName of targetProps) {
+      const rawFromPage = properties ? findPropertyValue(properties, propName) : undefined
+      const rawFromTopLevel = (page as Record<string, unknown>)[propName]
+      let rawFromApi: unknown = undefined
+      let rawFromAllProps: unknown = undefined
+
+      if (rawFromPage == null && rawFromTopLevel == null) {
+        try {
+          rawFromApi = await logseq.Editor.getBlockProperty(page.uuid, propName)
+        } catch {
+          rawFromApi = undefined
         }
-      } catch {
-        rawFromAllProps = undefined
       }
+
+      if (rawFromPage == null && rawFromTopLevel == null && rawFromApi == null) {
+        if (fetchedAllProps === undefined) {
+          try {
+            const allProps = await logseq.Editor.getBlockProperties(page.uuid)
+            fetchedAllProps = allProps && typeof allProps === 'object' ? (allProps as Record<string, unknown>) : null
+          } catch {
+            fetchedAllProps = null
+          }
+        }
+        if (fetchedAllProps) {
+          rawFromAllProps = findPropertyValue(fetchedAllProps, propName)
+        }
+      }
+
+      allValues.push(rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps)
     }
 
-    return uniqueTitlesFromValues([rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps])
+    return uniqueTitlesFromValues(allValues)
   }
 
   private collectExpandableKeysFrom(title: string, ancestors: string[], output: Set<string>): void {
