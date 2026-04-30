@@ -10,7 +10,7 @@ permissions:
 
 env:
   PLUGIN_NAME: logseq-db-favorite-tree
-  NODE_VERSION: "23"
+  NODE_VERSION: "24"
 
 jobs:
   build-and-attach:
