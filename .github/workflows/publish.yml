@@ -1,26 +1,21 @@
-name: Publish Plugin Release
+name: Build and Publish Plugin
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-
-permissions:
-  contents: write
+  push:
+    tags:
+      - "*"
 
 env:
   PLUGIN_NAME: logseq-db-favorite-tree
   NODE_VERSION: "20"
 
 jobs:
-  build-and-attach:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout release tag
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,34 +27,28 @@ jobs:
         run: npm ci
 
       - name: Build plugin
-        run: npm run build
+        id: build
+        run: |
+          npm run build
+          echo "tag_name=$(git tag --sort version:refname | tail -n 1)" >> $GITHUB_OUTPUT
 
       - name: Package release zip
         run: |
-          # Create a staging directory for the clean release
           STAGING="release/${PLUGIN_NAME}"
           mkdir -p "${STAGING}"
-          
-          # Copy only necessary assets to the root of the staging folder
+
           cp README.md icon.svg package.json "${STAGING}/"
           cp -R dist/* "${STAGING}/"
-          
-          # Update package.json to point to index.html at the root (flattened)
-          # We use sed to remove "dist/" prefix from the "main" and "logseq.main" fields
+
           sed -i 's/"dist\/index.html"/"index.html"/g' "${STAGING}/package.json"
-          
-          # Zip the plugin folder
+
           cd release
           zip -r "${PLUGIN_NAME}.zip" "${PLUGIN_NAME}"
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.PLUGIN_NAME }}-release
-          path: release/${{ env.PLUGIN_NAME }}.zip
-
-      - name: Attach zip to GitHub release
-        if: github.event_name == 'release'
+      - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: release/${{ env.PLUGIN_NAME }}.zip
+          name: ${{ env.PLUGIN_NAME }} ${{ steps.build.outputs.tag_name }}
+          files: |
+            release/${{ env.PLUGIN_NAME }}.zip
+            package.json
