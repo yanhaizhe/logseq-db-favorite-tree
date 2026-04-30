@@ -79,8 +79,8 @@ async function main(): Promise<void> {
     shouldIgnoreBubbleClick: plugin.shouldIgnoreBubbleClick,
   })
 
-  registerToolbar(i18n)
   await plugin.init()
+  registerToolbar(i18n)
 
   logseq.beforeunload(async () => {
     plugin.destroy()
