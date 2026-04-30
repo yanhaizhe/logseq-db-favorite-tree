@@ -80,15 +80,6 @@ async function main(): Promise<void> {
   })
 
   await plugin.init()
-  const key = logseq.baseInfo.id
-  logseq.provideStyle(`
-    div[data-injected-ui=favorite-tree-${key}] {
-      display: flex;
-      align-items: center;
-      font-weight: 500;
-      position: relative;
-    }
-  `)
   registerToolbar(i18n)
 
   logseq.beforeunload(async () => {
