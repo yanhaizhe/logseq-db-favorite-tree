@@ -2,7 +2,9 @@ import '@logseq/libs'
 import './style.css'
 import { buildSettingsSchema } from './constants'
 import { getFavoriteTreeI18n } from './i18n'
+import { createModels } from './models'
 import { FavoriteTreePlugin } from './plugin'
+import { SIDEBAR_TREE_HOST_STYLE } from './sidebar-render'
 import { registerToolbar } from './toolbar'
 import { wireDOMEvents } from './wire-dom-events'
 
@@ -16,6 +18,15 @@ async function main(): Promise<void> {
   }
 
   const plugin = new FavoriteTreePlugin(root, i18n)
+
+  logseq.provideModel(createModels(plugin))
+  logseq.provideStyle({
+    key: 'db-favorite-tree-left-sidebar-style',
+    style: SIDEBAR_TREE_HOST_STYLE,
+  })
+
+  registerToolbar(i18n)
+
   wireDOMEvents(root, {
     onStartDrag: plugin.startDrag,
     onHeaderDoubleClick: () => {
@@ -80,7 +91,6 @@ async function main(): Promise<void> {
   })
 
   await plugin.init()
-  registerToolbar(i18n)
 
   logseq.beforeunload(async () => {
     plugin.destroy()

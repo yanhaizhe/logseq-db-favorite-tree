@@ -3,7 +3,7 @@ import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
 import { FloatingLayoutManager } from './floating-layout'
 import { createFavoriteTreeI18n, getFavoriteTreeI18n, type FavoriteTreeI18n } from './i18n'
 import { renderFavoriteTree } from './render'
-import { renderSidebarTree, SIDEBAR_TREE_HOST_STYLE } from './sidebar-render'
+import { renderSidebarTree } from './sidebar-render'
 import { FavoriteTreeSettingsStore } from './settings'
 import { FavoriteTreeTreeService } from './tree-service'
 import type {
@@ -26,7 +26,6 @@ import { escapeSelectorValue, isPageDeletedLike, normalizeTitle, pageTitle, unwr
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
-  private static readonly SIDEBAR_TREE_STYLE_KEY = 'db-favorite-tree-left-sidebar-style'
   private static readonly SIDEBAR_TREE_PATHS = [
     '.left-sidebar-inner .favorites',
     '.left-sidebar-inner .nav-content-item[data-ref="favorites"]',
@@ -95,7 +94,6 @@ export class FavoriteTreePlugin {
   }
 
   async init(): Promise<void> {
-    this.registerInjectedModels()
     await this.initializeGraphContext()
     await this.syncLocale()
     const hostDocument = this.getHostDocument()
@@ -108,10 +106,6 @@ export class FavoriteTreePlugin {
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.addEventListener('input', this.handleSidebarSearchInput)
     hostDocument.addEventListener('keydown', this.handleSidebarKeydown)
-    logseq.provideStyle({
-      key: FavoriteTreePlugin.SIDEBAR_TREE_STYLE_KEY,
-      style: SIDEBAR_TREE_HOST_STYLE,
-    })
 
     this.render()
     this.applyMainUIState()
@@ -1117,98 +1111,6 @@ export class FavoriteTreePlugin {
 
   private syncTheme(): void {
     applyTheme(this.currentThemeMode)
-  }
-
-  private registerInjectedModels(): void {
-    logseq.provideModel({
-      toggleFavoriteTree: () => {
-        void this.togglePanel()
-      },
-      sidebarTreeToggle: (event: { dataset?: Record<string, string> }) => {
-        const key = event.dataset?.key
-        if (key) {
-          void this.onNodeToggle(key)
-        }
-      },
-      sidebarTreeOpenPage: (event: { dataset?: Record<string, string> }) => {
-        const page = event.dataset?.page
-        if (page) {
-          this.openPage(page)
-        }
-      },
-      sidebarTreeCreateChildPage: (event: { dataset?: Record<string, string> }) => {
-        const page = event.dataset?.page
-        if (page) {
-          void this.createChildPage(page)
-        }
-      },
-      sidebarTreeSubmitCreateChild: () => {
-        void this.submitCreateChildPage()
-      },
-      sidebarTreeCancelCreateChild: () => {
-        this.cancelCreateChildPage()
-      },
-      sidebarTreeOpenPageInSidebar: (event: { dataset?: Record<string, string> }) => {
-        const page = event.dataset?.page
-        if (page) {
-          void this.openPageInRightSidebar(page)
-        }
-      },
-      sidebarTreeToggleSortMode: (event: { dataset?: Record<string, string> }) => {
-        const parentKey = event.dataset?.parentKey
-        if (parentKey) {
-          this.toggleSortModeForParent(parentKey)
-        }
-      },
-      sidebarTreeClearCustomSort: (event: { dataset?: Record<string, string> }) => {
-        const parentKey = event.dataset?.parentKey
-        if (parentKey) {
-          this.clearCustomSortForParent(parentKey)
-        }
-      },
-      sidebarTreeShowFloating: () => {
-        void this.switchToFloatingMode('panel')
-      },
-      sidebarTreeToggleControls: () => {
-        this.toggleControlsCollapsed()
-      },
-      sidebarTreeRefresh: () => {
-        void this.manualRefresh()
-      },
-      sidebarTreeCollapseToBubble: () => {
-        void this.collapseToBubble()
-      },
-      sidebarTreeOpenSettings: () => {
-        this.openSettings()
-      },
-      sidebarTreeClose: () => {
-        this.closePanel()
-      },
-      sidebarTreeLocateCurrent: () => {
-        void this.locateCurrentPage()
-      },
-      sidebarTreeFocusCurrentPath: () => {
-        void this.focusCurrentPath()
-      },
-      sidebarTreeCollapseOtherBranches: () => {
-        void this.collapseOtherBranches()
-      },
-      sidebarTreeFocusPreviousSearchMatch: () => {
-        this.focusPreviousSearchMatch()
-      },
-      sidebarTreeFocusNextSearchMatch: () => {
-        this.focusNextSearchMatch()
-      },
-      sidebarTreeResetPanelSize: () => {
-        this.resetPanelSize()
-      },
-      sidebarTreeToggleExpandAll: () => {
-        void this.toggleExpandCollapseAll()
-      },
-      sidebarTreeToggleAutoRefresh: () => {
-        this.toggleAutoRefresh()
-      },
-    })
   }
 
   private async renderSidebarTreeUI(): Promise<void> {
