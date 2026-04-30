@@ -1,21 +1,26 @@
-name: Build and Publish Plugin
+name: Publish Plugin Release
 
 on:
-  push:
-    tags:
-      - "*"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 env:
   PLUGIN_NAME: logseq-db-favorite-tree
-  NODE_VERSION: "20"
+  NODE_VERSION: "23"
 
 jobs:
-  build:
+  build-and-attach:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,28 +32,31 @@ jobs:
         run: npm ci
 
       - name: Build plugin
-        id: build
-        run: |
-          npm run build
-          echo "tag_name=$(git tag --sort version:refname | tail -n 1)" >> $GITHUB_OUTPUT
+        run: npm run build
 
       - name: Package release zip
         run: |
+          TAG="${{ github.ref_name }}"
           STAGING="release/${PLUGIN_NAME}"
+          ZIPNAME="${PLUGIN_NAME}-${TAG}.zip"
           mkdir -p "${STAGING}"
-
+          
           cp README.md icon.svg package.json "${STAGING}/"
           cp -R dist/* "${STAGING}/"
-
+          
           sed -i 's/"dist\/index.html"/"index.html"/g' "${STAGING}/package.json"
-
+          
           cd release
-          zip -r "${PLUGIN_NAME}.zip" "${PLUGIN_NAME}"
+          zip -r "${ZIPNAME}" "${PLUGIN_NAME}"
 
-      - name: Create Release and Upload Assets
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_NAME }}-${{ github.ref_name }}
+          path: release/${{ env.PLUGIN_NAME }}-${{ github.ref_name }}.zip
+
+      - name: Attach zip to GitHub release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ env.PLUGIN_NAME }} ${{ steps.build.outputs.tag_name }}
-          files: |
-            release/${{ env.PLUGIN_NAME }}.zip
-            package.json
+          files: release/${{ env.PLUGIN_NAME }}-${{ github.ref_name }}.zip
