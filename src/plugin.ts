@@ -68,6 +68,8 @@ export class FavoriteTreePlugin {
   private readonly loadedKeys = new Set<string>()
   private readonly loadStates = new Map<string, LoadState>()
   private readonly loadErrors = new Map<string, string>()
+  private renderFrameId: number | null = null
+  private searchRenderTimeoutId: number | null = null
   private refreshTimerId: number | null = null
   private routeTimerId: number | null = null
   private pollTimerId: number | null = null
@@ -80,6 +82,7 @@ export class FavoriteTreePlugin {
   private lastRefreshReason: RefreshReason | null = null
   private lastRefreshError: string | null = null
   private destroyed = false
+  private isComposing = false
   private offHooks: Array<() => void> = []
   private i18n: FavoriteTreeI18n
 
@@ -105,6 +108,8 @@ export class FavoriteTreePlugin {
     window.addEventListener('focus', this.handleWindowFocus)
     document.addEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.addEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.addEventListener('compositionstart', this.handleCompositionStart)
+    hostDocument.addEventListener('compositionend', this.handleCompositionEnd)
     hostDocument.addEventListener('keydown', this.handleSidebarKeydown)
 
     this.render()
@@ -127,6 +132,12 @@ export class FavoriteTreePlugin {
     this.persistInternalState()
     this.layout.destroy()
     const hostDocument = this.getHostDocument()
+    if (this.renderFrameId !== null) {
+      window.cancelAnimationFrame(this.renderFrameId)
+    }
+    if (this.searchRenderTimeoutId !== null) {
+      window.clearTimeout(this.searchRenderTimeoutId)
+    }
     if (this.refreshTimerId !== null) {
       window.clearTimeout(this.refreshTimerId)
     }
@@ -149,6 +160,8 @@ export class FavoriteTreePlugin {
     window.removeEventListener('focus', this.handleWindowFocus)
     document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     hostDocument.removeEventListener('input', this.handleSidebarSearchInput)
+    hostDocument.removeEventListener('compositionstart', this.handleCompositionStart)
+    hostDocument.removeEventListener('compositionend', this.handleCompositionEnd)
     hostDocument.removeEventListener('keydown', this.handleSidebarKeydown)
     for (const off of this.offHooks) {
       off()
@@ -313,7 +326,7 @@ export class FavoriteTreePlugin {
 
     this.searching = !this.treeService.hasChildIndex()
     this.searchError = null
-    this.render()
+    this.scheduleSearchRender()
 
     try {
       await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
@@ -323,9 +336,8 @@ export class FavoriteTreePlugin {
 
       this.searching = false
       this.searchError = null
-      this.syncSearchMatchState(true)
+      this.syncSearchMatchState(false)
       this.render()
-      this.scrollActiveSearchMatchIntoView()
     } catch (error) {
       if (this.searchQuery !== nextQuery) {
         return
@@ -906,6 +918,20 @@ export class FavoriteTreePlugin {
     this.lastRenderMs = Math.max(0, Math.round(performance.now() - renderStartedAt))
   }
 
+  private scheduleSearchRender(): void {
+    if (this.renderFrameId !== null) {
+      window.cancelAnimationFrame(this.renderFrameId)
+      this.renderFrameId = null
+    }
+    if (this.searchRenderTimeoutId !== null) {
+      window.clearTimeout(this.searchRenderTimeoutId)
+    }
+    this.searchRenderTimeoutId = window.setTimeout(() => {
+      this.searchRenderTimeoutId = null
+      this.render()
+    }, 100)
+  }
+
   private getRenderState(): TreeStateSnapshot {
     const indexMs = this.treeService.getLastIndexBuildMs()
     const pages = this.treeService.getLastIndexBuildPageCount()
@@ -1343,13 +1369,27 @@ export class FavoriteTreePlugin {
   private readonly handleSidebarSearchInput = (event: Event): void => {
     const sidebarSearchInput = this.asSidebarSearchInput(event.target)
     if (sidebarSearchInput) {
-      void this.setSearchQuery(sidebarSearchInput.value)
+      if (!this.isComposing) {
+        void this.setSearchQuery(sidebarSearchInput.value)
+      }
       return
     }
 
     const createChildInput = this.asCreateChildInput(event.target)
     if (createChildInput) {
       this.setCreateChildDraftTitle(createChildInput.value)
+    }
+  }
+
+  private readonly handleCompositionStart = (): void => {
+    this.isComposing = true
+  }
+
+  private readonly handleCompositionEnd = (event: CompositionEvent): void => {
+    this.isComposing = false
+    const target = event.target as HTMLInputElement | null
+    if (target && this.asSidebarSearchInput(target)) {
+      void this.setSearchQuery(target.value)
     }
   }
 
@@ -1412,6 +1452,14 @@ export class FavoriteTreePlugin {
     this.searching = false
     this.searchError = null
     this.clearSearchMatchState()
+    if (this.searchRenderTimeoutId !== null) {
+      window.clearTimeout(this.searchRenderTimeoutId)
+      this.searchRenderTimeoutId = null
+    }
+    if (this.renderFrameId !== null) {
+      window.cancelAnimationFrame(this.renderFrameId)
+      this.renderFrameId = null
+    }
     this.currentPagePath = []
     this.flashLocatedNodeKey = null
     this.sortDragItem = null

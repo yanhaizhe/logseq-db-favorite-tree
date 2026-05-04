@@ -39,6 +39,7 @@ export type FavoriteTreeDOMHandlers = {
 export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandlers): void {
   let activeSortMarker: HTMLElement | null = null
   let activeSortDragSource: HTMLElement | null = null
+  let isComposing = false
 
   const clearSortMarker = (): void => {
     if (!activeSortMarker) {
@@ -135,12 +136,26 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     }
 
     if (target.dataset.role === 'search-input') {
-      handlers.onSearchQueryChange(target.value)
+      if (!isComposing) {
+        handlers.onSearchQueryChange(target.value)
+      }
       return
     }
 
     if (target.dataset.role === 'create-child-input') {
       handlers.onCreateChildDraftChange(target.value)
+    }
+  })
+
+  root.addEventListener('compositionstart', () => {
+    isComposing = true
+  })
+
+  root.addEventListener('compositionend', (event) => {
+    isComposing = false
+    const target = event.target as HTMLInputElement | null
+    if (target?.dataset.role === 'search-input') {
+      handlers.onSearchQueryChange(target.value)
     }
   })
 
