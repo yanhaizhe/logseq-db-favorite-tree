@@ -1221,40 +1221,34 @@ export class FavoriteTreePlugin {
     this.sidebarTreeTemplate = ''
 
     for (const path of paths) {
-      if (!this.hasSidebarTarget(path)) {
-        continue
-      }
-
-      logseq.provideUI({
-        key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
-        path,
-        reset: true,
-        template: '',
-      })
+      logseq.UI.queryElementRect(path)
+        .then((rect) => {
+          if (rect) {
+            logseq.provideUI({
+              key: FavoriteTreePlugin.SIDEBAR_TREE_UI_KEY,
+              path,
+              reset: true,
+              template: '',
+            })
+          }
+        })
+        .catch(() => {})
     }
   }
 
   private async resolveSidebarTreePath(): Promise<string | null> {
     for (const path of FavoriteTreePlugin.SIDEBAR_TREE_PATHS) {
-      if (!this.hasSidebarTarget(path)) {
-        continue
-      }
-
-      const rect = await logseq.UI.queryElementRect(path)
-      if (rect) {
-        return path
+      try {
+        const rect = await logseq.UI.queryElementRect(path)
+        if (rect) {
+          return path
+        }
+      } catch {
+        // Ignore errors
       }
     }
 
     return null
-  }
-
-  private hasSidebarTarget(path: string): boolean {
-    try {
-      return Boolean(this.getHostDocument().querySelector(path))
-    } catch {
-      return false
-    }
   }
 
   private getHostDocument(): Document {
