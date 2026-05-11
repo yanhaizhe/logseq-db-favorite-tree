@@ -20,6 +20,16 @@ export function createModels(plugin: FavoriteTreePlugin) {
       }
     },
 
+    sidebarTreeSearchInput: (event: any) => {
+      const value = event.value || ''
+      void plugin.setSearchQuery(value)
+    },
+
+    sidebarTreeCreateChildInput: (event: any) => {
+      const value = event.value || ''
+      plugin.setCreateChildDraftTitle(value)
+    },
+
     sidebarTreeCreateChildPage: (event: { dataset?: Record<string, string> }) => {
       const page = event.dataset?.page
       if (page) {

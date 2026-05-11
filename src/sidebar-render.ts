@@ -32,6 +32,7 @@ function renderSidebarCreateChildComposer(state: SidebarCreateChildComposerState
         <input
           class="favorite-sidebar-tree__create-child-input"
           data-role="create-child-input"
+          data-on-change="sidebarTreeCreateChildInput"
           type="text"
           value="${escapeHtml(state.draftTitle)}"
           placeholder="${escapeHtml(i18n.t('createChildInputPlaceholder'))}"
@@ -118,6 +119,7 @@ export function renderSidebarTree(
             <input
               class="favorite-sidebar-tree__search-input"
               data-role="sidebar-search-input"
+              data-on-change="sidebarTreeSearchInput"
               type="search"
               value="${escapeHtml(state.searchQuery)}"
               placeholder="${escapeHtml(i18n.t('searchPlaceholder'))}"

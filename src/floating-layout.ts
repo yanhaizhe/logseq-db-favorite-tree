@@ -223,8 +223,8 @@ export class FloatingLayoutManager {
       }
     } catch {
       return {
-        width: Math.max(320, window.innerWidth || document.documentElement.clientWidth || 1280),
-        height: Math.max(320, window.innerHeight || document.documentElement.clientHeight || 800),
+        width: Math.max(320, window.screen?.availWidth || 3840),
+        height: Math.max(320, window.screen?.availHeight || 2160),
       }
     }
   }
