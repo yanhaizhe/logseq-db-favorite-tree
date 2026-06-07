@@ -714,9 +714,30 @@ export class FavoriteTreePlugin {
 
   private registerHooks(): void {
     this.offHooks.push(
-      logseq.DB.onChanged(() => {
-        this.scheduleRefresh('db-changed')
-        void this.updateCurrentPage()
+      logseq.DB.onChanged((e) => {
+        let shouldRefresh = false
+        const txData = e?.txData
+        if (Array.isArray(txData)) {
+          shouldRefresh = txData.some((datom) => {
+            if (Array.isArray(datom) && datom.length >= 2) {
+              const attr = datom[1]
+              return (
+                attr === ':block/name' ||
+                attr === ':block/original-name' ||
+                attr === ':block/properties' ||
+                attr === ':block/properties-text-values'
+              )
+            }
+            return false
+          })
+        } else {
+          shouldRefresh = true
+        }
+
+        if (shouldRefresh) {
+          this.scheduleRefresh('db-changed')
+          void this.updateCurrentPage()
+        }
       }),
     )
 
