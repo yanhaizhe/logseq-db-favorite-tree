@@ -714,10 +714,8 @@ export class FavoriteTreePlugin {
 
   private registerHooks(): void {
     this.offHooks.push(
-      logseq.DB.onChanged((e) => {
-        if (this.isDBChangedRelevant(e)) {
-          this.scheduleRefresh('db-changed')
-        }
+      logseq.DB.onChanged(() => {
+        this.scheduleRefresh('db-changed')
       }),
     )
 
@@ -904,7 +902,7 @@ export class FavoriteTreePlugin {
         return true
       }
 
-      // 2. Direct property or tag attributes (e.g. :block/properties, :block/tags, :page/tags)
+      // 2. Direct property or tag attributes (e.g. :block/properties, :block/tags, :page/tags, :block/path-refs)
       if (
         attr === 'block/properties' ||
         attr === 'properties' ||
@@ -913,7 +911,11 @@ export class FavoriteTreePlugin {
         attr === 'block/tags' ||
         attr === 'page/tags' ||
         attr === 'node/tags' ||
-        attr === 'tags'
+        attr === 'tags' ||
+        attr === 'block/path-refs' ||
+        attr === 'block/refs' ||
+        attr === 'path-refs' ||
+        attr === 'refs'
       ) {
         const val = Array.isArray(datom)
           ? datom[2]
@@ -1708,7 +1710,7 @@ export class FavoriteTreePlugin {
       return cached.keys
     }
 
-    const pages = (await logseq.Editor.getAllPages()) ?? []
+    const pages = (await this.treeService.getAllPagesCached()) ?? []
     const keys = new Set<string>()
     for (const page of pages) {
       if (isPageDeletedLike(page as Record<string, unknown>)) {

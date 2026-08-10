@@ -5,6 +5,7 @@ export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
   private childIndexPromise: Promise<void> | null = null
   private allPageCache: { at: number; pages: PageEntity[] } | null = null
+  private pageParentCache = new Map<string, { updatedAt: number; parentTitles: string[] }>()
   private lastIndexBuildMs: number | null = null
   private lastIndexBuildPageCount: number | null = null
 
@@ -16,6 +17,7 @@ export class FavoriteTreeTreeService {
     this.childIndex = null
     this.childIndexPromise = null
     this.allPageCache = null
+    this.pageParentCache.clear()
     this.lastIndexBuildMs = null
     this.lastIndexBuildPageCount = null
   }
@@ -127,6 +129,18 @@ export class FavoriteTreeTreeService {
     return matches
   }
 
+  async getAllPagesCached(): Promise<PageEntity[]> {
+    const now = Date.now()
+    const cached = this.allPageCache
+    if (cached && now - cached.at < 1500) {
+      return cached.pages
+    }
+
+    const pages = (await logseq.Editor.getAllPages()) ?? []
+    this.allPageCache = { at: now, pages }
+    return pages
+  }
+
   private async loadFavoritesFromConfigs(): Promise<unknown> {
     try {
       return (
@@ -189,23 +203,22 @@ export class FavoriteTreeTreeService {
     this.lastIndexBuildMs = Math.max(0, Math.round(performance.now() - startedAt))
   }
 
-  private async getAllPagesCached(): Promise<PageEntity[]> {
-    const now = Date.now()
-    const cached = this.allPageCache
-    if (cached && now - cached.at < 1500) {
-      return cached.pages
-    }
-
-    const pages = (await logseq.Editor.getAllPages()) ?? []
-    this.allPageCache = { at: now, pages }
-    return pages
-  }
-
   private sortTitles(titles: string[]): string[] {
     return [...titles].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN', { sensitivity: 'base' }))
   }
 
   private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<string[]> {
+    const pageId = page.uuid || String(page.id || '')
+    const updatedAt = page.updatedAt || 0
+    const cacheKey = `${pageId}:${propertyName}`
+
+    if (pageId) {
+      const cached = this.pageParentCache.get(cacheKey)
+      if (cached && cached.updatedAt === updatedAt) {
+        return cached.parentTitles
+      }
+    }
+
     const properties =
       page.properties && typeof page.properties === 'object'
         ? (page.properties as Record<string, unknown>)
@@ -213,40 +226,53 @@ export class FavoriteTreeTreeService {
 
     const targetProps = Array.from(new Set([propertyName, 'tags', 'page tags', 'page-tags'])).filter(Boolean)
     const allValues: unknown[] = []
-    let fetchedAllProps: Record<string, unknown> | null | undefined = undefined
 
-    for (const propName of targetProps) {
-      const rawFromPage = properties ? findPropertyValue(properties, propName) : undefined
-      const rawFromTopLevel = (page as Record<string, unknown>)[propName]
-      let rawFromApi: unknown = undefined
-      let rawFromAllProps: unknown = undefined
-
-      if (rawFromPage == null && rawFromTopLevel == null) {
-        try {
-          rawFromApi = await logseq.Editor.getBlockProperty(page.uuid, propName)
-        } catch {
-          rawFromApi = undefined
+    let hasPropertyValue = false
+    if (properties) {
+      for (const propName of targetProps) {
+        const val = findPropertyValue(properties, propName)
+        if (val != null) {
+          allValues.push(val)
+          hasPropertyValue = true
         }
       }
-
-      if (rawFromPage == null && rawFromTopLevel == null && rawFromApi == null) {
-        if (fetchedAllProps === undefined) {
-          try {
-            const allProps = await logseq.Editor.getBlockProperties(page.uuid)
-            fetchedAllProps = allProps && typeof allProps === 'object' ? (allProps as Record<string, unknown>) : null
-          } catch {
-            fetchedAllProps = null
-          }
-        }
-        if (fetchedAllProps) {
-          rawFromAllProps = findPropertyValue(fetchedAllProps, propName)
-        }
-      }
-
-      allValues.push(rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps)
     }
 
-    return uniqueTitlesFromValues(allValues)
+    for (const propName of targetProps) {
+      const rawFromTopLevel = (page as Record<string, unknown>)[propName]
+      if (rawFromTopLevel != null) {
+        allValues.push(rawFromTopLevel)
+        hasPropertyValue = true
+      }
+    }
+
+    if (!hasPropertyValue && page.uuid) {
+      try {
+        let fetchedProps: Record<string, unknown> | null = null
+        if (typeof logseq.Editor.getPageProperties === 'function') {
+          fetchedProps = (await logseq.Editor.getPageProperties(page.uuid)) as Record<string, unknown> | null
+        }
+        if (!fetchedProps && typeof logseq.Editor.getBlockProperties === 'function') {
+          fetchedProps = (await logseq.Editor.getBlockProperties(page.uuid)) as Record<string, unknown> | null
+        }
+        if (fetchedProps) {
+          for (const propName of targetProps) {
+            const val = findPropertyValue(fetchedProps, propName)
+            if (val != null) {
+              allValues.push(val)
+            }
+          }
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    const parentTitles = uniqueTitlesFromValues(allValues)
+    if (pageId) {
+      this.pageParentCache.set(cacheKey, { updatedAt, parentTitles })
+    }
+    return parentTitles
   }
 
   private collectExpandableKeysFrom(title: string, ancestors: string[], output: Set<string>): void {
