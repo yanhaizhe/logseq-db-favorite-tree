@@ -715,28 +715,8 @@ export class FavoriteTreePlugin {
   private registerHooks(): void {
     this.offHooks.push(
       logseq.DB.onChanged((e) => {
-        let shouldRefresh = false
-        const txData = e?.txData
-        if (Array.isArray(txData)) {
-          shouldRefresh = txData.some((datom) => {
-            if (Array.isArray(datom) && datom.length >= 2) {
-              const attr = datom[1]
-              return (
-                attr === ':block/name' ||
-                attr === ':block/original-name' ||
-                attr === ':block/properties' ||
-                attr === ':block/properties-text-values'
-              )
-            }
-            return false
-          })
-        } else {
-          shouldRefresh = true
-        }
-
-        if (shouldRefresh) {
+        if (this.isDBChangedRelevant(e)) {
           this.scheduleRefresh('db-changed')
-          void this.updateCurrentPage()
         }
       }),
     )
@@ -851,11 +831,16 @@ export class FavoriteTreePlugin {
       return
     }
 
+    const isSilent = reason === 'db-changed' || reason === 'poll'
     const refreshStartedAt = performance.now()
     this.activePageKeysCache = null
     this.treeService.invalidateIndex()
     this.refreshing = true
-    this.render()
+
+    if (!isSilent) {
+      this.render()
+    }
+
     try {
       await this.syncLocale()
     } catch {
@@ -876,11 +861,93 @@ export class FavoriteTreePlugin {
       this.lastRefreshReason = reason
       this.lastRefreshError = message
       this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
-      logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
+      if (!isSilent) {
+        logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
+      }
     } finally {
       this.refreshing = false
       this.render()
     }
+  }
+
+  private isDBChangedRelevant(e: unknown): boolean {
+    const txData = e && typeof e === 'object' && 'txData' in e ? (e as { txData?: unknown }).txData : null
+    if (!Array.isArray(txData) || txData.length === 0) {
+      return false
+    }
+
+    const hierarchyProp = this.settings.getHierarchyProperty().toLowerCase().trim()
+    const targetProps = new Set(
+      ['parent', 'tags', 'page tags', 'page-tags', 'alias', hierarchyProp].filter(Boolean),
+    )
+
+    const propSyntaxPatterns = Array.from(targetProps).map((p) => `${p}::`)
+
+    return txData.some((datom) => {
+      if (!datom) {
+        return false
+      }
+
+      const attrRaw = Array.isArray(datom)
+        ? String(datom[1] ?? '')
+        : String((datom as Record<string, unknown>).a ?? (datom as Record<string, unknown>).attr ?? '')
+      const attr = attrRaw.toLowerCase().replace(/^:/, '')
+
+      // 1. Page creation, rename, or deletion
+      if (
+        attr === 'block/name' ||
+        attr === 'name' ||
+        attr === 'block/original-name' ||
+        attr === 'original-name' ||
+        attr === 'page/name'
+      ) {
+        return true
+      }
+
+      // 2. Direct property or tag attributes (e.g. :block/properties, :block/tags, :page/tags)
+      if (
+        attr === 'block/properties' ||
+        attr === 'properties' ||
+        attr === 'block/properties-text-values' ||
+        attr === 'properties-text-values' ||
+        attr === 'block/tags' ||
+        attr === 'page/tags' ||
+        attr === 'node/tags' ||
+        attr === 'tags'
+      ) {
+        const val = Array.isArray(datom)
+          ? datom[2]
+          : (datom as Record<string, unknown>).v ?? (datom as Record<string, unknown>).value
+
+        if (!val) {
+          return false
+        }
+
+        if (typeof val === 'object') {
+          const keys = Object.keys(val).map((k) => k.toLowerCase().replace(/^:/, ''))
+          return keys.some((k) => targetProps.has(k))
+        }
+
+        const valStr = String(val).toLowerCase()
+        return Array.from(targetProps).some((prop) => valStr.includes(prop))
+      }
+
+      // 3. Block content changes (typing property syntax in editor like parent:: [[Page]] or tags:: [[Tag]])
+      if (attr === 'block/content' || attr === 'content') {
+        const val = Array.isArray(datom)
+          ? datom[2]
+          : (datom as Record<string, unknown>).v ?? (datom as Record<string, unknown>).value
+
+        if (typeof val !== 'string' || !val.trim()) {
+          return false
+        }
+
+        const valStr = val.toLowerCase()
+        return propSyntaxPatterns.some((pattern) => valStr.includes(pattern))
+      }
+
+      return false
+    })
   }
 
   private async updateCurrentPage(): Promise<void> {
