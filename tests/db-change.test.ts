@@ -134,4 +134,31 @@ const fallbackOutlinerPayload = {
 }
 assert(!shouldRefreshOnDbChange(fallbackOutlinerPayload, 'parent'), 'Fallback outlinerOp with child blocks should NOT trigger refresh')
 
+// 14. Typing "tags:: [[Parent]]" in block content
+const blockWithTagsSyntaxPayload = {
+  txData: [
+    [10, ':block/content', 'tags:: [[ParentPage]]', 23, true],
+    [10, ':logseq.property/updated-at', 123456799, 23, true],
+  ] as any,
+}
+assert(shouldRefreshOnDbChange(blockWithTagsSyntaxPayload, 'parent'), 'Block content with tags:: SHOULD trigger refresh')
+
+// 15. Typing "parent:: [[Parent]]" in block content
+const blockWithParentSyntaxPayload = {
+  txData: [
+    [10, ':block/content', 'parent:: [[ParentPage]]', 24, true],
+    [10, ':logseq.property/updated-at', 123456800, 24, true],
+  ] as any,
+}
+assert(shouldRefreshOnDbChange(blockWithParentSyntaxPayload, 'parent'), 'Block content with parent:: SHOULD trigger refresh')
+
+// 16. Block with tags in payload.blocks
+const blockObjectWithTagsPayload = {
+  blocks: [
+    { uuid: 'p1', name: 'my-page', tags: ['ParentPage'] },
+  ],
+}
+assert(shouldRefreshOnDbChange(blockObjectWithTagsPayload, 'parent'), 'Block object with tags SHOULD trigger refresh')
+
 console.log('All db-change tests passed successfully!')
+
