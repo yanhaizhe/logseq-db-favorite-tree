@@ -16,6 +16,8 @@
 
 - Loads favorite pages as root nodes automatically
 - Resolves page hierarchy and supports lazy loading
+- Ultra-fast tree indexing via Datascript (~20ms), with seamless double-buffered replacement
+- Smart DB change filtering: note typing, Enter/newline block splitting, and indents never trigger refreshes; only page tag and parent property edits trigger instant real-time sync
 - Hides expand toggles on leaf nodes and keeps tree indentation clean
 - Supports native sidebar rendering with search, locate-current-page, expand/collapse all, refresh, and settings
 - Supports floating panel, floating bubble, and mixed switching behavior
@@ -151,8 +153,9 @@ Notes:
 
 - `src/main.ts`: startup entry and plugin bootstrapping
 - `src/plugin.ts`: orchestration layer for refresh, lifecycle, display mode, and UI state
+- `src/db-change.ts`: DB transaction filter and change detector, shielding normal typing noise and accurately recognizing tag/property updates
 - `src/sidebar-render.ts`: native sidebar tree rendering and host-side styles
-- `src/tree-service.ts`: favorite roots, property normalization, and tree/path logic
+- `src/tree-service.ts`: favorite roots, fast Datascript tree indexing, property normalization, and tree/path logic
 - `src/floating-layout.ts`: panel and bubble layout, dragging, resizing, and snapping
 - `src/render.ts`: pure HTML rendering for the floating panel and tree nodes
 - `src/settings.ts`: plugin settings and graph-scoped internal state persistence

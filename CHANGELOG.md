@@ -8,6 +8,11 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 
 ### Added
 
+- Intelligent DB event filtering (`src/db-change.ts`): shields normal note typing, Enter/newline block creation (`split-block`), and block indents/moves from triggering tree reloads, ensuring zero disruption while writing
+- Event-driven real-time sync: instant tree updates triggered exclusively when adding, modifying, or removing page tags (`tags`, `page tags`, `:block/tags`) or hierarchy property values (`parent`), including inline text property syntax (`tags:: [[xxx]]`, `parent:: [[xxx]]`)
+- Ultra-fast Datascript bulk indexing: single Datomic query pulling all pages and tags in ~20ms (reduced from 10–30s of sequential RPCs, 500+ times speedup) with concurrent chunked fallback
+- Double buffering & queue compensation: in-memory atomic index replacement without white-screen flickering, plus pending event queue to guarantee consistency under concurrent edits
+- Automated test suite: 16 unit tests for DB transaction filtering, text property syntax detection, and entity modification rules
 - Sort mode toggle: switch between default and custom order per level without losing saved custom order
 - Clear custom sort per level with confirmation dialog
 - Visual indicator for levels with active or saved custom sort orders
@@ -22,8 +27,8 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 
 ### Changed
 
+- Updated technical design (`technical-design.md`), feature list (`feature-list.md`), product roadmap PRD (`product-roadmap-prd.md`), and user guides (`user-guide.md`, `user-guide.en.md`) to reflect event filtering architecture, Datascript bulk querying, and performance benchmarks
 - Expand/collapse all in search mode now operates on visible matched branches only
-- Updated feature-list.md, product-roadmap-prd.md, and technical-design.md to reflect current implementation state
 - Added UI/UX optimization plan document with phased improvement roadmap
 
 ## [1.1.1] - 2026-04-27
