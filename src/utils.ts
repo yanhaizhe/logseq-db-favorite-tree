@@ -120,12 +120,16 @@ export function uniqueTitlesFromValues(values: unknown[]): string[] {
   return result
 }
 
+const PAGE_TAG_EQUIVALENTS = new Set(['页面标签', '頁面標籤', 'page tags', 'page-tags'])
+
 export function findPropertyValue(properties: Record<string, unknown>, propertyName: string): unknown {
   if (propertyName in properties) {
     return properties[propertyName]
   }
 
   const target = normalizePropertyLookupKey(propertyName)
+  const isTargetPageTag = PAGE_TAG_EQUIVALENTS.has(target)
+
   for (const [key, value] of Object.entries(properties)) {
     const normalizedKey = normalizePropertyLookupKey(key)
     if (normalizedKey === target) {
@@ -138,6 +142,10 @@ export function findPropertyValue(properties: Record<string, unknown>, propertyN
     }
 
     if (normalizedKey.includes(`/${target}-`) || normalizedKey.endsWith(`/${target}`)) {
+      return value
+    }
+
+    if (isTargetPageTag && (PAGE_TAG_EQUIVALENTS.has(normalizedKey) || PAGE_TAG_EQUIVALENTS.has(lastSegment))) {
       return value
     }
   }

@@ -125,10 +125,13 @@ async function runTests() {
   assert(extractErrorMessage('string error', 'fallback') === 'string error', 'extractErrorMessage handles raw string error')
   assert(extractErrorMessage(null, 'fallback') === 'fallback', 'extractErrorMessage returns fallback when error is null')
 
-  // 7. findPropertyValue handles 页面标签 across direct and namespaced forms
+  // 7. findPropertyValue handles 页面标签 and Page Tags across direct and namespaced forms
   assert(findPropertyValue({ 页面标签: 'ParentA' }, '页面标签') === 'ParentA', 'findPropertyValue matches direct 页面标签')
   assert(findPropertyValue({ ':user.property/页面标签': 'ParentB' }, '页面标签') === 'ParentB', 'findPropertyValue matches :user.property/页面标签')
   assert(findPropertyValue({ 'user.property/页面标签': 'ParentC' }, '页面标签') === 'ParentC', 'findPropertyValue matches user.property/页面标签')
+  assert(findPropertyValue({ 'Page Tags': 'ParentD' }, '页面标签') === 'ParentD', 'findPropertyValue cross-matches Page Tags when searching 页面标签')
+  assert(findPropertyValue({ '页面标签': 'ParentE' }, 'Page Tags') === 'ParentE', 'findPropertyValue cross-matches 页面标签 when searching Page Tags')
+  assert(findPropertyValue({ ':logseq.property/page-tags': 'ParentF' }, '页面标签') === 'ParentF', 'findPropertyValue matches :logseq.property/page-tags')
 
   // 8. Test entity ref extraction logic for Clojure :db/id
   const testIdMap = new Map<number, string>([[1042, 'ParentNode']])
@@ -152,6 +155,38 @@ async function runTests() {
   assert(resolveSample({ ':db/id': 1042 }) === 'ParentNode', 'resolves Clojure {:db/id 1042}')
   assert(resolveSample({ 'db/id': 1042 }) === 'ParentNode', 'resolves {db/id: 1042}')
   assert(resolveSample({ id: 1042 }) === 'ParentNode', 'resolves {id: 1042}')
+
+  // 9. Test ID and UUID extraction across formats (string, object uuid, transit, :block/uuid)
+  const extractIdAndUuid = (page: unknown): { uuid: string | null; id: number | null } => {
+    if (!page || typeof page !== 'object') return { uuid: null, id: null }
+    const rec = page as Record<string, unknown>
+    let uuid: string | null = null
+    if (typeof rec.uuid === 'string' && rec.uuid.trim()) {
+      uuid = rec.uuid.trim()
+    } else if (typeof rec[':block/uuid'] === 'string' && (rec[':block/uuid'] as string).trim()) {
+      uuid = (rec[':block/uuid'] as string).trim()
+    } else if (typeof rec.uuid === 'object' && rec.uuid !== null && typeof (rec.uuid as any).uuid === 'string') {
+      uuid = (rec.uuid as any).uuid
+    }
+
+    let id: number | null = null
+    if (typeof rec.id === 'number') {
+      id = rec.id
+    } else if (typeof rec[':db/id'] === 'number') {
+      id = rec[':db/id'] as number
+    } else if (typeof rec['db/id'] === 'number') {
+      id = rec['db/id'] as number
+    }
+
+    return { uuid, id }
+  }
+
+  const p1 = extractIdAndUuid({ uuid: '111-222', id: 456 })
+  assert(p1.uuid === '111-222' && p1.id === 456, 'extracts plain uuid and id')
+  const p2 = extractIdAndUuid({ ':block/uuid': '333-444', ':db/id': 789 })
+  assert(p2.uuid === '333-444' && p2.id === 789, 'extracts Clojure :block/uuid and :db/id')
+  const p3 = extractIdAndUuid({ uuid: { uuid: '555-666' }, 'db/id': 999 })
+  assert(p3.uuid === '555-666' && p3.id === 999, 'extracts Transit object UUID and db/id')
 
   console.log('All features tests passed successfully!')
 }

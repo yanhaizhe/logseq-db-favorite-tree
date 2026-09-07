@@ -794,74 +794,7 @@ export class FavoriteTreePlugin {
     const cleanParentTitle = unwrapPageRef(parentTitle).trim()
     let createdPageName: string | null = null
     try {
-      // 1. Create page safely without inline custom properties to prevent Datomic schema errors in Logseq DB
-      let createdPage: PageEntity | null = null
-      try {
-        createdPage = await logseq.Editor.createPage(
-          childTitle,
-          {},
-          { redirect: false, createFirstBlock: true },
-        )
-      } catch (createErr) {
-        console.warn('[DB Favorite Tree] createPage with options failed, retrying simple createPage:', createErr)
-        try {
-          createdPage = await logseq.Editor.createPage(childTitle)
-        } catch (createErr2) {
-          console.warn('[DB Favorite Tree] simple createPage failed:', createErr2)
-        }
-      }
-
-      if (!createdPage) {
-        createdPage = await logseq.Editor.getPage(childTitle)
-      }
-
-      if (!createdPage) {
-        throw new Error(this.i18n.t('createChildEmpty'))
-      }
-
-      const createdTitle = pageTitle(createdPage) ?? childTitle
-      createdPageName = createdTitle
-
-      // 2. Resolve Page UUID/ID across DB Clojure entities and traditional Markdown entities
-      const rec = createdPage as Record<string, unknown>
-      let pageUuid =
-        (typeof createdPage.uuid === 'string' && createdPage.uuid.trim())
-          ? createdPage.uuid.trim()
-          : (typeof rec[':block/uuid'] === 'string' && (rec[':block/uuid'] as string).trim())
-            ? (rec[':block/uuid'] as string).trim()
-            : null
-
-      let pageDbId =
-        typeof createdPage.id === 'number'
-          ? createdPage.id
-          : typeof rec[':db/id'] === 'number'
-            ? (rec[':db/id'] as number)
-            : null
-
-      if (!pageUuid && pageDbId == null) {
-        try {
-          const fresh = await logseq.Editor.getPage(createdTitle)
-          if (fresh) {
-            const freshRec = fresh as Record<string, unknown>
-            pageUuid =
-              (typeof fresh.uuid === 'string' && fresh.uuid.trim())
-                ? fresh.uuid.trim()
-                : (typeof freshRec[':block/uuid'] === 'string' && (freshRec[':block/uuid'] as string).trim())
-                  ? (freshRec[':block/uuid'] as string).trim()
-                  : null
-            pageDbId =
-              typeof fresh.id === 'number'
-                ? fresh.id
-                : typeof freshRec[':db/id'] === 'number'
-                  ? (freshRec[':db/id'] as number)
-                  : null
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      // 3. Resolve parent entity and target property schema
+      // 1. Resolve parent page and entity ID
       const parentPage = await logseq.Editor.getPage(cleanParentTitle).catch(() => null)
       const parentRec = parentPage as Record<string, unknown> | null
       const parentId =
@@ -882,13 +815,14 @@ export class FavoriteTreePlugin {
         (propRec?.['property/schema'] as Record<string, unknown> | undefined) ??
         null
       const propType = schema?.type ?? schema?.[':type'] ?? (propEntity as any)?.type
-      const propCardinality = schema?.cardinality ?? schema?.[':cardinality'] ?? (propEntity as any)?.cardinality
 
       // Check parent's own property value shape as a reference template
       let parentSampleVal: unknown = undefined
       if (parentPage?.uuid) {
         try {
-          const parentProps = await logseq.Editor.getBlockProperties(parentPage.uuid)
+          const parentProps =
+            (await logseq.Editor.getPageProperties(parentPage.uuid).catch(() => null)) ??
+            (await logseq.Editor.getBlockProperties(parentPage.uuid).catch(() => null))
           if (parentProps && typeof parentProps === 'object') {
             parentSampleVal = findPropertyValue(parentProps, pageTagProperty)
           }
@@ -899,114 +833,305 @@ export class FavoriteTreePlugin {
 
       // Build ordered candidate values for 页面标签
       const candidateValues: unknown[] = []
-      if (Array.isArray(parentSampleVal)) {
-        if (
-          parentSampleVal.length > 0 &&
-          (typeof parentSampleVal[0] === 'number' ||
-            (typeof parentSampleVal[0] === 'object' && parentSampleVal[0] !== null))
-        ) {
-          if (parentId != null) candidateValues.push([parentId])
-        } else if (parentSampleVal.length > 0 && typeof parentSampleVal[0] === 'string') {
-          candidateValues.push([cleanParentTitle])
+      if (parentSampleVal !== undefined) {
+        if (Array.isArray(parentSampleVal)) {
+          if (
+            parentSampleVal.length > 0 &&
+            (typeof parentSampleVal[0] === 'number' ||
+              (typeof parentSampleVal[0] === 'object' && parentSampleVal[0] !== null))
+          ) {
+            if (parentId != null) candidateValues.push([parentId])
+          } else if (parentSampleVal.length > 0 && typeof parentSampleVal[0] === 'string') {
+            candidateValues.push([cleanParentTitle])
+          }
+        } else if (typeof parentSampleVal === 'number' && parentId != null) {
+          candidateValues.push(parentId)
+        } else if (typeof parentSampleVal === 'string') {
+          candidateValues.push(cleanParentTitle)
         }
-      } else if (typeof parentSampleVal === 'number') {
-        if (parentId != null) candidateValues.push(parentId)
-      } else if (typeof parentSampleVal === 'string') {
-        candidateValues.push(cleanParentTitle)
       }
 
       if (isDb || propType === 'node') {
         if (parentId != null) {
-          if (propCardinality === 'one') {
-            if (!candidateValues.includes(parentId)) candidateValues.push(parentId)
+          if (!candidateValues.some((c) => Array.isArray(c) && c[0] === parentId)) {
             candidateValues.push([parentId])
-          } else {
-            if (!candidateValues.some((c) => Array.isArray(c) && c[0] === parentId)) {
-              candidateValues.push([parentId])
-            }
-            if (!candidateValues.includes(parentId)) candidateValues.push(parentId)
+          }
+          if (!candidateValues.includes(parentId)) {
+            candidateValues.push(parentId)
           }
         }
-        candidateValues.push(cleanParentTitle)
-        candidateValues.push([cleanParentTitle])
+        if (!candidateValues.includes(cleanParentTitle)) {
+          candidateValues.push(cleanParentTitle)
+        }
+        if (!candidateValues.some((c) => Array.isArray(c) && c[0] === cleanParentTitle)) {
+          candidateValues.push([cleanParentTitle])
+        }
       } else {
-        candidateValues.push(cleanParentTitle)
-        candidateValues.push([cleanParentTitle])
+        if (!candidateValues.includes(cleanParentTitle)) {
+          candidateValues.push(cleanParentTitle)
+        }
+        if (!candidateValues.some((c) => Array.isArray(c) && c[0] === cleanParentTitle)) {
+          candidateValues.push([cleanParentTitle])
+        }
         if (parentId != null) {
-          candidateValues.push([parentId])
-          candidateValues.push(parentId)
+          candidateValues.push([parentId], parentId)
         }
       }
+      candidateValues.push(`[[${cleanParentTitle}]]`)
 
-      // 4. Write hierarchy parent property (only one property: 页面标签)
-      const targetIdentities: Array<string | number> = []
-      if (pageUuid) targetIdentities.push(pageUuid)
-      if (pageDbId != null) targetIdentities.push(pageDbId)
+      // Helper to extract UUID and ID safely across Transit / JS objects
+      const extractIdAndUuid = (page: unknown): { uuid: string | null; id: number | null } => {
+        if (!page || typeof page !== 'object') return { uuid: null, id: null }
+        const rec = page as Record<string, unknown>
+        let uuid: string | null = null
+        if (typeof rec.uuid === 'string' && rec.uuid.trim()) {
+          uuid = rec.uuid.trim()
+        } else if (typeof rec[':block/uuid'] === 'string' && (rec[':block/uuid'] as string).trim()) {
+          uuid = (rec[':block/uuid'] as string).trim()
+        } else if (typeof rec.uuid === 'object' && rec.uuid !== null && typeof (rec.uuid as any).uuid === 'string') {
+          uuid = (rec.uuid as any).uuid
+        }
 
-      let propertyWritten = false
-      let writeError: unknown = null
+        let id: number | null = null
+        if (typeof rec.id === 'number') {
+          id = rec.id
+        } else if (typeof rec[':db/id'] === 'number') {
+          id = rec[':db/id'] as number
+        } else if (typeof rec['db/id'] === 'number') {
+          id = rec['db/id'] as number
+        }
 
-      for (const target of targetIdentities) {
-        for (const candidateVal of candidateValues) {
-          if (candidateVal == null) continue
-          try {
-            await logseq.Editor.upsertBlockProperty(target, pageTagProperty, candidateVal)
-            const currentProps = await logseq.Editor.getBlockProperties(target).catch(() => null)
-            if (currentProps) {
-              if (findPropertyValue(currentProps, pageTagProperty) != null) {
-                propertyWritten = true
-                break
+        return { uuid, id }
+      }
+
+      // Helper to check whether property is written on the page
+      const checkPageProperties = async (title: string, uuid: string | null, id: number | null): Promise<boolean> => {
+        try {
+          const fresh = await logseq.Editor.getPage(title).catch(() => null)
+          if (fresh) {
+            if (fresh.properties && typeof fresh.properties === 'object') {
+              if (findPropertyValue(fresh.properties as Record<string, unknown>, pageTagProperty) != null) {
+                return true
               }
-            } else {
-              propertyWritten = true
+            }
+            if (findPropertyValue(fresh as Record<string, unknown>, pageTagProperty) != null) {
+              return true
+            }
+            const rec = fresh as Record<string, unknown>
+            const tags = rec[':block/tags'] ?? rec['block/tags'] ?? rec.tags
+            if (tags != null && (Array.isArray(tags) ? tags.length > 0 : Boolean(tags))) {
+              return true
+            }
+          }
+          const target = uuid ?? id ?? title
+          const pageProps = await logseq.Editor.getPageProperties(target).catch(() => null)
+          if (pageProps && findPropertyValue(pageProps, pageTagProperty) != null) {
+            return true
+          }
+          const blockProps = await logseq.Editor.getBlockProperties(target).catch(() => null)
+          if (blockProps && findPropertyValue(blockProps, pageTagProperty) != null) {
+            return true
+          }
+        } catch {
+          // ignore
+        }
+        return false
+      }
+
+      // 2. Create page - first try atomic creation with the property directly
+      let createdPage: PageEntity | null = null
+      for (const key of ['Page Tags', pageTagProperty, 'page-tags', '页面标签']) {
+        for (const val of candidateValues) {
+          if (val == null) continue
+          try {
+            createdPage = await logseq.Editor.createPage(
+              childTitle,
+              { [key]: val },
+              { redirect: false },
+            )
+            if (createdPage) {
               break
             }
-          } catch (propErr) {
-            writeError = propErr
-            console.warn(`[DB Favorite Tree] upsertBlockProperty failed for target ${target}:`, propErr)
+          } catch {
+            // Fall through to next candidate or fallback
           }
         }
-        if (propertyWritten) break
+        if (createdPage) break
       }
 
-      if (!propertyWritten) {
+      // If createPage with property failed, try standard createPage
+      if (!createdPage) {
         try {
-          const blocks = await logseq.Editor.getPageBlocksTree(createdTitle)
-          let targetBlockUuid = Array.isArray(blocks) && blocks.length > 0 ? blocks[0]?.uuid : null
-          if (!targetBlockUuid) {
-            const newBlock = await logseq.Editor.appendBlockInPage(createdTitle, '')
-            if (newBlock?.uuid) {
-              targetBlockUuid = newBlock.uuid
-            }
+          createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false })
+        } catch {
+          createdPage = await logseq.Editor.createPage(childTitle).catch(() => null)
+        }
+      }
+
+      if (!createdPage) {
+        createdPage = await logseq.Editor.getPage(childTitle).catch(() => null)
+      }
+
+      if (!createdPage) {
+        throw new Error(this.i18n.t('createChildEmpty'))
+      }
+
+      const createdTitle = pageTitle(createdPage) ?? childTitle
+      createdPageName = createdTitle
+
+      let { uuid: pageUuid, id: pageDbId } = extractIdAndUuid(createdPage)
+      if (!pageUuid && pageDbId == null) {
+        const fresh = await logseq.Editor.getPage(createdTitle).catch(() => null)
+        if (fresh) {
+          const freshIds = extractIdAndUuid(fresh)
+          pageUuid = freshIds.uuid
+          pageDbId = freshIds.id
+        }
+      }
+
+      // 3. Resolve parent tag entity for Logseq DB tagging
+      let parentTagUuid: string | null = null
+      let parentTagId: number | null = parentId
+
+      try {
+        const parentTag = await logseq.Editor.getTag(cleanParentTitle).catch(() => null)
+        if (parentTag) {
+          const ids = extractIdAndUuid(parentTag)
+          if (ids.uuid) parentTagUuid = ids.uuid
+          if (ids.id != null) parentTagId = ids.id
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!parentTagUuid) {
+        try {
+          const createdTag = await logseq.Editor.createTag(cleanParentTitle).catch(() => null)
+          if (createdTag) {
+            const ids = extractIdAndUuid(createdTag)
+            if (ids.uuid) parentTagUuid = ids.uuid
+            if (ids.id != null) parentTagId = ids.id
           }
-          if (targetBlockUuid) {
-            for (const candidateVal of candidateValues) {
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!parentTagUuid && parentPage) {
+        const ids = extractIdAndUuid(parentPage)
+        if (ids.uuid) parentTagUuid = ids.uuid
+        if (ids.id != null && parentTagId == null) parentTagId = ids.id
+      }
+
+      // 4. In Logseq DB, page tags (Page Tags / 页面标签) are attached via addBlockTag(pageUuid, parentTagUuid)
+      if (pageUuid && parentTagUuid) {
+        try {
+          await logseq.Editor.addBlockTag(pageUuid, parentTagUuid)
+        } catch (tagErr) {
+          console.warn('[DB Favorite Tree] addBlockTag with parentTagUuid failed:', tagErr)
+        }
+      }
+      if (pageUuid && parentPage) {
+        const pUuid = extractIdAndUuid(parentPage).uuid
+        if (pUuid && pUuid !== parentTagUuid) {
+          try {
+            await logseq.Editor.addBlockTag(pageUuid, pUuid)
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      // 5. Upsert hierarchy property values directly on page entity
+      const targetIdentities: Array<string | number> = []
+      if (pageUuid) targetIdentities.push(pageUuid)
+      if (pageDbId != null && !targetIdentities.includes(pageDbId)) targetIdentities.push(pageDbId)
+
+      const propertyKeysToTry = Array.from(
+        new Set([
+          'Page Tags',
+          'page-tags',
+          'page tags',
+          pageTagProperty,
+          '页面标签',
+          ':logseq.property/page-tags',
+          ':user.property/Page Tags',
+          pageTagProperty.startsWith(':') ? pageTagProperty : `:user.property/${pageTagProperty}`,
+        ])
+      ).filter(Boolean)
+
+      const candidateValsToTry: unknown[] = []
+      if (parentTagId != null) {
+        candidateValsToTry.push([parentTagId], parentTagId)
+      }
+      for (const c of candidateValues) {
+        if (!candidateValsToTry.includes(c)) candidateValsToTry.push(c)
+      }
+
+      let propertyConfirmed = await checkPageProperties(createdTitle, pageUuid, pageDbId)
+      if (!propertyConfirmed) {
+        for (const target of targetIdentities) {
+          for (const propKey of propertyKeysToTry) {
+            for (const candidateVal of candidateValsToTry) {
               if (candidateVal == null) continue
               try {
-                await logseq.Editor.upsertBlockProperty(targetBlockUuid, pageTagProperty, candidateVal)
-                const currentProps = await logseq.Editor.getBlockProperties(targetBlockUuid).catch(() => null)
-                if (currentProps) {
-                  if (findPropertyValue(currentProps, pageTagProperty) != null) {
-                    propertyWritten = true
-                    break
-                  }
-                } else {
-                  propertyWritten = true
+                await logseq.Editor.upsertBlockProperty(target, propKey, candidateVal)
+                if (await checkPageProperties(createdTitle, pageUuid, pageDbId)) {
+                  propertyConfirmed = true
                   break
                 }
-              } catch (blockErr) {
-                writeError = writeError ?? blockErr
-                console.warn('[DB Favorite Tree] upsertBlockProperty on first block failed:', blockErr)
+              } catch {
+                // Proceed through candidates
               }
             }
+            if (propertyConfirmed) break
           }
-        } catch (blockErr) {
-          writeError = writeError ?? blockErr
+          if (propertyConfirmed) break
         }
       }
 
-      if (!propertyWritten && writeError) {
-        throw writeError
+      // Fallback: If page-level property upsert did not take effect, try prepending a block
+      if (!propertyConfirmed && pageUuid) {
+        try {
+          const prepended = await logseq.Editor.prependBlockInPage(pageUuid, '').catch(() => null)
+          if (prepended?.uuid) {
+            for (const propKey of propertyKeysToTry) {
+              for (const candidateVal of candidateValsToTry) {
+                if (candidateVal == null) continue
+                try {
+                  await logseq.Editor.upsertBlockProperty(prepended.uuid, propKey, candidateVal)
+                  if (await checkPageProperties(createdTitle, pageUuid, pageDbId)) {
+                    propertyConfirmed = true
+                    break
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+              if (propertyConfirmed) break
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 7. Verify linking with tree service & properties
+      const isChildLinked = async (): Promise<boolean> => {
+        this.treeService.invalidateIndex()
+        await this.treeService.ensureChildIndex(pageTagProperty, true)
+        const children = this.treeService.getChildrenFor(cleanParentTitle)
+        if (children.map(normalizeTitle).includes(normalizeTitle(createdTitle))) {
+          return true
+        }
+        return await checkPageProperties(createdTitle, pageUuid, pageDbId)
+      }
+
+      for (const delayMs of [100, 200, 300, 500]) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+        if (await isChildLinked()) {
+          break
+        }
       }
 
       this.createChildDraftParent = null
@@ -1017,12 +1142,10 @@ export class FavoriteTreePlugin {
       this.loadStates.set(normalizedParentKey, 'loaded')
       this.loadErrors.delete(normalizedParentKey)
 
-      // Short delay to allow DB transaction to commit before querying
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
       this.treeService.invalidateIndex()
       await this.refresh('manual')
       this.scrollNodeIntoView(normalizeTitle(createdTitle))
+
       logseq.UI.showMsg(this.i18n.t('createChildSuccess', { title: createdTitle, parent: parentTitle }), 'success')
     } catch (error) {
       const message = extractErrorMessage(error, this.i18n.t('loadChildrenFailed'))
@@ -1050,6 +1173,7 @@ export class FavoriteTreePlugin {
           'warning',
         )
       }
+    } finally {
       this.render()
     }
   }

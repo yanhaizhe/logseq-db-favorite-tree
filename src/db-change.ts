@@ -1,7 +1,7 @@
 import type { BlockEntity, IDatom } from '@logseq/libs/dist/LSPlugin'
 import { findPropertyValue, normalizePropertyLookupKey } from './utils'
 
-export const DEFAULT_PAGE_TAG_PROPERTIES = ['页面标签', 'tags', 'page tags', 'page-tags', 'parent'] as const
+export const DEFAULT_PAGE_TAG_PROPERTIES = ['Page Tags', '页面标签', 'tags', 'page tags', 'page-tags', 'parent'] as const
 
 /**
  * Attributes that represent pure outliner block editing, line splitting,
@@ -107,6 +107,8 @@ export function extractAttributeString(attr: unknown): string {
  * NOTE: `:block/parent` is excluded because it is an outliner structural attribute,
  * not a user hierarchy property.
  */
+const PAGE_TAG_EQUIVALENTS = new Set(['页面标签', '頁面標籤', 'page tags', 'page-tags'])
+
 export function isMatchingPropertyKey(attr: string, targetProperties: string[]): boolean {
   const normalizedAttr = normalizePropertyLookupKey(attr)
   if (!normalizedAttr || normalizedAttr === 'block/parent') {
@@ -130,6 +132,10 @@ export function isMatchingPropertyKey(attr: string, targetProperties: string[]):
     }
 
     if (normalizedAttr.includes(`/${target}-`) || normalizedAttr.endsWith(`/${target}`)) {
+      return true
+    }
+
+    if (PAGE_TAG_EQUIVALENTS.has(target) && (PAGE_TAG_EQUIVALENTS.has(normalizedAttr) || PAGE_TAG_EQUIVALENTS.has(lastSegment))) {
       return true
     }
   }
