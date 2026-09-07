@@ -22,7 +22,7 @@ import type {
   ViewMode,
 } from './types'
 import { applyTheme } from './theme'
-import { escapeSelectorValue, isPageDeletedLike, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
+import { escapeSelectorValue, isPageDeletedLike, isTreeRelevantDBChangeEvent, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -714,9 +714,10 @@ export class FavoriteTreePlugin {
 
   private registerHooks(): void {
     this.offHooks.push(
-      logseq.DB.onChanged(() => {
-        this.scheduleRefresh('db-changed')
-        void this.updateCurrentPage()
+      logseq.DB.onChanged((event) => {
+        if (this.shouldRefreshFromDBChange(event)) {
+          this.scheduleRefresh('db-changed')
+        }
       }),
     )
 
@@ -843,6 +844,7 @@ export class FavoriteTreePlugin {
 
     try {
       this.rootFavorites = await this.treeService.loadFavoriteRoots()
+      await this.syncCurrentPageName()
       await this.syncDerivedTreeState()
 
       this.lastRefreshAt = Date.now()
@@ -862,7 +864,19 @@ export class FavoriteTreePlugin {
     }
   }
 
-  private async updateCurrentPage(): Promise<void> {
+  private shouldRefreshFromDBChange(event?: unknown): boolean {
+    return isTreeRelevantDBChangeEvent(event, this.settings.getHierarchyProperty())
+  }
+
+  private async updateCurrentPage(triggerRender = true): Promise<void> {
+    await this.syncCurrentPageName()
+    await this.syncCurrentPagePath()
+    if (triggerRender) {
+      this.render()
+    }
+  }
+
+  private async syncCurrentPageName(): Promise<void> {
     const current = await logseq.Editor.getCurrentPage()
     const currentTitle = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
     this.currentPageName = await this.resolveExistingCurrentPageTitle(currentTitle)
@@ -871,8 +885,6 @@ export class FavoriteTreePlugin {
       this.lastLocatedNodeKey = null
       this.persistInternalState()
     }
-    await this.syncCurrentPagePath()
-    this.render()
   }
 
   private render(): void {

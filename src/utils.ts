@@ -238,3 +238,164 @@ export function isPageDeletedLike(page: Record<string, unknown>): boolean {
 
   return false
 }
+
+export function isTreeRelevantDBChangeEvent(
+  event: unknown,
+  hierarchyPropertyName = 'parent',
+): boolean {
+  if (!event || typeof event !== 'object') {
+    return true
+  }
+
+  const changeEvent = event as {
+    blocks?: unknown
+    txData?: unknown
+    txMeta?: unknown
+  }
+
+  const { blocks, txData } = changeEvent
+
+  if (txData === undefined && blocks === undefined) {
+    return true
+  }
+
+  const hierarchyProp = normalizePropertyLookupKey(hierarchyPropertyName)
+  const targetPropertyKeys = new Set([
+    'tags',
+    'page-tags',
+    'page tags',
+    'favorite',
+    'favorites',
+  ])
+  if (hierarchyProp) {
+    targetPropertyKeys.add(hierarchyProp)
+  }
+
+  // 1. Primary check: txData (DataScript/Datomic datoms)
+  if (Array.isArray(txData)) {
+    if (txData.length === 0 && (!Array.isArray(blocks) || blocks.length === 0)) {
+      return false
+    }
+
+    for (const datom of txData) {
+      if (!Array.isArray(datom) || datom.length < 2) {
+        continue
+      }
+
+      const attr = datom[1]
+      if (typeof attr !== 'string') {
+        continue
+      }
+
+      const cleanAttr = normalizePropertyLookupKey(attr)
+
+      // Skip internal outliner structure (block tree, not page hierarchy)
+      if (cleanAttr === 'block/parent' || cleanAttr === 'block/left' || cleanAttr === 'block/format') {
+        continue
+      }
+
+      // Title & page identity mutations
+      if (
+        cleanAttr === 'page/name' ||
+        cleanAttr === 'page/original-name' ||
+        cleanAttr === 'page/title' ||
+        cleanAttr === 'block/name' ||
+        cleanAttr === 'block/original-name' ||
+        cleanAttr === 'block/title' ||
+        cleanAttr === 'logseq.page/name' ||
+        cleanAttr === 'logseq.page/original-name' ||
+        cleanAttr === 'page/uuid'
+      ) {
+        return true
+      }
+
+      // Direct tag mutations
+      if (
+        cleanAttr === 'block/tags' ||
+        cleanAttr === 'page/tags' ||
+        cleanAttr === 'block/page-tags' ||
+        cleanAttr === 'tags' ||
+        cleanAttr.endsWith('/tags')
+      ) {
+        return true
+      }
+
+      // Property container mutations (check if hierarchy property or tags are present inside)
+      if (
+        cleanAttr === 'block/properties' ||
+        cleanAttr === 'page/properties' ||
+        cleanAttr === 'block/properties-order' ||
+        cleanAttr === 'page/properties-order'
+      ) {
+        const propValue = datom[2]
+        if (propValue && typeof propValue === 'object' && !Array.isArray(propValue)) {
+          const propObj = propValue as Record<string, unknown>
+          for (const key of Object.keys(propObj)) {
+            const cleanKey = normalizePropertyLookupKey(key)
+            if (
+              targetPropertyKeys.has(cleanKey) ||
+              (hierarchyProp && cleanKey.includes(hierarchyProp))
+            ) {
+              return true
+            }
+          }
+        } else {
+          return true
+        }
+      }
+
+      // Direct schema attribute mutations (DB graphs / properties)
+      if (
+        targetPropertyKeys.has(cleanAttr) ||
+        cleanAttr.startsWith('property/') ||
+        cleanAttr.startsWith('page.property/') ||
+        (hierarchyProp && (cleanAttr.endsWith(`/${hierarchyProp}`) || cleanAttr.includes(hierarchyProp)))
+      ) {
+        return true
+      }
+    }
+
+    // Evaluated txData and found only non-relevant mutations (content, timestamps, outliner ops)
+    return false
+  }
+
+  // 2. Secondary check: blocks array
+  if (Array.isArray(blocks)) {
+    if (blocks.length === 0) {
+      return false
+    }
+
+    for (const block of blocks) {
+      if (!block || typeof block !== 'object') {
+        continue
+      }
+
+      const blockRecord = block as Record<string, unknown>
+      if (
+        blockRecord.type === 'page' ||
+        typeof blockRecord.name === 'string' ||
+        typeof blockRecord.originalName === 'string'
+      ) {
+        return true
+      }
+
+      const properties = blockRecord.properties
+      if (properties && typeof properties === 'object') {
+        for (const key of Object.keys(properties as Record<string, unknown>)) {
+          const cleanKey = normalizePropertyLookupKey(key)
+          if (
+            targetPropertyKeys.has(cleanKey) ||
+            (hierarchyProp && cleanKey.includes(hierarchyProp))
+          ) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
+  }
+
+  return true
+}
+
