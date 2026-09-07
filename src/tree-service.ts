@@ -1,5 +1,14 @@
 import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
-import { findPropertyValue, isPageDeletedLike, normalizeFavoriteSeed, normalizeFavoriteSeeds, normalizeTitle, pageTitle, uniqueTitlesFromValues } from './utils'
+import { isMatchingPropertyKey, DEFAULT_PAGE_TAG_PROPERTIES } from './db-change'
+import {
+  findPropertyValue,
+  isPageDeletedLike,
+  normalizeFavoriteSeed,
+  normalizeFavoriteSeeds,
+  normalizeTitle,
+  pageTitle,
+  uniqueTitlesFromValues,
+} from './utils'
 
 export class FavoriteTreeTreeService {
   private childIndex: Map<string, string[]> | null = null
@@ -12,8 +21,10 @@ export class FavoriteTreeTreeService {
     return this.childIndex !== null
   }
 
-  invalidateIndex(): void {
-    this.childIndex = null
+  invalidateIndex(hard = false): void {
+    if (hard) {
+      this.childIndex = null
+    }
     this.childIndexPromise = null
     this.allPageCache = null
     this.lastIndexBuildMs = null
@@ -35,7 +46,7 @@ export class FavoriteTreeTreeService {
     const allPages = await this.getAllPagesCached()
     const activePageTitleByKey = new Map<string, string>()
     for (const page of allPages) {
-      if (isPageDeletedLike(page)) {
+      if (isPageDeletedLike(page as Record<string, unknown>)) {
         continue
       }
       const title = pageTitle(page)
@@ -58,7 +69,7 @@ export class FavoriteTreeTreeService {
       if (!title) {
         try {
           const page = await logseq.Editor.getPage(normalizedSeed)
-          if (page && !isPageDeletedLike(page)) {
+          if (page && !isPageDeletedLike(page as Record<string, unknown>)) {
             title = pageTitle(page)
           }
         } catch {
@@ -77,8 +88,8 @@ export class FavoriteTreeTreeService {
     return this.sortTitles(resolved)
   }
 
-  async ensureChildIndex(hierarchyProperty: string): Promise<void> {
-    if (this.childIndex) {
+  async ensureChildIndex(hierarchyProperty: string, force = false): Promise<void> {
+    if (this.childIndex && !force) {
       return
     }
     if (this.childIndexPromise) {
@@ -87,8 +98,11 @@ export class FavoriteTreeTreeService {
     }
 
     this.childIndexPromise = this.buildChildIndex(hierarchyProperty)
-    await this.childIndexPromise
-    this.childIndexPromise = null
+    try {
+      await this.childIndexPromise
+    } finally {
+      this.childIndexPromise = null
+    }
   }
 
   getChildrenFor(title: string): string[] {
@@ -139,12 +153,146 @@ export class FavoriteTreeTreeService {
 
   private async buildChildIndex(propertyName: string): Promise<void> {
     const startedAt = performance.now()
+
+    // 1. Fast-Path: Bulk Datascript query in single IPC trip (~15-30ms)
+    try {
+      const built = await this.buildChildIndexViaDatascript(propertyName)
+      if (built) {
+        this.lastIndexBuildMs = Math.max(0, Math.round(performance.now() - startedAt))
+        return
+      }
+    } catch (error) {
+      console.warn('[DB Favorite Tree] Datascript query failed, falling back to batch API:', error)
+    }
+
+    // 2. Fallback: Concurrency-limited batch API
+    await this.buildChildIndexViaBatchApi(propertyName)
+    this.lastIndexBuildMs = Math.max(0, Math.round(performance.now() - startedAt))
+  }
+
+  private async buildChildIndexViaDatascript(propertyName: string): Promise<boolean> {
+    const targetProperties = Array.from(
+      new Set([propertyName, ...DEFAULT_PAGE_TAG_PROPERTIES]),
+    ).filter(Boolean)
+
+    let rawResults: unknown[] | null = null
+    try {
+      rawResults = await logseq.DB.datascriptQuery<unknown[]>(`
+        [:find (pull ?p [* {:block/tags [:db/id :block/name :block/original-name :block/title]}])
+         :where
+         [?p :block/name _]]
+      `)
+    } catch {
+      try {
+        rawResults = await logseq.DB.datascriptQuery<unknown[]>(`
+          [:find (pull ?p [*])
+           :where
+           [?p :block/name _]]
+        `)
+      } catch {
+        return false
+      }
+    }
+
+    if (!Array.isArray(rawResults) || rawResults.length === 0) {
+      return false
+    }
+
+    const rawPages = rawResults.map((row) => (Array.isArray(row) ? row[0] : row)) as Record<string, unknown>[]
+    const idToTitleMap = new Map<number, string>()
+    const existingPageKeys = new Set<string>()
+    const activePages: PageEntity[] = []
+    const validPagesData: Array<{ title: string; page: Record<string, unknown> }> = []
+
+    for (const page of rawPages) {
+      if (!page || typeof page !== 'object' || isPageDeletedLike(page)) {
+        continue
+      }
+
+      const title = this.extractTitleFromRecord(page)
+      const key = normalizeTitle(title)
+      if (!title || !key) {
+        continue
+      }
+
+      const id = page[':db/id'] ?? page['db/id'] ?? page.id
+      if (typeof id === 'number') {
+        idToTitleMap.set(id, title)
+      }
+
+      existingPageKeys.add(key)
+      activePages.push(page as unknown as PageEntity)
+      validPagesData.push({ title, page })
+    }
+
+    this.allPageCache = { at: Date.now(), pages: activePages }
+    this.lastIndexBuildPageCount = activePages.length
+
+    const nextIndex = new Map<string, string[]>()
+
+    for (const { title, page } of validPagesData) {
+      const pageKey = normalizeTitle(title)
+      const candidateValues: unknown[] = []
+
+      // 1. Page tags: :block/tags or tags
+      const rawTags = page[':block/tags'] ?? page['block/tags'] ?? page.tags
+      if (rawTags != null) {
+        candidateValues.push(rawTags)
+      }
+
+      // 2. Direct properties on the page record matching targetProperties
+      for (const [propKey, propVal] of Object.entries(page)) {
+        if (propVal != null && isMatchingPropertyKey(propKey, targetProperties)) {
+          candidateValues.push(propVal)
+        }
+      }
+
+      // 3. Properties map (:block/properties or properties)
+      const props = (page.properties ?? page[':block/properties'] ?? page['block/properties']) as
+        | Record<string, unknown>
+        | undefined
+      if (props && typeof props === 'object') {
+        for (const propName of targetProperties) {
+          const val = findPropertyValue(props, propName)
+          if (val != null) {
+            candidateValues.push(val)
+          }
+        }
+      }
+
+      // Resolve candidate values to parent titles
+      const parentTitles = this.resolveValuesToTitles(candidateValues, idToTitleMap)
+
+      for (const parentTitle of parentTitles) {
+        const parentKey = normalizeTitle(parentTitle)
+        if (!parentKey || !existingPageKeys.has(parentKey) || parentKey === pageKey) {
+          continue
+        }
+
+        const existing = nextIndex.get(parentKey) ?? []
+        if (!existing.includes(title)) {
+          existing.push(title)
+          nextIndex.set(parentKey, existing)
+        }
+      }
+    }
+
+    for (const [key, children] of nextIndex.entries()) {
+      nextIndex.set(key, this.sortTitles(children))
+    }
+
+    // Atomically replace child index (double-buffering)
+    this.childIndex = nextIndex
+    return true
+  }
+
+  private async buildChildIndexViaBatchApi(propertyName: string): Promise<void> {
     const allPages = await this.getAllPagesCached()
     this.lastIndexBuildPageCount = allPages.length
-    const index = new Map<string, string[]>()
+    const nextIndex = new Map<string, string[]>()
     const existingPageKeys = new Set<string>()
     for (const page of allPages) {
-      if (isPageDeletedLike(page)) {
+      if (isPageDeletedLike(page as Record<string, unknown>)) {
         continue
       }
       const key = normalizeTitle(pageTitle(page))
@@ -153,46 +301,127 @@ export class FavoriteTreeTreeService {
       }
     }
 
-    for (const page of allPages) {
-      if (isPageDeletedLike(page)) {
-        continue
+    // Process pages in concurrent batches of 20 to avoid sequential blocking
+    const BATCH_SIZE = 20
+    for (let i = 0; i < allPages.length; i += BATCH_SIZE) {
+      const batch = allPages.slice(i, i + BATCH_SIZE)
+      await Promise.all(
+        batch.map(async (page) => {
+          if (isPageDeletedLike(page as Record<string, unknown>)) {
+            return
+          }
+          const title = pageTitle(page)
+          if (!title) {
+            return
+          }
+
+          const pageKey = normalizeTitle(title)
+          const parentTitles = await this.resolveParentTitles(page, propertyName)
+          for (const parentTitle of parentTitles) {
+            const parentKey = normalizeTitle(parentTitle)
+            if (!parentKey || !existingPageKeys.has(parentKey) || parentKey === pageKey) {
+              continue
+            }
+
+            const existing = nextIndex.get(parentKey) ?? []
+            if (!existing.includes(title)) {
+              existing.push(title)
+              nextIndex.set(parentKey, existing)
+            }
+          }
+        }),
+      )
+    }
+
+    for (const [key, children] of nextIndex.entries()) {
+      nextIndex.set(key, this.sortTitles(children))
+    }
+
+    this.childIndex = nextIndex
+  }
+
+  private resolveValuesToTitles(values: unknown[], idToTitleMap: Map<number, string>): string[] {
+    const rawStrings: unknown[] = []
+
+    const processItem = (item: unknown): void => {
+      if (item == null) {
+        return
       }
-      const title = pageTitle(page)
-      if (!title) {
-        continue
+
+      if (Array.isArray(item)) {
+        for (const subItem of item) {
+          processItem(subItem)
+        }
+        return
       }
 
-      for (const parentTitle of await this.resolveParentTitles(page, propertyName)) {
-        const normalizedParentTitle = parentTitle.trim()
-        if (!normalizedParentTitle) {
-          continue
+      if (typeof item === 'number') {
+        const titleFromId = idToTitleMap.get(item)
+        if (titleFromId) {
+          rawStrings.push(titleFromId)
         }
+        return
+      }
 
-        const parentKey = normalizeTitle(normalizedParentTitle)
-        if (!parentKey || !existingPageKeys.has(parentKey)) {
-          continue
+      if (typeof item === 'object') {
+        const record = item as Record<string, unknown>
+        const title = this.extractTitleFromRecord(record)
+        if (title) {
+          rawStrings.push(title)
+          return
         }
+        if (record.id && typeof record.id === 'number') {
+          const titleFromId = idToTitleMap.get(record.id)
+          if (titleFromId) {
+            rawStrings.push(titleFromId)
+            return
+          }
+        }
+        if ('value' in record) {
+          processItem(record.value)
+          return
+        }
+      }
 
-        const existing = index.get(parentKey) ?? []
-        if (!existing.includes(title)) {
-          existing.push(title)
-          index.set(parentKey, existing)
-        }
+      rawStrings.push(item)
+    }
+
+    for (const val of values) {
+      processItem(val)
+    }
+
+    return uniqueTitlesFromValues(rawStrings)
+  }
+
+  private extractTitleFromRecord(record: Record<string, unknown>): string | null {
+    const original = record[':block/original-name'] ?? record['block/original-name'] ?? record.originalName
+    if (typeof original === 'string' && original.trim()) {
+      return original.trim()
+    }
+
+    const name = record[':block/name'] ?? record['block/name'] ?? record.name
+    if (typeof name === 'string' && name.trim()) {
+      return name.trim()
+    }
+
+    const title = record[':block/title'] ?? record['block/title'] ?? record.title
+    if (typeof title === 'string' && title.trim()) {
+      return title.trim()
+    }
+    if (Array.isArray(title)) {
+      const joined = title.join('').trim()
+      if (joined) {
+        return joined
       }
     }
 
-    for (const [key, children] of index.entries()) {
-      index.set(key, this.sortTitles(children))
-    }
-
-    this.childIndex = index
-    this.lastIndexBuildMs = Math.max(0, Math.round(performance.now() - startedAt))
+    return null
   }
 
   private async getAllPagesCached(): Promise<PageEntity[]> {
     const now = Date.now()
     const cached = this.allPageCache
-    if (cached && now - cached.at < 1500) {
+    if (cached && now - cached.at < 2000) {
       return cached.pages
     }
 
@@ -206,44 +435,29 @@ export class FavoriteTreeTreeService {
   }
 
   private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<string[]> {
-    const properties =
+    let properties =
       page.properties && typeof page.properties === 'object'
         ? (page.properties as Record<string, unknown>)
         : null
 
     const targetProps = Array.from(new Set([propertyName, 'tags', 'page tags', 'page-tags'])).filter(Boolean)
     const allValues: unknown[] = []
-    let fetchedAllProps: Record<string, unknown> | null | undefined = undefined
+
+    if (!properties) {
+      try {
+        const fetched = await logseq.Editor.getBlockProperties(page.uuid)
+        if (fetched && typeof fetched === 'object') {
+          properties = fetched as Record<string, unknown>
+        }
+      } catch {
+        properties = null
+      }
+    }
 
     for (const propName of targetProps) {
       const rawFromPage = properties ? findPropertyValue(properties, propName) : undefined
       const rawFromTopLevel = (page as Record<string, unknown>)[propName]
-      let rawFromApi: unknown = undefined
-      let rawFromAllProps: unknown = undefined
-
-      if (rawFromPage == null && rawFromTopLevel == null) {
-        try {
-          rawFromApi = await logseq.Editor.getBlockProperty(page.uuid, propName)
-        } catch {
-          rawFromApi = undefined
-        }
-      }
-
-      if (rawFromPage == null && rawFromTopLevel == null && rawFromApi == null) {
-        if (fetchedAllProps === undefined) {
-          try {
-            const allProps = await logseq.Editor.getBlockProperties(page.uuid)
-            fetchedAllProps = allProps && typeof allProps === 'object' ? (allProps as Record<string, unknown>) : null
-          } catch {
-            fetchedAllProps = null
-          }
-        }
-        if (fetchedAllProps) {
-          rawFromAllProps = findPropertyValue(fetchedAllProps, propName)
-        }
-      }
-
-      allValues.push(rawFromPage, rawFromTopLevel, rawFromApi, rawFromAllProps)
+      allValues.push(rawFromPage, rawFromTopLevel)
     }
 
     return uniqueTitlesFromValues(allValues)

@@ -1,5 +1,6 @@
 import type { ThemeMode } from '@logseq/libs/dist/LSPlugin'
 import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
+import { shouldRefreshOnDbChange } from './db-change'
 import { FloatingLayoutManager } from './floating-layout'
 import { createFavoriteTreeI18n, getFavoriteTreeI18n, type FavoriteTreeI18n } from './i18n'
 import { renderFavoriteTree } from './render'
@@ -38,6 +39,7 @@ export class FavoriteTreePlugin {
   private panelVisible = false
   private viewMode: ViewMode = 'panel'
   private refreshing = false
+  private pendingRefreshReason: RefreshReason | null = null
   private searching = false
   private searchQuery = ''
   private searchError: string | null = null
@@ -714,9 +716,10 @@ export class FavoriteTreePlugin {
 
   private registerHooks(): void {
     this.offHooks.push(
-      logseq.DB.onChanged(() => {
-        this.scheduleRefresh('db-changed')
-        void this.updateCurrentPage()
+      logseq.DB.onChanged((payload) => {
+        if (shouldRefreshOnDbChange(payload as any, this.settings.getHierarchyProperty())) {
+          this.scheduleRefresh('db-changed')
+        }
       }),
     )
 
@@ -765,7 +768,7 @@ export class FavoriteTreePlugin {
         const displayModePreferenceChanged = newSettings.displayModePreference !== oldSettings?.displayModePreference
 
         if (propertyChanged) {
-          this.treeService.invalidateIndex()
+          this.treeService.invalidateIndex(true)
           void this.refresh('settings-property')
         }
 
@@ -827,12 +830,13 @@ export class FavoriteTreePlugin {
 
   private async refresh(reason: RefreshReason): Promise<void> {
     if (this.refreshing) {
+      this.pendingRefreshReason = reason
       return
     }
 
     const refreshStartedAt = performance.now()
     this.activePageKeysCache = null
-    this.treeService.invalidateIndex()
+    this.treeService.invalidateIndex(false)
     this.refreshing = true
     this.render()
     try {
@@ -859,6 +863,11 @@ export class FavoriteTreePlugin {
     } finally {
       this.refreshing = false
       this.render()
+      if (this.pendingRefreshReason !== null) {
+        const nextReason = this.pendingRefreshReason
+        this.pendingRefreshReason = null
+        void this.refresh(nextReason)
+      }
     }
   }
 
@@ -1510,7 +1519,7 @@ export class FavoriteTreePlugin {
     this.persistInternalState()
     this.currentGraphKey = await this.resolveCurrentGraphKey()
     this.restoreGraphState()
-    this.treeService.invalidateIndex()
+    this.treeService.invalidateIndex(true)
     this.layout.ensureInViewport(this.settings.getSidebarPosition())
     this.applyMainUIState()
     this.render()
@@ -1557,7 +1566,7 @@ export class FavoriteTreePlugin {
       this.searching = true
     }
 
-    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty(), true)
     this.searchError = null
     this.syncExpandedLoadState()
     await this.syncCurrentPagePath()
