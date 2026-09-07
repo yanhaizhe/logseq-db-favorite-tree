@@ -6,7 +6,7 @@ export function buildSettingsSchema(i18n: FavoriteTreeI18n): SettingSchemaDesc[]
     {
       key: 'hierarchyProperty',
       type: 'string',
-      default: 'parent',
+      default: '页面标签',
       title: i18n.t('settingsHierarchyTitle'),
       description: i18n.t('settingsHierarchyDescription'),
     },

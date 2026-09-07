@@ -1,7 +1,7 @@
 import type { BlockEntity, IDatom } from '@logseq/libs/dist/LSPlugin'
 import { findPropertyValue, normalizePropertyLookupKey } from './utils'
 
-export const DEFAULT_PAGE_TAG_PROPERTIES = ['tags', 'page tags', 'page-tags'] as const
+export const DEFAULT_PAGE_TAG_PROPERTIES = ['页面标签', 'tags', 'page tags', 'page-tags', 'parent'] as const
 
 /**
  * Attributes that represent pure outliner block editing, line splitting,

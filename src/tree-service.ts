@@ -440,7 +440,7 @@ export class FavoriteTreeTreeService {
         ? (page.properties as Record<string, unknown>)
         : null
 
-    const targetProps = Array.from(new Set([propertyName, 'tags', 'page tags', 'page-tags'])).filter(Boolean)
+    const targetProps = Array.from(new Set([propertyName, ...DEFAULT_PAGE_TAG_PROPERTIES])).filter(Boolean)
     const allValues: unknown[] = []
 
     if (!properties) {

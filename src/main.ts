@@ -81,6 +81,11 @@ async function main(): Promise<void> {
     onOpenPageInSidebar: (page) => {
       void plugin.openPageInRightSidebar(page)
     },
+    onOpenContextMenu: plugin.openContextMenu,
+    onCloseContextMenu: plugin.closeContextMenu,
+    onContextMenuAction: (action, page, parentKey) => {
+      void plugin.executeContextMenuAction(action, page, parentKey)
+    },
     onToggleSortMode: plugin.toggleSortModeForParent,
     onClearCustomSort: plugin.clearCustomSortForParent,
     onStartSortDrag: plugin.startSortDrag,

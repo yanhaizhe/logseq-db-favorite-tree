@@ -16,6 +16,8 @@ assert(isMatchingPropertyKey('parent', ['parent']), 'matches parent')
 assert(isMatchingPropertyKey(':user.property/tags', ['tags']), 'matches :user.property/tags')
 assert(isMatchingPropertyKey(':page-tags', ['page-tags']), 'matches :page-tags')
 assert(isMatchingPropertyKey(':user.property/page-tags', ['page-tags']), 'matches :user.property/page-tags')
+assert(isMatchingPropertyKey(':user.property/页面标签', ['页面标签']), 'matches :user.property/页面标签')
+assert(isMatchingPropertyKey('页面标签', ['页面标签']), 'matches 页面标签')
 
 // :block/parent is outliner tree structure, NOT hierarchy property
 assert(!isMatchingPropertyKey(':block/parent', ['parent']), ':block/parent must NOT match hierarchy parent')

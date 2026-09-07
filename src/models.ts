@@ -52,6 +52,42 @@ export function createModels(plugin: FavoriteTreePlugin) {
       }
     },
 
+    sidebarTreeOpenContextMenu: (event: { dataset?: Record<string, string>; x?: number; y?: number }) => {
+      const page = event.dataset?.page
+      if (!page) {
+        return
+      }
+      const parentKey = event.dataset?.parentKey || ''
+      const nodeKey = event.dataset?.key || ''
+      const hasChildren = event.dataset?.hasChildren === 'true'
+      const hasCustomSort = event.dataset?.hasCustomSort === 'true'
+      const isExpanded = event.dataset?.isExpanded === 'true'
+      const pos = plugin.resolveContextMenuPosition(nodeKey, page, event.x, event.y)
+      plugin.openContextMenu({
+        x: pos.x,
+        y: pos.y,
+        page,
+        parentKey,
+        nodeKey,
+        hasChildren,
+        hasCustomSort,
+        isExpanded,
+      })
+    },
+
+    sidebarTreeContextAction: (event: { dataset?: Record<string, string> }) => {
+      const action = event.dataset?.contextAction
+      const page = event.dataset?.page || ''
+      const parentKey = event.dataset?.parentKey || ''
+      if (action && page) {
+        void plugin.executeContextMenuAction(action, page, parentKey)
+      }
+    },
+
+    sidebarTreeCloseContextMenu: () => {
+      plugin.closeContextMenu()
+    },
+
     sidebarTreeToggleSortMode: (event: { dataset?: Record<string, string> }) => {
       const parentKey = event.dataset?.parentKey
       if (parentKey) {

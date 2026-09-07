@@ -1,4 +1,4 @@
-import type { DragKind, SortDropTarget, SortableItem } from './types'
+import type { ContextMenuState, DragKind, SortDropTarget, SortableItem } from './types'
 import { escapeSelectorValue } from './utils'
 
 export type FavoriteTreeDOMHandlers = {
@@ -27,6 +27,9 @@ export type FavoriteTreeDOMHandlers = {
   onSubmitCreateChild: () => void
   onCancelCreateChild: () => void
   onOpenPageInSidebar: (page: string) => void
+  onOpenContextMenu: (menu: ContextMenuState) => void
+  onCloseContextMenu: () => void
+  onContextMenuAction: (action: string, page: string, parentKey: string) => void
   onToggleSortMode: (parentKey: string) => void
   onClearCustomSort: (parentKey: string) => void
   onStartSortDrag: (item: SortableItem) => void
@@ -160,12 +163,53 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
   })
 
   root.addEventListener('click', (event) => {
+    const inContextMenu = (event.target as HTMLElement | null)?.closest<HTMLElement>('.ft-context-menu')
+    const inContextTrigger = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action="open-context-menu"]')
+    if (!inContextMenu && !inContextTrigger) {
+      handlers.onCloseContextMenu()
+    }
+
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')
     if (!target) {
       return
     }
 
     const action = target.dataset.action
+    if (action === 'open-context-menu') {
+      const page = target.dataset.page
+      if (!page) {
+        return
+      }
+      const parentKey = target.dataset.parentKey || ''
+      const nodeKey = target.dataset.key || ''
+      const hasChildren = target.dataset.hasChildren === 'true'
+      const hasCustomSort = target.dataset.hasCustomSort === 'true'
+      const isExpanded = target.dataset.isExpanded === 'true'
+      const rect = target.getBoundingClientRect()
+      const mouseEvent = event as MouseEvent
+      const clickX = typeof mouseEvent.clientX === 'number' && mouseEvent.clientX > 0 ? mouseEvent.clientX : Math.round(rect.left)
+      const clickY = typeof mouseEvent.clientY === 'number' && mouseEvent.clientY > 0 ? mouseEvent.clientY : Math.round(rect.bottom + 4)
+      handlers.onOpenContextMenu({
+        x: clickX,
+        y: clickY,
+        page,
+        parentKey,
+        nodeKey,
+        hasChildren,
+        hasCustomSort,
+        isExpanded,
+      })
+      return
+    }
+    if (action === 'context-menu-action') {
+      const contextAction = target.dataset.contextAction
+      const page = target.dataset.page || ''
+      const parentKey = target.dataset.parentKey || ''
+      if (contextAction && page) {
+        handlers.onContextMenuAction(contextAction, page, parentKey)
+      }
+      return
+    }
     if (action === 'toggle-controls') {
       handlers.onToggleControls()
       return
@@ -377,7 +421,44 @@ export function wireDOMEvents(root: HTMLElement, handlers: FavoriteTreeDOMHandle
     handlers.onEndSortDrag()
   })
 
+  root.addEventListener('contextmenu', (event) => {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLElement>('.tree-node__row')
+    if (!row) {
+      return
+    }
+
+    const page = row.dataset.page || row.dataset.sortTitle
+    if (!page) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const parentKey = row.dataset.parentKey || row.dataset.sortParentKey || ''
+    const nodeKey = row.dataset.key || ''
+    const treeNode = row.closest('.tree-node')
+    const hasChildren = treeNode?.querySelector('.tree-node__children') !== null
+    const hasCustomSort = row.querySelector('.tree-node__sort-mode') !== null
+    const isExpanded = row.querySelector('.tree-node__toggle svg')?.classList.contains('ft-icon') ?? false
+
+    handlers.onOpenContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      page,
+      parentKey,
+      nodeKey,
+      hasChildren,
+      hasCustomSort,
+      isExpanded,
+    })
+  })
+
   root.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      handlers.onCloseContextMenu()
+    }
+
     const createChildInput = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-role="create-child-input"]')
     if (createChildInput) {
       if (event.key === 'Enter') {

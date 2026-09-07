@@ -1,6 +1,6 @@
 import type { FavoriteTreeI18n } from './i18n'
 import { renderIcon, renderTooltip } from './render'
-import type { TreeStateSnapshot } from './types'
+import type { ContextMenuState, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
 type SidebarTreeRenderAccessors = {
@@ -241,7 +241,57 @@ export function renderSidebarTree(
       <div class="favorite-sidebar-tree__body">
         ${content}
       </div>
+      ${state.contextMenu ? renderSidebarContextMenu(state.contextMenu, i18n) : ''}
     </section>
+  `
+}
+
+function renderSidebarContextMenu(menu: ContextMenuState, i18n: FavoriteTreeI18n): string {
+  const { page, parentKey, x, y, hasChildren, hasCustomSort, isExpanded } = menu
+  const expandCollapseAction = isExpanded ? 'collapse-subtree' : 'expand-subtree'
+  const expandCollapseLabel = isExpanded ? i18n.t('contextMenuCollapseSubtree') : i18n.t('contextMenuExpandSubtree')
+  const expandCollapseIcon = isExpanded ? 'collapse-tree' : 'expand-tree'
+
+  return `
+    <div
+      class="favorite-sidebar-tree__context-menu"
+      style="left: ${x}px; top: ${y}px;"
+    >
+      <div class="favorite-sidebar-tree__context-header">${escapeHtml(page)}</div>
+      <div class="favorite-sidebar-tree__context-divider"></div>
+      <button class="favorite-sidebar-tree__context-item" data-context-action="open-in-right-sidebar" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="favorite-sidebar-tree__context-icon">${renderIcon('right-sidebar', 'favorite-sidebar-tree__icon')}</span>
+        <span class="favorite-sidebar-tree__context-label">${escapeHtml(i18n.t('contextMenuOpenInRightSidebar'))}</span>
+        <span class="favorite-sidebar-tree__context-shortcut">Shift+Click</span>
+      </button>
+      <button class="favorite-sidebar-tree__context-item" data-context-action="create-child-page" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="favorite-sidebar-tree__context-icon">${renderIcon('child-plus', 'favorite-sidebar-tree__icon')}</span>
+        <span class="favorite-sidebar-tree__context-label">${escapeHtml(i18n.t('contextMenuCreateChildPage'))}</span>
+      </button>
+      <div class="favorite-sidebar-tree__context-divider"></div>
+      <button class="favorite-sidebar-tree__context-item" data-context-action="copy-page-ref" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="favorite-sidebar-tree__context-icon">${renderIcon('copy', 'favorite-sidebar-tree__icon')}</span>
+        <span class="favorite-sidebar-tree__context-label">${escapeHtml(i18n.t('contextMenuCopyPageRef'))}</span>
+      </button>
+      <button class="favorite-sidebar-tree__context-item" data-context-action="copy-page-title" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="favorite-sidebar-tree__context-icon">${renderIcon('copy', 'favorite-sidebar-tree__icon')}</span>
+        <span class="favorite-sidebar-tree__context-label">${escapeHtml(i18n.t('contextMenuCopyPageTitle'))}</span>
+      </button>
+      ${hasChildren ? `
+        <div class="favorite-sidebar-tree__context-divider"></div>
+        <button class="favorite-sidebar-tree__context-item" data-context-action="${expandCollapseAction}" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+          <span class="favorite-sidebar-tree__context-icon">${renderIcon(expandCollapseIcon as any, 'favorite-sidebar-tree__icon')}</span>
+          <span class="favorite-sidebar-tree__context-label">${escapeHtml(expandCollapseLabel)}</span>
+        </button>
+      ` : ''}
+      ${hasCustomSort ? `
+        <div class="favorite-sidebar-tree__context-divider"></div>
+        <button class="favorite-sidebar-tree__context-item favorite-sidebar-tree__context-item--danger" data-context-action="clear-custom-sort" data-on-click="sidebarTreeContextAction" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+          <span class="favorite-sidebar-tree__context-icon">${renderIcon('close', 'favorite-sidebar-tree__icon')}</span>
+          <span class="favorite-sidebar-tree__context-label">${escapeHtml(i18n.t('contextMenuClearCustomSort'))}</span>
+        </button>
+      ` : ''}
+    </div>
   `
 }
 
@@ -600,21 +650,47 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   position: relative;
 }
 
+.favorite-sidebar-tree__node--child {
+  position: relative;
+}
+
+.favorite-sidebar-tree__node--child::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ls-border-color, #d7dce5) 55%, transparent 45%);
+  transition: background-color 140ms ease;
+  pointer-events: none;
+}
+
+.favorite-sidebar-tree__node--child:last-child::before,
+.favorite-sidebar-tree__node--child[data-is-last="true"]::before {
+  bottom: auto;
+  height: 14px;
+}
+
 .favorite-sidebar-tree__node--child > .favorite-sidebar-tree__row::before {
   content: "";
   position: absolute;
-  left: -13px;
-  top: 50%;
-  width: 13px;
-  border-top: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 68%, transparent 32%);
-  transform: translateY(-0.5px);
-  transition: border-color 120ms ease;
+  left: -8px;
+  top: 0;
+  width: 7px;
+  height: 14px;
+  border-left: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 55%, transparent 45%);
+  border-bottom: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 55%, transparent 45%);
+  border-bottom-left-radius: 4px;
+  pointer-events: none;
+  transition: border-color 140ms ease;
 }
 
-.favorite-sidebar-tree__node--child > .favorite-sidebar-tree__row:hover::before,
-.favorite-sidebar-tree__node--child > .favorite-sidebar-tree__row.is-current::before,
-.favorite-sidebar-tree__node--child > .favorite-sidebar-tree__row.is-search-match-current::before {
-  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 28%, var(--ls-border-color, #d7dce5) 72%);
+.favorite-sidebar-tree__node--child:hover::before,
+.favorite-sidebar-tree__node--child:hover > .favorite-sidebar-tree__row::before,
+.favorite-sidebar-tree__node:hover > .favorite-sidebar-tree__children > .favorite-sidebar-tree__node--child::before {
+  border-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 45%, var(--ls-border-color, #d7dce5) 55%);
+  background-color: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 45%, var(--ls-border-color, #d7dce5) 55%);
 }
 
 .favorite-sidebar-tree__row {
@@ -718,7 +794,14 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   color: var(--ls-secondary-text-color, #6b7280);
   cursor: pointer;
   flex: 0 0 22px;
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.favorite-sidebar-tree__row:hover .favorite-sidebar-tree__inline-action,
+.favorite-sidebar-tree__inline-action:focus-visible,
+.favorite-sidebar-tree__inline-action.is-active {
+  opacity: 1;
 }
 
 .favorite-sidebar-tree__inline-action:hover,
@@ -770,9 +853,9 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 .favorite-sidebar-tree__children {
-  margin-left: 18px;
-  padding-left: 10px;
-  border-left: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 50%, transparent 50%);
+  margin-left: 16px;
+  padding-left: 0;
+  position: relative;
 }
 
 .favorite-sidebar-tree__empty {
@@ -830,6 +913,128 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+
+/* Sidebar Context Menu */
+.favorite-sidebar-tree__context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 190px;
+  padding: 5px;
+  background: var(--ls-secondary-background-color, var(--ls-primary-background-color, #ffffff));
+  border: 1px solid var(--ls-border-color, rgba(148, 163, 184, 0.28));
+  border-radius: 9px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: ft-sidebar-menu-appear 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--ls-primary-text-color, #1f2937);
+}
+
+html[data-theme="dark"] .favorite-sidebar-tree__context-menu,
+.dark .favorite-sidebar-tree__context-menu {
+  background: var(--ls-secondary-background-color, #1e222d);
+  border-color: var(--ls-border-color, rgba(255, 255, 255, 0.12));
+  color: var(--ls-primary-text-color, #e5e7eb);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+html[data-theme="dark"] .favorite-sidebar-tree__context-divider,
+.dark .favorite-sidebar-tree__context-divider {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme="dark"] .favorite-sidebar-tree__context-shortcut,
+.dark .favorite-sidebar-tree__context-shortcut {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ls-secondary-text-color, #9ca3af);
+}
+
+@keyframes ft-sidebar-menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.favorite-sidebar-tree__context-header {
+  padding: 5px 8px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ls-secondary-text-color, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.favorite-sidebar-tree__context-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: color-mix(in srgb, var(--ls-border-color, #d7dce5) 70%, transparent 30%);
+}
+
+.favorite-sidebar-tree__context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 100ms ease, color 100ms ease;
+}
+
+.favorite-sidebar-tree__context-item:hover,
+.favorite-sidebar-tree__context-item:focus-visible {
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 12%, transparent 88%);
+  color: var(--ls-link-text-color, #2563eb);
+}
+
+.favorite-sidebar-tree__context-item--danger {
+  color: #ef4444;
+}
+
+.favorite-sidebar-tree__context-item--danger:hover,
+.favorite-sidebar-tree__context-item--danger:focus-visible {
+  background: color-mix(in srgb, #ef4444 12%, transparent 88%);
+  color: #dc2626;
+}
+
+.favorite-sidebar-tree__context-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: inherit;
+}
+
+.favorite-sidebar-tree__context-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.favorite-sidebar-tree__context-shortcut {
+  font-size: 10px;
+  color: var(--ls-secondary-text-color, #6b7280);
+  background: color-mix(in srgb, var(--ls-tertiary-background-color, #f5f7fb) 90%, var(--ls-border-color, #d7dce5) 10%);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--ls-border-color, #d7dce5) 60%, transparent 40%);
+  margin-left: 8px;
+  white-space: nowrap;
 }
 `
 
@@ -966,7 +1171,12 @@ function renderSidebarNode(
 
   return `
     <div class="favorite-sidebar-tree__node ${depth > 0 ? 'favorite-sidebar-tree__node--child' : ''}" data-node-key="${escapeHtml(key)}" data-is-last="${isLast ? 'true' : 'false'}">
-      <div class="favorite-sidebar-tree__row ${isCurrent ? 'is-current' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}">
+      <div
+        class="favorite-sidebar-tree__row ${isCurrent ? 'is-current' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}"
+        data-page="${escapeHtml(title)}"
+        data-parent-key="${escapeHtml(ancestors[ancestors.length - 1] || normalizeTitle(title))}"
+        data-key="${escapeHtml(key)}"
+      >
         ${toggleMarkup}
         <button
           class="favorite-sidebar-tree__title"
@@ -982,16 +1192,16 @@ function renderSidebarNode(
         </button>
         <button
           class="favorite-sidebar-tree__inline-action has-tooltip"
-          data-on-click="sidebarTreeCreateChildPage"
+          data-role="sidebar-context-trigger"
+          data-on-click="sidebarTreeOpenContextMenu"
           data-page="${escapeHtml(title)}"
-          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
-        >${renderIcon('child-plus', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('createChildPageForParent', { title }), 'favorite-sidebar-tree__tooltip')}</button>
-        <button
-          class="favorite-sidebar-tree__inline-action has-tooltip"
-          data-on-click="sidebarTreeOpenPageInSidebar"
-          data-page="${escapeHtml(title)}"
-          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
-        >${renderIcon('right-sidebar', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('openInRightSidebar', { title }), 'favorite-sidebar-tree__tooltip')}</button>
+          data-parent-key="${escapeHtml(ancestors[ancestors.length - 1] || normalizeTitle(title))}"
+          data-key="${escapeHtml(key)}"
+          data-has-children="${hasChildren ? 'true' : 'false'}"
+          data-has-custom-sort="${Boolean(state.sortOrders[key]?.length) ? 'true' : 'false'}"
+          data-is-expanded="${effectiveExpanded ? 'true' : 'false'}"
+          aria-label="${escapeHtml(i18n.t('contextMenuMoreActions'))}"
+        >${renderIcon('more', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('contextMenuMoreActions'), 'favorite-sidebar-tree__tooltip')}</button>
         ${renderSidebarSortModeControls(state, key, i18n)}
       </div>
       ${childrenMarkup}
@@ -1032,7 +1242,12 @@ function renderSidebarSortModeControls(state: TreeStateSnapshot, parentKey: stri
 function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI18n, normalizedQuery: string): string {
   return `
     <div class="favorite-sidebar-tree__node favorite-sidebar-tree__node--child">
-      <div class="favorite-sidebar-tree__row">
+      <div
+        class="favorite-sidebar-tree__row"
+        data-page="${escapeHtml(title)}"
+        data-parent-key="${escapeHtml(normalizeTitle(title))}"
+        data-key="${escapeHtml(normalizeTitle(title))}"
+      >
         <span class="favorite-sidebar-tree__toggle is-placeholder"></span>
         <button
           class="favorite-sidebar-tree__title"
@@ -1045,16 +1260,16 @@ function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI1
         </button>
         <button
           class="favorite-sidebar-tree__inline-action has-tooltip"
-          data-on-click="sidebarTreeCreateChildPage"
+          data-role="sidebar-context-trigger"
+          data-on-click="sidebarTreeOpenContextMenu"
           data-page="${escapeHtml(title)}"
-          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
-        >${renderIcon('child-plus', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('createChildPageForParent', { title }), 'favorite-sidebar-tree__tooltip')}</button>
-        <button
-          class="favorite-sidebar-tree__inline-action has-tooltip"
-          data-on-click="sidebarTreeOpenPageInSidebar"
-          data-page="${escapeHtml(title)}"
-          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
-        >${renderIcon('right-sidebar', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('openInRightSidebar', { title }), 'favorite-sidebar-tree__tooltip')}</button>
+          data-parent-key="${escapeHtml(normalizeTitle(title))}"
+          data-key="${escapeHtml(normalizeTitle(title))}"
+          data-has-children="false"
+          data-has-custom-sort="false"
+          data-is-expanded="false"
+          aria-label="${escapeHtml(i18n.t('contextMenuMoreActions'))}"
+        >${renderIcon('more', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('contextMenuMoreActions'), 'favorite-sidebar-tree__tooltip')}</button>
       </div>
     </div>
   `

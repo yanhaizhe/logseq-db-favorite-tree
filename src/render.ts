@@ -1,6 +1,6 @@
 import { ROOT_SORT_KEY } from './constants'
 import type { FavoriteTreeI18n } from './i18n'
-import type { LoadState, SortMode, TreeStateSnapshot } from './types'
+import type { ContextMenuState, LoadState, SortMode, TreeStateSnapshot } from './types'
 import { escapeHtml, normalizeTitle } from './utils'
 
 type TreeRenderAccessors = {
@@ -42,6 +42,8 @@ type IconName =
   | 'floating'
   | 'expand-tree'
   | 'collapse-tree'
+  | 'more'
+  | 'copy'
 
 export function renderIcon(name: IconName, className = 'ft-icon'): string {
   const attrs = `class="${className}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"`
@@ -225,6 +227,21 @@ export function renderIcon(name: IconName, className = 'ft-icon'): string {
           <path d="M7 11.75h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           <path d="M7 16.75h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           <path d="M14 9.75h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      `
+    case 'more':
+      return `
+        <svg ${attrs}>
+          <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+          <circle cx="18" cy="12" r="1.5" fill="currentColor"/>
+        </svg>
+      `
+    case 'copy':
+      return `
+        <svg ${attrs}>
+          <rect x="8.5" y="8.5" width="10" height="10" rx="1.8" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M5.5 15.5H5a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 5 3.5h9A1.5 1.5 0 0 1 15.5 5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
       `
   }
@@ -502,6 +519,57 @@ export function renderFavoriteTree(
         <span>${state.refreshing ? escapeHtml(i18n.t('refreshing')) : `${escapeHtml(autoRefreshState)} · ${escapeHtml(i18n.t('rootCount', { count: state.rootFavorites.length }))}`}</span>
       </div>
       <div class="favorite-tree__resize-handle" data-drag-handle="panel-resize" title="${escapeHtml(i18n.t('resizePanel'))}"></div>
+      ${state.contextMenu ? renderContextMenu(state.contextMenu, i18n) : ''}
+    </div>
+  `
+}
+
+function renderContextMenu(menu: ContextMenuState, i18n: FavoriteTreeI18n): string {
+  const { page, parentKey, x, y, hasChildren, hasCustomSort, isExpanded } = menu
+  const expandCollapseAction = isExpanded ? 'collapse-subtree' : 'expand-subtree'
+  const expandCollapseLabel = isExpanded ? i18n.t('contextMenuCollapseSubtree') : i18n.t('contextMenuExpandSubtree')
+  const expandCollapseIcon: IconName = isExpanded ? 'collapse-tree' : 'expand-tree'
+
+  return `
+    <div
+      class="ft-context-menu"
+      style="left: ${x}px; top: ${y}px;"
+      data-no-drag="true"
+    >
+      <div class="ft-context-menu__header">${escapeHtml(page)}</div>
+      <div class="ft-context-menu__divider"></div>
+      <button class="ft-context-menu__item" data-action="context-menu-action" data-context-action="open-in-right-sidebar" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="ft-context-menu__icon">${renderIcon('right-sidebar', 'ft-icon ft-icon--xs')}</span>
+        <span class="ft-context-menu__label">${escapeHtml(i18n.t('contextMenuOpenInRightSidebar'))}</span>
+        <span class="ft-context-menu__shortcut">Shift+Click</span>
+      </button>
+      <button class="ft-context-menu__item" data-action="context-menu-action" data-context-action="create-child-page" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="ft-context-menu__icon">${renderIcon('child-plus', 'ft-icon ft-icon--xs')}</span>
+        <span class="ft-context-menu__label">${escapeHtml(i18n.t('contextMenuCreateChildPage'))}</span>
+      </button>
+      <div class="ft-context-menu__divider"></div>
+      <button class="ft-context-menu__item" data-action="context-menu-action" data-context-action="copy-page-ref" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="ft-context-menu__icon">${renderIcon('copy', 'ft-icon ft-icon--xs')}</span>
+        <span class="ft-context-menu__label">${escapeHtml(i18n.t('contextMenuCopyPageRef'))}</span>
+      </button>
+      <button class="ft-context-menu__item" data-action="context-menu-action" data-context-action="copy-page-title" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+        <span class="ft-context-menu__icon">${renderIcon('copy', 'ft-icon ft-icon--xs')}</span>
+        <span class="ft-context-menu__label">${escapeHtml(i18n.t('contextMenuCopyPageTitle'))}</span>
+      </button>
+      ${hasChildren ? `
+        <div class="ft-context-menu__divider"></div>
+        <button class="ft-context-menu__item" data-action="context-menu-action" data-context-action="${expandCollapseAction}" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+          <span class="ft-context-menu__icon">${renderIcon(expandCollapseIcon, 'ft-icon ft-icon--xs')}</span>
+          <span class="ft-context-menu__label">${escapeHtml(expandCollapseLabel)}</span>
+        </button>
+      ` : ''}
+      ${hasCustomSort ? `
+        <div class="ft-context-menu__divider"></div>
+        <button class="ft-context-menu__item ft-context-menu__item--danger" data-action="context-menu-action" data-context-action="clear-custom-sort" data-page="${escapeHtml(page)}" data-parent-key="${escapeHtml(parentKey)}">
+          <span class="ft-context-menu__icon">${renderIcon('close', 'ft-icon ft-icon--xs')}</span>
+          <span class="ft-context-menu__label">${escapeHtml(i18n.t('contextMenuClearCustomSort'))}</span>
+        </button>
+      ` : ''}
     </div>
   `
 }
@@ -575,10 +643,13 @@ function renderNode(
     : '<span class="tree-node__toggle is-passive"></span>'
 
   return `
-    <div class="tree-node" data-node-key="${escapeHtml(key)}">
+    <div class="tree-node ${depth > 0 ? 'tree-node--child' : ''}" data-node-key="${escapeHtml(key)}">
       <div
         class="tree-node__row ${isCurrent ? 'is-current' : ''} ${isLocated ? 'is-located' : ''} ${isFlashing ? 'is-flashing' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}"
         style="--depth:${depth}"
+        data-page="${escapeHtml(title)}"
+        data-parent-key="${escapeHtml(sortParentKey)}"
+        data-key="${escapeHtml(key)}"
         data-sort-item-id="${escapeHtml(sortItemId)}"
         data-sort-parent-key="${escapeHtml(sortParentKey)}"
         data-sort-title="${escapeHtml(title)}"
@@ -590,23 +661,18 @@ function renderNode(
         </button>
         <button
           class="tree-node__inline-action has-tooltip"
-          data-action="create-child-page"
+          data-action="open-context-menu"
           data-page="${escapeHtml(title)}"
+          data-parent-key="${escapeHtml(sortParentKey)}"
+          data-key="${escapeHtml(key)}"
+          data-has-children="${hasKnownChildren ? 'true' : 'false'}"
+          data-has-custom-sort="${Boolean(state.sortOrders[key]?.length) ? 'true' : 'false'}"
+          data-is-expanded="${effectiveExpanded ? 'true' : 'false'}"
           data-no-drag="true"
-          aria-label="${escapeHtml(i18n.t('createChildPageForParent', { title }))}"
+          aria-label="${escapeHtml(i18n.t('contextMenuMoreActions'))}"
         >
-          ${renderIcon('child-plus', 'ft-icon ft-icon--xs')}
-          ${renderTooltip(i18n.t('createChildPageForParent', { title }))}
-        </button>
-        <button
-          class="tree-node__inline-action has-tooltip"
-          data-action="open-page-in-sidebar"
-          data-page="${escapeHtml(title)}"
-          data-no-drag="true"
-          aria-label="${escapeHtml(i18n.t('openInRightSidebar', { title }))}"
-        >
-          ${renderIcon('right-sidebar', 'ft-icon ft-icon--xs')}
-          ${renderTooltip(i18n.t('openInRightSidebar', { title }))}
+          ${renderIcon('more', 'ft-icon ft-icon--xs')}
+          ${renderTooltip(i18n.t('contextMenuMoreActions'))}
         </button>
         ${childSortControls}
         <span class="tree-node__meta">${isCurrent ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeCurrent'))}</span>` : ''}${isLocated ? `<span class="tree-node__badge">${escapeHtml(i18n.t('badgeLocated'))}</span>` : ''}${isSelfSearchMatch ? `<span class="tree-node__badge ${isActiveSearchMatch ? 'tree-node__badge--active-match' : ''}">${escapeHtml(i18n.t('badgeMatch'))}</span>` : ''}</span>
@@ -714,7 +780,7 @@ function renderStatusCard(options: {
 
 function renderCycleNode(title: string, depth: number, i18n: FavoriteTreeI18n): string {
   return `
-    <div class="tree-node" data-node-key="${escapeHtml(normalizeTitle(title))}">
+    <div class="tree-node ${depth > 0 ? 'tree-node--child' : ''}" data-node-key="${escapeHtml(normalizeTitle(title))}">
       <div class="tree-node__row is-cycle" style="--depth:${depth}">
         <span class="tree-node__toggle is-passive"></span>
         <button class="tree-node__title" data-action="open-page" data-page="${escapeHtml(title)}" title="${escapeHtml(i18n.t('openPage', { title }))}">

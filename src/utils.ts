@@ -5,13 +5,34 @@ export function pageTitle(page: Partial<PageLookup> | null | undefined): string 
     return null
   }
 
-  const original = typeof page.originalName === 'string' ? page.originalName.trim() : ''
-  if (original) {
-    return original
+  const record = page as Record<string, unknown>
+  const original =
+    record[':block/original-name'] ??
+    record['block/original-name'] ??
+    record['original-name'] ??
+    page.originalName ??
+    record[':block/title'] ??
+    record['block/title'] ??
+    record.title
+  if (typeof original === 'string' && original.trim()) {
+    return original.trim()
+  }
+  if (Array.isArray(original)) {
+    const joined = original.join('').trim()
+    if (joined) {
+      return joined
+    }
   }
 
-  const name = typeof page.name === 'string' ? page.name.trim() : ''
-  return name || null
+  const name =
+    record[':block/name'] ??
+    record['block/name'] ??
+    page.name
+  if (typeof name === 'string' && name.trim()) {
+    return name.trim()
+  }
+
+  return null
 }
 
 export function normalizeTitle(value: string | null | undefined): string {
@@ -157,16 +178,32 @@ export function normalizePropertyReferences(value: unknown): string[] {
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>
 
-    if (typeof record.originalName === 'string' && record.originalName.trim()) {
-      return [record.originalName.trim()]
+    const original =
+      record[':block/original-name'] ??
+      record['block/original-name'] ??
+      record['original-name'] ??
+      record.originalName
+    if (typeof original === 'string' && original.trim()) {
+      return [original.trim()]
     }
 
-    if (typeof record.name === 'string' && record.name.trim()) {
-      return [record.name.trim()]
+    const name =
+      record[':block/name'] ??
+      record['block/name'] ??
+      record.name
+    if (typeof name === 'string' && name.trim()) {
+      return [name.trim()]
     }
 
-    if (Array.isArray(record.title)) {
-      const joined = record.title.join('').trim()
+    const title =
+      record[':block/title'] ??
+      record['block/title'] ??
+      record.title
+    if (typeof title === 'string' && title.trim()) {
+      return [title.trim()]
+    }
+    if (Array.isArray(title)) {
+      const joined = title.join('').trim()
       return joined ? [joined] : []
     }
 
@@ -237,4 +274,56 @@ export function isPageDeletedLike(page: Record<string, unknown>): boolean {
   }
 
   return false
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Fall through to fallback below
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    try {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const successful = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      return successful
+    } catch {
+      return false
+    }
+  }
+
+  return false
+}
+
+export function extractErrorMessage(error: unknown, fallback: string = ''): string {
+  if (!error) {
+    return fallback
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error.trim()
+  }
+  if (typeof error === 'object') {
+    const record = error as Record<string, unknown>
+    for (const key of ['message', 'msg', 'error', 'reason', 'detail']) {
+      const val = record[key]
+      if (typeof val === 'string' && val.trim()) {
+        return val.trim()
+      }
+    }
+  }
+  return fallback
 }

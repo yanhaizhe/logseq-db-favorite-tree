@@ -113,6 +113,16 @@ type Messages = {
   createChildFailedNeedsCleanup: TranslationValue
   openInRightSidebar: TranslationValue
   openInRightSidebarFailed: TranslationValue
+  contextMenuMoreActions: TranslationValue
+  contextMenuOpenInRightSidebar: TranslationValue
+  contextMenuCreateChildPage: TranslationValue
+  contextMenuCopyPageRef: TranslationValue
+  contextMenuCopyPageTitle: TranslationValue
+  contextMenuExpandSubtree: TranslationValue
+  contextMenuCollapseSubtree: TranslationValue
+  contextMenuClearCustomSort: TranslationValue
+  toastCopiedRef: TranslationValue
+  toastCopiedTitle: TranslationValue
   badgeCurrent: TranslationValue
   badgeLocated: TranslationValue
   badgeMatch: TranslationValue
@@ -157,7 +167,7 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     toolbarTitle: 'DB Favorite Tree',
     settingsHierarchyTitle: 'Hierarchy Property',
     settingsHierarchyDescription:
-      'Property name used to declare the parent page. The default is parent. Both single and multi-value references are supported.',
+      'Property name used to declare the parent page. The default is tags (page tags). Both single and multi-value references are supported.',
     settingsPanelWidthTitle: 'Panel Width',
     settingsPanelWidthDescription: 'Default width of the floating panel in pixels.',
     settingsPollIntervalTitle: 'Auto Refresh Interval (Seconds)',
@@ -251,6 +261,16 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
       `${title} was created, but writing the parent relation failed: ${message}. Please check it manually.`,
     openInRightSidebar: ({ title }) => `Open ${title} in the right sidebar`,
     openInRightSidebarFailed: ({ title }) => `Failed to open ${title} in the right sidebar.`,
+    contextMenuMoreActions: 'More actions',
+    contextMenuOpenInRightSidebar: 'Open in right sidebar',
+    contextMenuCreateChildPage: 'New child page',
+    contextMenuCopyPageRef: 'Copy page reference',
+    contextMenuCopyPageTitle: 'Copy page title',
+    contextMenuExpandSubtree: 'Expand all children',
+    contextMenuCollapseSubtree: 'Collapse all children',
+    contextMenuClearCustomSort: 'Reset custom sort for level',
+    toastCopiedRef: ({ ref }) => `Copied page reference: ${ref}`,
+    toastCopiedTitle: ({ title }) => `Copied page title: ${title}`,
     badgeCurrent: 'Current',
     badgeLocated: 'Located',
     badgeMatch: 'Match',
@@ -794,7 +814,7 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
   'zh-CN': {
     toolbarTitle: 'DB 收藏树',
     settingsHierarchyTitle: '层级属性名',
-    settingsHierarchyDescription: '用于声明父页面的属性名，默认值为 parent。属性值支持单值或多值节点。',
+    settingsHierarchyDescription: '用于声明父页面的属性名，默认值为 页面标签。属性值支持单值或多值节点。',
     settingsPanelWidthTitle: '面板宽度',
     settingsPanelWidthDescription: '收藏树展开为悬浮面板时的宽度，单位为像素。',
     settingsPollIntervalTitle: '自动刷新间隔（秒）',
@@ -882,6 +902,16 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已创建，但写入父子关系失败：${message}。请手动检查。`,
     openInRightSidebar: ({ title }) => `在右侧边栏打开 ${title}`,
     openInRightSidebarFailed: ({ title }) => `无法在右侧边栏打开 ${title}。`,
+    contextMenuMoreActions: '更多操作',
+    contextMenuOpenInRightSidebar: '在右侧栏打开',
+    contextMenuCreateChildPage: '新建子页面',
+    contextMenuCopyPageRef: '复制页面引用',
+    contextMenuCopyPageTitle: '复制页面名称',
+    contextMenuExpandSubtree: '展开所有子节点',
+    contextMenuCollapseSubtree: '折叠所有子节点',
+    contextMenuClearCustomSort: '重置此层级排序',
+    toastCopiedRef: ({ ref }) => `已复制页面引用：${ref}`,
+    toastCopiedTitle: ({ title }) => `已复制页面名称：${title}`,
     badgeCurrent: '当前页',
     badgeLocated: '定位',
     badgeMatch: '匹配',
@@ -915,7 +945,7 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
   'zh-Hant': {
     toolbarTitle: 'DB 收藏樹',
     settingsHierarchyTitle: '層級屬性名稱',
-    settingsHierarchyDescription: '用於宣告父頁面的屬性名稱，預設為 parent。屬性值支援單值或多值節點。',
+    settingsHierarchyDescription: '用於宣告父頁面的屬性名稱，預設為 頁面標籤。屬性值支援單值或多值節點。',
     settingsPanelWidthTitle: '面板寬度',
     settingsPanelWidthDescription: '收藏樹展開為浮動面板時的寬度，單位為像素。',
     settingsPollIntervalTitle: '自動重新整理間隔（秒）',
@@ -1003,6 +1033,16 @@ const messages: Record<AppLanguage, Partial<Messages>> = {
     createChildFailedNeedsCleanup: ({ title, message }) => `${title} 已建立，但寫入父子關係失敗：${message}。請手動檢查。`,
     openInRightSidebar: ({ title }) => `在右側邊欄開啟 ${title}`,
     openInRightSidebarFailed: ({ title }) => `無法在右側邊欄開啟 ${title}。`,
+    contextMenuMoreActions: '更多操作',
+    contextMenuOpenInRightSidebar: '在右側欄開啟',
+    contextMenuCreateChildPage: '建立子頁面',
+    contextMenuCopyPageRef: '複製頁面引用',
+    contextMenuCopyPageTitle: '複製頁面名稱',
+    contextMenuExpandSubtree: '展開所有子節點',
+    contextMenuCollapseSubtree: '摺疊所有子節點',
+    contextMenuClearCustomSort: '重置此層級排序',
+    toastCopiedRef: ({ ref }) => `已複製頁面引用：${ref}`,
+    toastCopiedTitle: ({ title }) => `已複製頁面名稱：${title}`,
     badgeCurrent: '目前頁',
     badgeLocated: '定位',
     badgeMatch: '匹配',

@@ -12,6 +12,9 @@ import type {
   DisplayModePreference,
   DragKind,
   LoadState,
+  ContextMenuState,
+  PageEntity,
+  PageLookup,
   PluginSettings,
   RefreshReason,
   SortDropTarget,
@@ -22,8 +25,19 @@ import type {
   TreeStateSnapshot,
   ViewMode,
 } from './types'
-import { applyTheme } from './theme'
-import { escapeSelectorValue, isPageDeletedLike, normalizeTitle, pageTitle, unwrapPageRef } from './utils'
+import {
+  applyTheme,
+} from './theme'
+import {
+  copyTextToClipboard,
+  escapeSelectorValue,
+  extractErrorMessage,
+  findPropertyValue,
+  isPageDeletedLike,
+  normalizeTitle,
+  pageTitle,
+  unwrapPageRef,
+} from './utils'
 
 export class FavoriteTreePlugin {
   private static readonly SIDEBAR_TREE_UI_KEY = 'db-favorite-tree-left-sidebar'
@@ -43,6 +57,8 @@ export class FavoriteTreePlugin {
   private searching = false
   private searchQuery = ''
   private searchError: string | null = null
+  private contextMenu: ContextMenuState | null = null
+  private lastPointerPos: { x: number; y: number; time: number } | null = null
   private createChildDraftParent: string | null = null
   private createChildDraftTitle = ''
   private shouldFocusCreateChildInput = false
@@ -113,6 +129,10 @@ export class FavoriteTreePlugin {
     hostDocument.addEventListener('compositionstart', this.handleCompositionStart)
     hostDocument.addEventListener('compositionend', this.handleCompositionEnd)
     hostDocument.addEventListener('keydown', this.handleSidebarKeydown)
+    hostDocument.addEventListener('contextmenu', this.handleSidebarContextMenu, true)
+    hostDocument.addEventListener('click', this.handleSidebarClick, true)
+    hostDocument.addEventListener('pointerdown', this.handleGlobalPointerDown, true)
+    window.addEventListener('pointerdown', this.handleGlobalPointerDown, true)
 
     this.render()
     this.applyMainUIState()
@@ -165,6 +185,10 @@ export class FavoriteTreePlugin {
     hostDocument.removeEventListener('compositionstart', this.handleCompositionStart)
     hostDocument.removeEventListener('compositionend', this.handleCompositionEnd)
     hostDocument.removeEventListener('keydown', this.handleSidebarKeydown)
+    hostDocument.removeEventListener('contextmenu', this.handleSidebarContextMenu, true)
+    hostDocument.removeEventListener('click', this.handleSidebarClick, true)
+    hostDocument.removeEventListener('pointerdown', this.handleGlobalPointerDown, true)
+    window.removeEventListener('pointerdown', this.handleGlobalPointerDown, true)
     for (const off of this.offHooks) {
       off()
     }
@@ -346,7 +370,7 @@ export class FavoriteTreePlugin {
       }
 
       this.searching = false
-      this.searchError = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      this.searchError = extractErrorMessage(error, this.i18n.t('loadChildrenFailed'))
       this.clearSearchMatchState()
       this.render()
     }
@@ -479,15 +503,24 @@ export class FavoriteTreePlugin {
       }
     } catch (error) {
       this.loadStates.set(nodeKey, 'error')
-      this.loadErrors.set(nodeKey, error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed'))
+      this.loadErrors.set(nodeKey, extractErrorMessage(error, this.i18n.t('loadChildrenFailed')))
     }
 
     this.render()
   }
 
   openPage = (pageName: string): void => {
-    this.internalNavigationPageName = pageName
-    logseq.App.pushState('page', { name: pageName })
+    const trimmed = pageName.trim()
+    if (!trimmed) return
+    this.internalNavigationPageName = trimmed
+    this.currentPageName = trimmed
+    void this.syncCurrentPagePath().then(() => {
+      if (this.currentPagePath.length > 0) {
+        this.revealPath(this.currentPagePath, 'merge')
+      }
+      this.render()
+    })
+    logseq.App.pushState('page', { name: trimmed })
   }
 
   openPageInRightSidebar = async (pageName: string): Promise<void> => {
@@ -502,6 +535,186 @@ export class FavoriteTreePlugin {
       logseq.Editor.openInRightSidebar(pageId)
     } catch {
       logseq.UI.showMsg(this.i18n.t('openInRightSidebarFailed', { title: pageName }), 'warning')
+    }
+  }
+
+  openContextMenu = (menu: ContextMenuState): void => {
+    const isSidebar = this.displayMode === 'sidebar'
+    const doc = isSidebar ? this.getHostDocument() : document
+    const viewportWidth = doc.defaultView?.innerWidth ?? window.innerWidth ?? 800
+    const viewportHeight = doc.defaultView?.innerHeight ?? window.innerHeight ?? 600
+    const menuWidth = 200
+    const menuHeight = 240
+
+    let x = menu.x
+    let y = menu.y
+
+    if (x + menuWidth > viewportWidth - 8) {
+      x = Math.max(8, x - menuWidth)
+    } else {
+      x = Math.max(8, x)
+    }
+
+    if (y + menuHeight > viewportHeight - 8) {
+      y = Math.max(8, y - menuHeight)
+    } else {
+      y = Math.max(8, y)
+    }
+
+    this.contextMenu = { ...menu, x, y }
+    this.render()
+    if (this.displayMode === 'sidebar') {
+      void this.renderSidebarTreeUI()
+    }
+  }
+
+  resolveContextMenuPosition(
+    nodeKey: string,
+    page: string,
+    explicitX?: number,
+    explicitY?: number,
+  ): { x: number; y: number } {
+    if (typeof explicitX === 'number' && typeof explicitY === 'number' && (explicitX > 0 || explicitY > 0)) {
+      return { x: explicitX, y: explicitY }
+    }
+
+    if (this.lastPointerPos && Date.now() - this.lastPointerPos.time < 2000) {
+      return { x: this.lastPointerPos.x, y: this.lastPointerPos.y }
+    }
+
+    try {
+      const doc = this.getHostDocument()
+      const escapedKey = escapeSelectorValue(nodeKey)
+      const escapedPage = escapeSelectorValue(page)
+      const trigger =
+        doc.querySelector<HTMLElement>(`[data-node-key="${escapedKey}"] [data-role="sidebar-context-trigger"]`) ||
+        doc.querySelector<HTMLElement>(`[data-page="${escapedPage}"] [data-role="sidebar-context-trigger"]`) ||
+        doc.querySelector<HTMLElement>(`[data-node-key="${escapedKey}"]`) ||
+        doc.querySelector<HTMLElement>(`[data-page="${escapedPage}"]`)
+
+      if (trigger) {
+        const rect = trigger.getBoundingClientRect()
+        return {
+          x: Math.round(rect.left),
+          y: Math.round(rect.bottom + 4),
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return { x: 200, y: 200 }
+  }
+
+  closeContextMenu = (): void => {
+    if (this.contextMenu) {
+      this.contextMenu = null
+      this.render()
+      if (this.displayMode === 'sidebar') {
+        void this.renderSidebarTreeUI()
+      }
+    }
+  }
+
+  async copyPageReference(page: string): Promise<void> {
+    const ref = `[[${page}]]`
+    const copied = await copyTextToClipboard(ref)
+    if (copied) {
+      logseq.UI.showMsg(this.i18n.t('toastCopiedRef', { ref }), 'success')
+    }
+    this.closeContextMenu()
+  }
+
+  async copyPageTitle(page: string): Promise<void> {
+    const copied = await copyTextToClipboard(page)
+    if (copied) {
+      logseq.UI.showMsg(this.i18n.t('toastCopiedTitle', { title: page }), 'success')
+    }
+    this.closeContextMenu()
+  }
+
+  async expandSubtree(page: string): Promise<void> {
+    await this.treeService.ensureChildIndex(this.settings.getHierarchyProperty())
+    const visited = new Set<string>()
+    const queue = [page]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const currentKey = normalizeTitle(current)
+      if (visited.has(currentKey)) continue
+      visited.add(currentKey)
+      this.expandedKeys.add(currentKey)
+      this.loadedKeys.add(currentKey)
+      this.loadStates.set(currentKey, 'loaded')
+      const children = this.treeService.getChildrenFor(current)
+      for (const child of children) {
+        const childKey = normalizeTitle(child)
+        if (!visited.has(childKey)) {
+          queue.push(child)
+        }
+      }
+    }
+    this.closeContextMenu()
+    this.persistInternalState()
+    this.render()
+    if (this.displayMode === 'sidebar') {
+      void this.renderSidebarTreeUI()
+    }
+  }
+
+  collapseSubtree(page: string): void {
+    const visited = new Set<string>()
+    const queue = [page]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const currentKey = normalizeTitle(current)
+      if (visited.has(currentKey)) continue
+      visited.add(currentKey)
+      this.expandedKeys.delete(currentKey)
+      const children = this.treeService.getChildrenFor(current)
+      for (const child of children) {
+        const childKey = normalizeTitle(child)
+        if (!visited.has(childKey)) {
+          queue.push(child)
+        }
+      }
+    }
+    this.closeContextMenu()
+    this.persistInternalState()
+    this.render()
+    if (this.displayMode === 'sidebar') {
+      void this.renderSidebarTreeUI()
+    }
+  }
+
+  executeContextMenuAction = async (action: string, page: string, parentKey: string): Promise<void> => {
+    switch (action) {
+      case 'open-in-right-sidebar':
+        this.closeContextMenu()
+        await this.openPageInRightSidebar(page)
+        break
+      case 'create-child-page':
+        this.closeContextMenu()
+        await this.createChildPage(page)
+        break
+      case 'copy-page-ref':
+        await this.copyPageReference(page)
+        break
+      case 'copy-page-title':
+        await this.copyPageTitle(page)
+        break
+      case 'expand-subtree':
+        await this.expandSubtree(page)
+        break
+      case 'collapse-subtree':
+        this.collapseSubtree(page)
+        break
+      case 'clear-custom-sort':
+        this.closeContextMenu()
+        this.clearCustomSortForParent(parentKey)
+        break
+      default:
+        this.closeContextMenu()
+        break
     }
   }
 
@@ -547,7 +760,10 @@ export class FavoriteTreePlugin {
       return
     }
 
-    const hierarchyProperty = this.settings.getHierarchyProperty()
+    const configuredProp = this.settings.getHierarchyProperty()
+    const pageTagProperty = configuredProp && configuredProp !== 'parent' && configuredProp !== 'tags'
+      ? configuredProp
+      : '页面标签'
     const childTitle = unwrapPageRef(this.createChildDraftTitle).trim()
     if (!childTitle) {
       logseq.UI.showMsg(this.i18n.t('createChildEmpty'), 'warning')
@@ -571,17 +787,123 @@ export class FavoriteTreePlugin {
       return
     }
 
+    const cleanParentTitle = unwrapPageRef(parentTitle).trim()
     let createdPageName: string | null = null
     try {
-      const createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false, createFirstBlock: false })
-      const createdPageId = createdPage?.uuid
-      const createdTitle = createdPage?.originalName ?? createdPage?.name ?? childTitle
-      if (!createdPageId) {
+      // 1. Create page safely without inline custom properties to prevent Datomic schema errors in Logseq DB
+      let createdPage: PageEntity | null = null
+      try {
+        createdPage = await logseq.Editor.createPage(
+          childTitle,
+          {},
+          { redirect: false, createFirstBlock: true },
+        )
+      } catch (createErr) {
+        console.warn('[DB Favorite Tree] createPage with options failed, retrying simple createPage:', createErr)
+        try {
+          createdPage = await logseq.Editor.createPage(childTitle)
+        } catch (createErr2) {
+          console.warn('[DB Favorite Tree] simple createPage failed:', createErr2)
+        }
+      }
+
+      if (!createdPage) {
+        createdPage = await logseq.Editor.getPage(childTitle)
+      }
+
+      if (!createdPage) {
         throw new Error(this.i18n.t('createChildEmpty'))
       }
 
+      const createdTitle = pageTitle(createdPage) ?? childTitle
       createdPageName = createdTitle
-      await logseq.Editor.upsertBlockProperty(createdPageId, hierarchyProperty, `[[${parentTitle}]]`)
+
+      // 2. Resolve Page UUID/ID across DB Clojure entities and traditional Markdown entities
+      const rec = createdPage as Record<string, unknown>
+      let pageUuid =
+        (typeof createdPage.uuid === 'string' && createdPage.uuid.trim())
+          ? createdPage.uuid.trim()
+          : (typeof rec[':block/uuid'] === 'string' && (rec[':block/uuid'] as string).trim())
+            ? (rec[':block/uuid'] as string).trim()
+            : null
+
+      let pageDbId =
+        typeof createdPage.id === 'number'
+          ? createdPage.id
+          : typeof rec[':db/id'] === 'number'
+            ? (rec[':db/id'] as number)
+            : null
+
+      if (!pageUuid && pageDbId == null) {
+        try {
+          const fresh = await logseq.Editor.getPage(createdTitle)
+          if (fresh) {
+            const freshRec = fresh as Record<string, unknown>
+            pageUuid =
+              (typeof fresh.uuid === 'string' && fresh.uuid.trim())
+                ? fresh.uuid.trim()
+                : (typeof freshRec[':block/uuid'] === 'string' && (freshRec[':block/uuid'] as string).trim())
+                  ? (freshRec[':block/uuid'] as string).trim()
+                  : null
+            pageDbId =
+              typeof fresh.id === 'number'
+                ? fresh.id
+                : typeof freshRec[':db/id'] === 'number'
+                  ? (freshRec[':db/id'] as number)
+                  : null
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 3. Write hierarchy parent property (only one property: 页面标签)
+      let propertyWritten = false
+      let writeError: unknown = null
+
+      if (pageUuid) {
+        try {
+          await logseq.Editor.upsertBlockProperty(pageUuid, pageTagProperty, cleanParentTitle)
+          propertyWritten = true
+        } catch (propErr) {
+          writeError = propErr
+          console.warn('[DB Favorite Tree] upsertBlockProperty on pageUuid failed:', propErr)
+        }
+      }
+
+      if (!propertyWritten) {
+        try {
+          const blocks = await logseq.Editor.getPageBlocksTree(createdTitle)
+          let targetBlockUuid = Array.isArray(blocks) && blocks.length > 0 ? blocks[0]?.uuid : null
+          if (!targetBlockUuid) {
+            const newBlock = await logseq.Editor.appendBlockInPage(createdTitle, '')
+            if (newBlock?.uuid) {
+              targetBlockUuid = newBlock.uuid
+            }
+          }
+          if (targetBlockUuid) {
+            await logseq.Editor.upsertBlockProperty(targetBlockUuid, pageTagProperty, cleanParentTitle)
+            propertyWritten = true
+          }
+        } catch (blockErr) {
+          writeError = writeError ?? blockErr
+          console.warn('[DB Favorite Tree] upsertBlockProperty on first block failed:', blockErr)
+        }
+      }
+
+      if (!propertyWritten && pageDbId != null) {
+        try {
+          await logseq.Editor.upsertBlockProperty(pageDbId, pageTagProperty, cleanParentTitle)
+          propertyWritten = true
+        } catch (idErr) {
+          writeError = writeError ?? idErr
+          console.warn('[DB Favorite Tree] upsertBlockProperty on pageDbId failed:', idErr)
+        }
+      }
+
+      if (!propertyWritten && writeError) {
+        throw writeError
+      }
 
       this.createChildDraftParent = null
       this.createChildDraftTitle = ''
@@ -590,12 +912,16 @@ export class FavoriteTreePlugin {
       this.loadedKeys.add(normalizedParentKey)
       this.loadStates.set(normalizedParentKey, 'loaded')
       this.loadErrors.delete(normalizedParentKey)
+
+      // Short delay to allow DB transaction to commit before querying
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
       this.treeService.invalidateIndex()
       await this.refresh('manual')
       this.scrollNodeIntoView(normalizeTitle(createdTitle))
       logseq.UI.showMsg(this.i18n.t('createChildSuccess', { title: createdTitle, parent: parentTitle }), 'success')
     } catch (error) {
-      const message = error instanceof Error ? error.message : this.i18n.t('loadChildrenFailed')
+      const message = extractErrorMessage(error, this.i18n.t('loadChildrenFailed'))
       let rolledBack = false
 
       if (createdPageName) {
@@ -607,12 +933,20 @@ export class FavoriteTreePlugin {
         }
       }
 
-      logseq.UI.showMsg(
-        rolledBack
-          ? this.i18n.t('createChildFailedRolledBack', { message })
-          : this.i18n.t('createChildFailedNeedsCleanup', { title: createdPageName ?? childTitle, message }),
-        'warning',
-      )
+      if (createdPageName) {
+        logseq.UI.showMsg(
+          rolledBack
+            ? this.i18n.t('createChildFailedRolledBack', { message })
+            : this.i18n.t('createChildFailedNeedsCleanup', { title: createdPageName, message }),
+          'warning',
+        )
+      } else {
+        logseq.UI.showMsg(
+          this.i18n.t('createChildFailedRolledBack', { message }),
+          'warning',
+        )
+      }
+      this.render()
     }
   }
 
@@ -724,17 +1058,34 @@ export class FavoriteTreePlugin {
     )
 
     this.offHooks.push(
-      logseq.App.onRouteChanged(() => {
-        if (this.internalNavigationPageName !== null) {
-          this.currentPageName = this.internalNavigationPageName
-          this.internalNavigationPageName = null
-          return
+      logseq.App.onRouteChanged((route: any) => {
+        let routePage: string | null = null
+        if (route && typeof route.path === 'string' && route.path.startsWith('/page/')) {
+          try {
+            routePage = decodeURIComponent(route.path.slice(6).replace(/\+/g, ' ')).trim()
+          } catch {
+            routePage = route.path.slice(6).trim()
+          }
         }
+
+        const hint = this.internalNavigationPageName || routePage
+        this.internalNavigationPageName = null
+
+        if (hint) {
+          this.currentPageName = hint
+          void this.syncCurrentPagePath().then(() => {
+            if (this.currentPagePath.length > 0) {
+              this.revealPath(this.currentPagePath, 'merge')
+            }
+            this.render()
+          })
+        }
+
         if (this.routeTimerId !== null) {
           window.clearTimeout(this.routeTimerId)
         }
         this.routeTimerId = window.setTimeout(() => {
-          void this.updateCurrentPage()
+          void this.updateCurrentPage(hint)
         }, 120)
       }),
     )
@@ -854,7 +1205,7 @@ export class FavoriteTreePlugin {
       this.lastRefreshError = null
       this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
     } catch (error) {
-      const message = error instanceof Error ? error.message : this.i18n.t('refreshReasonDefault')
+      const message = extractErrorMessage(error, this.i18n.t('refreshReasonDefault'))
       this.lastRefreshAt = Date.now()
       this.lastRefreshReason = reason
       this.lastRefreshError = message
@@ -871,9 +1222,19 @@ export class FavoriteTreePlugin {
     }
   }
 
-  private async updateCurrentPage(): Promise<void> {
-    const current = await logseq.Editor.getCurrentPage()
-    const currentTitle = current && typeof current === 'object' ? normalizeCurrentPageTitle(current) : null
+  private async updateCurrentPage(targetTitleHint?: string | null): Promise<void> {
+    let currentTitle: string | null = null
+    try {
+      const current = await logseq.Editor.getCurrentPage()
+      currentTitle = normalizeCurrentPageTitle(current)
+    } catch {
+      // ignore
+    }
+
+    if (!currentTitle && targetTitleHint) {
+      currentTitle = targetTitleHint
+    }
+
     this.currentPageName = await this.resolveExistingCurrentPageTitle(currentTitle)
     const currentPageKey = normalizeTitle(this.currentPageName)
     if (this.lastLocatedNodeKey && this.lastLocatedNodeKey !== currentPageKey) {
@@ -881,6 +1242,9 @@ export class FavoriteTreePlugin {
       this.persistInternalState()
     }
     await this.syncCurrentPagePath()
+    if (this.currentPagePath.length > 0) {
+      this.revealPath(this.currentPagePath, 'merge')
+    }
     this.render()
   }
 
@@ -991,6 +1355,7 @@ export class FavoriteTreePlugin {
       controlsCollapsed: this.controlsCollapsed,
       rootSortHasCustomOrder: this.hasCustomSortOrder(ROOT_SORT_KEY),
       rootSortMode: this.getSortModeForParent(ROOT_SORT_KEY),
+      contextMenu: this.contextMenu,
     }
   }
 
@@ -1397,6 +1762,12 @@ export class FavoriteTreePlugin {
   }
 
   private readonly handleSidebarKeydown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.contextMenu) {
+      event.preventDefault()
+      this.closeContextMenu()
+      return
+    }
+
     const target = this.asCreateChildInput(event.target)
     if (!target) {
       return
@@ -1412,6 +1783,110 @@ export class FavoriteTreePlugin {
       event.preventDefault()
       this.cancelCreateChildPage()
     }
+  }
+
+  private readonly handleSidebarContextMenu = (event: MouseEvent): void => {
+    if (this.displayMode !== 'sidebar') return
+    const hostDocument = this.getHostDocument()
+    const sidebarRoot = hostDocument.querySelector('[data-favorite-sidebar-tree="true"]')
+    if (!sidebarRoot || !sidebarRoot.contains(event.target as Node)) return
+
+    const row = (event.target as HTMLElement | null)?.closest<HTMLElement>('.favorite-sidebar-tree__row')
+    if (!row) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const page = row.dataset.page || row.querySelector<HTMLElement>('[data-page]')?.dataset.page
+    if (!page) return
+
+    const parentKey = row.dataset.parentKey || row.closest<HTMLElement>('[data-parent-key]')?.dataset.parentKey || normalizeTitle(page)
+    const nodeKey = row.dataset.key || normalizeTitle(page)
+    const hasChildren = row.closest('.favorite-sidebar-tree__node')?.querySelector('.favorite-sidebar-tree__children') !== null
+      || this.treeService.getChildrenFor(page).length > 0
+    const hasCustomSort = !!(this.sortOrders[normalizeTitle(page)]?.length)
+    const isExpanded = this.expandedKeys.has(normalizeTitle(page))
+
+    this.openContextMenu({
+      page,
+      parentKey,
+      nodeKey,
+      x: event.clientX,
+      y: event.clientY,
+      hasChildren,
+      hasCustomSort,
+      isExpanded,
+    })
+  }
+
+  private readonly handleSidebarClick = (event: MouseEvent): void => {
+    const target = event.target as HTMLElement | null
+    const trigger = target?.closest<HTMLElement>('[data-role="sidebar-context-trigger"]')
+    if (trigger) {
+      event.preventDefault()
+      event.stopPropagation()
+      const page = trigger.dataset.page
+      if (!page) return
+      const parentKey = trigger.dataset.parentKey || normalizeTitle(page)
+      const nodeKey = trigger.dataset.key || normalizeTitle(page)
+      const rect = trigger.getBoundingClientRect()
+      const hasChildren = trigger.dataset.hasChildren === 'true'
+      const hasCustomSort = trigger.dataset.hasCustomSort === 'true'
+      const isExpanded = trigger.dataset.isExpanded === 'true'
+      const clickX = typeof event.clientX === 'number' && event.clientX > 0 ? event.clientX : (this.lastPointerPos?.x ?? Math.round(rect.left))
+      const clickY = typeof event.clientY === 'number' && event.clientY > 0 ? event.clientY : (this.lastPointerPos?.y ?? Math.round(rect.bottom + 4))
+      this.openContextMenu({
+        page,
+        parentKey,
+        nodeKey,
+        x: clickX,
+        y: clickY,
+        hasChildren,
+        hasCustomSort,
+        isExpanded,
+      })
+      return
+    }
+
+    const actionBtn = target?.closest<HTMLElement>('[data-context-action]')
+    if (actionBtn) {
+      event.preventDefault()
+      event.stopPropagation()
+      const action = actionBtn.dataset.contextAction
+      const page = actionBtn.dataset.page
+      const parentKey = actionBtn.dataset.parentKey || ''
+      if (action && page) {
+        void this.executeContextMenuAction(action, page, parentKey)
+      }
+      return
+    }
+
+    if (this.contextMenu && !target?.closest('.favorite-sidebar-tree__context-menu') && !target?.closest('.ft-context-menu')) {
+      this.closeContextMenu()
+    }
+  }
+
+  private readonly handleGlobalPointerDown = (event: Event): void => {
+    const mouseEvent = event as MouseEvent
+    if (typeof mouseEvent.clientX === 'number' && typeof mouseEvent.clientY === 'number') {
+      this.lastPointerPos = {
+        x: mouseEvent.clientX,
+        y: mouseEvent.clientY,
+        time: Date.now(),
+      }
+    }
+
+    if (!this.contextMenu) return
+    const target = event.target as HTMLElement | null
+    if (
+      target?.closest('.ft-context-menu') ||
+      target?.closest('.favorite-sidebar-tree__context-menu') ||
+      target?.closest('[data-role="sidebar-context-trigger"]') ||
+      target?.closest('[data-action="open-context-menu"]')
+    ) {
+      return
+    }
+    this.closeContextMenu()
   }
 
   private readonly handleVisibilityChange = (): void => {
@@ -1435,6 +1910,14 @@ export class FavoriteTreePlugin {
   }
 
   private async initializeGraphContext(): Promise<void> {
+    const rawProp = logseq.settings?.hierarchyProperty
+    if (rawProp === 'parent' || rawProp === 'tags') {
+      try {
+        logseq.updateSettings({ hierarchyProperty: '页面标签' })
+      } catch {
+        // ignore
+      }
+    }
     this.currentGraphKey = await this.resolveCurrentGraphKey()
     this.restoreGraphState()
   }
@@ -1597,11 +2080,11 @@ export class FavoriteTreePlugin {
   }
 
   private async resolveExistingCurrentPageTitle(currentTitle: string | null): Promise<string | null> {
-    if (!currentTitle) {
+    if (!currentTitle || !currentTitle.trim()) {
       return null
     }
 
-    return (await this.isPageActive(currentTitle)) ? currentTitle : null
+    return currentTitle.trim()
   }
 
   private async isPageActive(title: string): Promise<boolean> {
@@ -1941,13 +2424,15 @@ export class FavoriteTreePlugin {
   }
 }
 
-function normalizeCurrentPageTitle(current: object): string | null {
-  const record = current as Record<string, unknown>
-  const original = typeof record.originalName === 'string' ? record.originalName.trim() : ''
-  if (original) {
-    return original
+function normalizeCurrentPageTitle(current: unknown): string | null {
+  if (!current) {
+    return null
   }
-
-  const name = typeof record.name === 'string' ? record.name.trim() : ''
-  return name || null
+  if (typeof current === 'string' && current.trim()) {
+    return current.trim()
+  }
+  if (typeof current === 'object') {
+    return pageTitle(current as Partial<PageLookup>)
+  }
+  return null
 }

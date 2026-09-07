@@ -1,4 +1,5 @@
 import type { PageEntity } from '@logseq/libs/dist/LSPlugin'
+export type { PageEntity }
 
 export type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export type ViewMode = 'panel' | 'bubble'
@@ -141,6 +142,18 @@ export type TreeStateSnapshot = {
   controlsCollapsed: boolean
   rootSortHasCustomOrder: boolean
   rootSortMode: SortMode
+  contextMenu: ContextMenuState | null
+}
+
+export type ContextMenuState = {
+  page: string
+  parentKey: string
+  nodeKey?: string
+  x: number
+  y: number
+  hasChildren: boolean
+  hasCustomSort: boolean
+  isExpanded: boolean
 }
 
 export type PageLookup = Pick<PageEntity, 'name' | 'originalName' | 'properties' | 'uuid'>

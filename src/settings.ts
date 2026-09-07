@@ -17,7 +17,14 @@ import type {
 export class FavoriteTreeSettingsStore {
   getHierarchyProperty(): string {
     const value = this.getSettings()?.hierarchyProperty
-    return typeof value === 'string' && value.trim() ? value.trim() : 'parent'
+    if (typeof value === 'string' && value.trim()) {
+      const trimmed = value.trim()
+      if (trimmed === 'parent' || trimmed === 'tags') {
+        return '页面标签'
+      }
+      return trimmed
+    }
+    return '页面标签'
   }
 
   getSidebarPosition(): SidebarPosition {
@@ -246,7 +253,14 @@ export class FavoriteTreeSettingsStore {
   }
 
   private getSettings(): PluginSettings | undefined {
-    return logseq.settings as PluginSettings | undefined
+    try {
+      if (typeof logseq !== 'undefined') {
+        return logseq.settings as PluginSettings | undefined
+      }
+    } catch {
+      // ignore
+    }
+    return undefined
   }
 
   private getBoolean(key: string, fallback: boolean): boolean {
