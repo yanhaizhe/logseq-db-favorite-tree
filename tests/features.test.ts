@@ -128,6 +128,30 @@ async function runTests() {
   // 7. findPropertyValue handles 页面标签 across direct and namespaced forms
   assert(findPropertyValue({ 页面标签: 'ParentA' }, '页面标签') === 'ParentA', 'findPropertyValue matches direct 页面标签')
   assert(findPropertyValue({ ':user.property/页面标签': 'ParentB' }, '页面标签') === 'ParentB', 'findPropertyValue matches :user.property/页面标签')
+  assert(findPropertyValue({ 'user.property/页面标签': 'ParentC' }, '页面标签') === 'ParentC', 'findPropertyValue matches user.property/页面标签')
+
+  // 8. Test entity ref extraction logic for Clojure :db/id
+  const testIdMap = new Map<number, string>([[1042, 'ParentNode']])
+  const resolveSample = (item: unknown) => {
+    if (typeof item === 'number') return testIdMap.get(item) ?? null
+    if (typeof item === 'object' && item !== null) {
+      const rec = item as Record<string, unknown>
+      const dbId =
+        typeof rec.id === 'number'
+          ? rec.id
+          : typeof rec[':db/id'] === 'number'
+            ? (rec[':db/id'] as number)
+            : typeof rec['db/id'] === 'number'
+              ? (rec['db/id'] as number)
+              : null
+      if (dbId != null) return testIdMap.get(dbId) ?? null
+    }
+    return null
+  }
+  assert(resolveSample(1042) === 'ParentNode', 'resolves numeric entity id directly')
+  assert(resolveSample({ ':db/id': 1042 }) === 'ParentNode', 'resolves Clojure {:db/id 1042}')
+  assert(resolveSample({ 'db/id': 1042 }) === 'ParentNode', 'resolves {db/id: 1042}')
+  assert(resolveSample({ id: 1042 }) === 'ParentNode', 'resolves {id: 1042}')
 
   console.log('All features tests passed successfully!')
 }

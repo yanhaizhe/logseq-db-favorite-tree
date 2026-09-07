@@ -291,13 +291,21 @@ export class FavoriteTreeTreeService {
     this.lastIndexBuildPageCount = allPages.length
     const nextIndex = new Map<string, string[]>()
     const existingPageKeys = new Set<string>()
+    const idToTitleMap = new Map<number, string>()
+
     for (const page of allPages) {
       if (isPageDeletedLike(page as Record<string, unknown>)) {
         continue
       }
-      const key = normalizeTitle(pageTitle(page))
-      if (key) {
+      const title = pageTitle(page)
+      const key = normalizeTitle(title)
+      if (title && key) {
         existingPageKeys.add(key)
+        const rec = page as Record<string, unknown>
+        const id = rec[':db/id'] ?? rec['db/id'] ?? page.id
+        if (typeof id === 'number') {
+          idToTitleMap.set(id, title)
+        }
       }
     }
 
@@ -316,7 +324,7 @@ export class FavoriteTreeTreeService {
           }
 
           const pageKey = normalizeTitle(title)
-          const parentTitles = await this.resolveParentTitles(page, propertyName)
+          const parentTitles = await this.resolveParentTitles(page, propertyName, idToTitleMap)
           for (const parentTitle of parentTitles) {
             const parentKey = normalizeTitle(parentTitle)
             if (!parentKey || !existingPageKeys.has(parentKey) || parentKey === pageKey) {
@@ -370,8 +378,16 @@ export class FavoriteTreeTreeService {
           rawStrings.push(title)
           return
         }
-        if (record.id && typeof record.id === 'number') {
-          const titleFromId = idToTitleMap.get(record.id)
+        const dbId =
+          typeof record.id === 'number'
+            ? record.id
+            : typeof record[':db/id'] === 'number'
+              ? (record[':db/id'] as number)
+              : typeof record['db/id'] === 'number'
+                ? (record['db/id'] as number)
+                : null
+        if (dbId != null) {
+          const titleFromId = idToTitleMap.get(dbId)
           if (titleFromId) {
             rawStrings.push(titleFromId)
             return
@@ -434,7 +450,11 @@ export class FavoriteTreeTreeService {
     return [...titles].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN', { sensitivity: 'base' }))
   }
 
-  private async resolveParentTitles(page: PageEntity, propertyName: string): Promise<string[]> {
+  private async resolveParentTitles(
+    page: PageEntity,
+    propertyName: string,
+    idToTitleMap: Map<number, string>,
+  ): Promise<string[]> {
     let properties =
       page.properties && typeof page.properties === 'object'
         ? (page.properties as Record<string, unknown>)
@@ -460,7 +480,7 @@ export class FavoriteTreeTreeService {
       allValues.push(rawFromPage, rawFromTopLevel)
     }
 
-    return uniqueTitlesFromValues(allValues)
+    return this.resolveValuesToTitles(allValues, idToTitleMap)
   }
 
   private collectExpandableKeysFrom(title: string, ancestors: string[], output: Set<string>): void {

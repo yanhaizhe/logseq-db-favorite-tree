@@ -277,30 +277,87 @@ export function isPageDeletedLike(page: Record<string, unknown>): boolean {
 }
 
 export async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
+  // Strategy 1: Electron native clipboard module (Logseq desktop)
+  try {
+    const electron =
+      (typeof window !== 'undefined' && (window as any).require?.('electron')) ??
+      (typeof window !== 'undefined' && (window.top as any)?.require?.('electron')) ??
+      (typeof window !== 'undefined' && (window.parent as any)?.require?.('electron'))
+    if (electron?.clipboard?.writeText) {
+      electron.clipboard.writeText(text)
       return true
-    } catch {
-      // Fall through to fallback below
     }
+  } catch {
+    // Proceed to browser clipboard APIs
   }
 
-  if (typeof document !== 'undefined') {
-    try {
+  // Strategy 2: Host window (window.top / window.parent) clipboard API
+  try {
+    const topNav =
+      typeof window !== 'undefined'
+        ? window.top?.navigator?.clipboard ?? window.parent?.navigator?.clipboard
+        : null
+    if (topNav?.writeText) {
+      await topNav.writeText(text)
+      return true
+    }
+  } catch {
+    // Fall through
+  }
+
+  // Strategy 3: Current window clipboard API
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      if (typeof window !== 'undefined') {
+        window.focus?.()
+      }
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Fall through
+  }
+
+  // Strategy 4: execCommand('copy') in host document (window.top.document)
+  try {
+    const hostDoc =
+      typeof window !== 'undefined' ? window.top?.document ?? window.parent?.document : null
+    if (hostDoc?.body) {
+      const textarea = hostDoc.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      textarea.style.left = '-9999px'
+      hostDoc.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      const successful = hostDoc.execCommand('copy')
+      hostDoc.body.removeChild(textarea)
+      if (successful) {
+        return true
+      }
+    }
+  } catch {
+    // Fall through
+  }
+
+  // Strategy 5: execCommand('copy') in current iframe document
+  try {
+    if (typeof document !== 'undefined' && document.body) {
       const textarea = document.createElement('textarea')
       textarea.value = text
       textarea.style.position = 'fixed'
       textarea.style.opacity = '0'
       textarea.style.left = '-9999px'
       document.body.appendChild(textarea)
+      textarea.focus()
       textarea.select()
       const successful = document.execCommand('copy')
       document.body.removeChild(textarea)
       return successful
-    } catch {
-      return false
     }
+  } catch {
+    return false
   }
 
   return false

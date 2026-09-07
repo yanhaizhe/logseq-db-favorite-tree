@@ -621,6 +621,8 @@ export class FavoriteTreePlugin {
     const copied = await copyTextToClipboard(ref)
     if (copied) {
       logseq.UI.showMsg(this.i18n.t('toastCopiedRef', { ref }), 'success')
+    } else {
+      logseq.UI.showMsg(ref, 'warning')
     }
     this.closeContextMenu()
   }
@@ -629,6 +631,8 @@ export class FavoriteTreePlugin {
     const copied = await copyTextToClipboard(page)
     if (copied) {
       logseq.UI.showMsg(this.i18n.t('toastCopiedTitle', { title: page }), 'success')
+    } else {
+      logseq.UI.showMsg(page, 'warning')
     }
     this.closeContextMenu()
   }
@@ -857,18 +861,112 @@ export class FavoriteTreePlugin {
         }
       }
 
-      // 3. Write hierarchy parent property (only one property: 页面标签)
+      // 3. Resolve parent entity and target property schema
+      const parentPage = await logseq.Editor.getPage(cleanParentTitle).catch(() => null)
+      const parentRec = parentPage as Record<string, unknown> | null
+      const parentId =
+        typeof parentPage?.id === 'number'
+          ? parentPage.id
+          : typeof parentRec?.[':db/id'] === 'number'
+            ? (parentRec[':db/id'] as number)
+            : typeof parentRec?.['db/id'] === 'number'
+              ? (parentRec['db/id'] as number)
+              : null
+
+      const isDb = await logseq.App.checkCurrentIsDbGraph().catch(() => false)
+      const propEntity = await logseq.Editor.getProperty(pageTagProperty).catch(() => null)
+      const propRec = propEntity as Record<string, unknown> | null
+      const schema =
+        (propEntity as any)?.schema ??
+        (propRec?.[':property/schema'] as Record<string, unknown> | undefined) ??
+        (propRec?.['property/schema'] as Record<string, unknown> | undefined) ??
+        null
+      const propType = schema?.type ?? schema?.[':type'] ?? (propEntity as any)?.type
+      const propCardinality = schema?.cardinality ?? schema?.[':cardinality'] ?? (propEntity as any)?.cardinality
+
+      // Check parent's own property value shape as a reference template
+      let parentSampleVal: unknown = undefined
+      if (parentPage?.uuid) {
+        try {
+          const parentProps = await logseq.Editor.getBlockProperties(parentPage.uuid)
+          if (parentProps && typeof parentProps === 'object') {
+            parentSampleVal = findPropertyValue(parentProps, pageTagProperty)
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Build ordered candidate values for 页面标签
+      const candidateValues: unknown[] = []
+      if (Array.isArray(parentSampleVal)) {
+        if (
+          parentSampleVal.length > 0 &&
+          (typeof parentSampleVal[0] === 'number' ||
+            (typeof parentSampleVal[0] === 'object' && parentSampleVal[0] !== null))
+        ) {
+          if (parentId != null) candidateValues.push([parentId])
+        } else if (parentSampleVal.length > 0 && typeof parentSampleVal[0] === 'string') {
+          candidateValues.push([cleanParentTitle])
+        }
+      } else if (typeof parentSampleVal === 'number') {
+        if (parentId != null) candidateValues.push(parentId)
+      } else if (typeof parentSampleVal === 'string') {
+        candidateValues.push(cleanParentTitle)
+      }
+
+      if (isDb || propType === 'node') {
+        if (parentId != null) {
+          if (propCardinality === 'one') {
+            if (!candidateValues.includes(parentId)) candidateValues.push(parentId)
+            candidateValues.push([parentId])
+          } else {
+            if (!candidateValues.some((c) => Array.isArray(c) && c[0] === parentId)) {
+              candidateValues.push([parentId])
+            }
+            if (!candidateValues.includes(parentId)) candidateValues.push(parentId)
+          }
+        }
+        candidateValues.push(cleanParentTitle)
+        candidateValues.push([cleanParentTitle])
+      } else {
+        candidateValues.push(cleanParentTitle)
+        candidateValues.push([cleanParentTitle])
+        if (parentId != null) {
+          candidateValues.push([parentId])
+          candidateValues.push(parentId)
+        }
+      }
+
+      // 4. Write hierarchy parent property (only one property: 页面标签)
+      const targetIdentities: Array<string | number> = []
+      if (pageUuid) targetIdentities.push(pageUuid)
+      if (pageDbId != null) targetIdentities.push(pageDbId)
+
       let propertyWritten = false
       let writeError: unknown = null
 
-      if (pageUuid) {
-        try {
-          await logseq.Editor.upsertBlockProperty(pageUuid, pageTagProperty, cleanParentTitle)
-          propertyWritten = true
-        } catch (propErr) {
-          writeError = propErr
-          console.warn('[DB Favorite Tree] upsertBlockProperty on pageUuid failed:', propErr)
+      for (const target of targetIdentities) {
+        for (const candidateVal of candidateValues) {
+          if (candidateVal == null) continue
+          try {
+            await logseq.Editor.upsertBlockProperty(target, pageTagProperty, candidateVal)
+            const currentProps = await logseq.Editor.getBlockProperties(target).catch(() => null)
+            if (currentProps) {
+              if (findPropertyValue(currentProps, pageTagProperty) != null) {
+                propertyWritten = true
+                break
+              }
+            } else {
+              propertyWritten = true
+              break
+            }
+          } catch (propErr) {
+            writeError = propErr
+            console.warn(`[DB Favorite Tree] upsertBlockProperty failed for target ${target}:`, propErr)
+          }
         }
+        if (propertyWritten) break
       }
 
       if (!propertyWritten) {
@@ -882,22 +980,28 @@ export class FavoriteTreePlugin {
             }
           }
           if (targetBlockUuid) {
-            await logseq.Editor.upsertBlockProperty(targetBlockUuid, pageTagProperty, cleanParentTitle)
-            propertyWritten = true
+            for (const candidateVal of candidateValues) {
+              if (candidateVal == null) continue
+              try {
+                await logseq.Editor.upsertBlockProperty(targetBlockUuid, pageTagProperty, candidateVal)
+                const currentProps = await logseq.Editor.getBlockProperties(targetBlockUuid).catch(() => null)
+                if (currentProps) {
+                  if (findPropertyValue(currentProps, pageTagProperty) != null) {
+                    propertyWritten = true
+                    break
+                  }
+                } else {
+                  propertyWritten = true
+                  break
+                }
+              } catch (blockErr) {
+                writeError = writeError ?? blockErr
+                console.warn('[DB Favorite Tree] upsertBlockProperty on first block failed:', blockErr)
+              }
+            }
           }
         } catch (blockErr) {
           writeError = writeError ?? blockErr
-          console.warn('[DB Favorite Tree] upsertBlockProperty on first block failed:', blockErr)
-        }
-      }
-
-      if (!propertyWritten && pageDbId != null) {
-        try {
-          await logseq.Editor.upsertBlockProperty(pageDbId, pageTagProperty, cleanParentTitle)
-          propertyWritten = true
-        } catch (idErr) {
-          writeError = writeError ?? idErr
-          console.warn('[DB Favorite Tree] upsertBlockProperty on pageDbId failed:', idErr)
         }
       }
 
