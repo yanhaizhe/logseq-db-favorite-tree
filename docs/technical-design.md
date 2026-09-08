@@ -102,7 +102,7 @@
 
 当前公开设置项包括：
 
-- `hierarchyProperty`：层级属性名，默认 `parent`
+- `hierarchyProperty`：层级属性名，默认 `Page Tags`（中文环境对应 `页面标签`，支持双向别名自动映射）
 - `panelWidth`：悬浮面板默认宽度
 - `pollIntervalSeconds`：自动刷新轮询间隔
 - `sidebarPosition`：首次显示时默认靠左或靠右
@@ -112,8 +112,9 @@
 运行期核心状态主要由 `plugin.ts` 维护，包括：
 
 - 根节点列表
-- 当前页标题
-- 当前页路径
+- 当前页标题与当前页路径
+- 右键上下文菜单状态（`contextMenu: { page, parentKey, x, y, hasChildren, hasCustomSort, isExpanded }`）
+- 新建子页面草稿状态（`createChildDraftParent`、`createChildDraftTitle`）
 - 已展开节点集合
 - 已加载节点集合
 - 加载状态与错误状态
@@ -243,6 +244,16 @@ graph 维度持久化数据包括：
 - 聚焦当前路径模式：清空已展开集合后仅展开当前页路径
 - 折叠其他分支模式：在保持当前路径展开的同时收起其他所有分支
 
+### 7.3 当前页实时感知与路径自动展开
+
+- **双通道无缝感知**：
+  - **通道 1（树内点击跳转 `openPage`）**：点击目录树节点时，立即在内存中同步更新 `currentPageName`、重新计算面包屑 `currentPagePath` 并触发表层高亮重绘；
+  - **通道 2（宿主路由切换 `onRouteChanged`）**：用户在 Logseq 主界面点击链接或回退前进时，优先从路由路径（如 `/page/...`）同步提取页面标题，经 120ms 防抖后调用 `logseq.Editor.getCurrentPage()` 最终确认，杜绝路由延迟。
+- **全字段兼容实体解析 (`pageTitle`)**：
+  - 针对 Logseq DB 复杂的 Clojure 数据模型，全面兼容 `:block/original-name`、`:block/title`、`:block/name` 及其非冒号版本与数组格式，避免 DB 页面标题被误判为 `null`。
+- **分支自动跟随展开 (`revealPath('merge')`)**：
+  - 当检测到当前活动页在收藏树中存在有效父子链路时，以 `merge` 增量展开模式自动展开所有父级分支；既保证当前活动页在目录树中始终可见高亮，又绝不强制收起用户此前手动展开的其他工作分支。
+
 ## 8. 刷新与一致性策略
 
 ### 8.1 刷新来源与精准事件过滤
@@ -333,3 +344,36 @@ graph 维度持久化数据包括：
 - 增加从当前页一键加入收藏 / 从树内移出收藏
 - 针对大树场景补强性能与状态恢复兜底
 - 搜索结果路径高亮
+
+## 13. 右键上下文菜单与 5 级剪贴板架构
+
+### 13.1 上下文菜单交互分发
+- **触发入口**：支持在节点行右键（`contextmenu`）或悬停后点击右侧操作按钮（`···`）弹出。
+- **坐标跟随与视口自适应**：基于光标点击的 `clientX`、`clientY` 进行绝对定位，内部通过视口宽高计算动态夹持，防止在窗口右侧或底部边缘发生内容溢出。
+- **动作路由与关闭策略**：
+  - 支持快捷操作：在右侧栏打开、新建子页面、复制页面引用、复制页面名称、展开/折叠全部子项、清除当前层自订排序；
+  - 监听全局 `click` 与 `keydown` (Esc) 事件，点击菜单外部或执行动作后即刻自动销毁菜单并重绘。
+
+### 13.2 5 级高可用剪贴板策略 (`copyTextToClipboard`)
+为彻底解决 Logseq 独立 `<iframe>` 沙箱环境 Chromium `Document is not focused` 导致复制拒绝的难题，构建了 5 层渐进式写入链路：
+1. **第 1 级（Electron 原生剪贴板）**：通过 `window.require('electron')` 或 `window.top.require('electron')` 直接调用底层操作系统的 `clipboard.writeText(text)`，彻底绕开浏览器的焦点与权限限制；
+2. **第 2 级（宿主活动窗口剪贴板）**：调用处于前台激活状态的 `window.top.navigator.clipboard.writeText(text)`；
+3. **第 3 级（插件环境异步剪贴板）**：执行 `window.focus()` 尝试主动夺焦后调用 `navigator.clipboard.writeText(text)`；
+4. **第 4 级（宿主文档 DOM 兜底）**：在宿主根文档 `window.top.document.body` 动态挂载不可见 `<textarea>`，执行 `document.execCommand('copy')`；
+5. **第 5 级（本地 iframe DOM 兜底）**：在插件自身文档中动态创建 `<textarea>` 执行 `execCommand('copy')`。
+
+## 14. Logseq DB 原生新建子页面与关系自动绑定
+
+### 14.1 核心机制与 Schema 对齐
+- **DB 节点引用规范 (`node` 属性)**：
+  - 在 Logseq DB 内置 Schema 中，页面层级标签属性正式命名为 **`Page Tags`**（在中文界面中渲染为 `🗋 页面标签`）；
+  - 底层关系使用实体引用，必须传递父页面的实体整数 ID `[parentId]`（而非字符串），并在底层挂载 `:block/tags`。
+- **别名映射与中英文环境无缝互认**：
+  - 引入 `PAGE_TAG_EQUIVALENTS = ['Page Tags', '页面标签', 'page tags', 'page-tags']`；
+  - 无论用户当前环境属性名如何配置，查询与监听层均能自动双向识别。
+
+### 14.2 纯净页面创建与双重校验闭环
+1. **原子化创建**：优先在 `logseq.Editor.createPage` 中以 `{ 'Page Tags': [parentId] }` 事务直接建页；若底层不支持参数建页则平滑降级至标准建页；
+2. **实体级标签绑定**：调用 `logseq.Editor.addBlockTag(pageUuid, parentTagUuid)`，直接在底层数据库确立父子类属关联；
+3. **直接作用于页面实体，杜绝空块污染**：属性直接作用于 `pageUuid` / `pageDbId`，移除了此前为绕过索引异常而插入的空块 `prependBlockInPage`，保持新页面干净无多余圆点 `• `；
+4. **服务级双重校验**：在短延时轮询中，通过 `treeService.getChildrenFor(cleanParentTitle)` 与页面属性多级校验（`getPage`、`getPageProperties`、`getBlockProperties`）确认父子关系生效后，即时展开并高亮新节点。

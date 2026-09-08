@@ -8,6 +8,25 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 
 ### Added
 
+- **Sidebar & Floating Context Menu (右键/更多操作上下文菜单)**:
+  - Supports 7 core actions: Open in right sidebar, Create child page, Copy page reference `[[...]]`, Copy page title, Expand all children, Collapse all children, Reset custom sort for level
+  - Triggers via right-click or hovering `···` button on any tree node
+  - Cursor coordinate following with automatic viewport edge clamping to prevent offscreen rendering
+  - Keyboard accessibility (Esc to close, click outside to dismiss)
+- **5-Layer Resilient Clipboard Engine**:
+  - Eliminates clipboard failures in Chromium sandboxed iframes (`Document is not focused`)
+  - Sequential fallback ladder: Electron native clipboard -> host top-window async clipboard -> plugin iframe async clipboard -> host DOM textarea execCommand -> plugin DOM textarea execCommand
+- **Logseq DB Native Hierarchy Alignment (`Page Tags` / `页面标签`)**:
+  - Switched default hierarchy property from `parent` to `Page Tags` (`页面标签`), matching Logseq DB's native page classification system
+  - Bidirectional cross-language alias mapping across `Page Tags` ↔ `页面标签` ↔ `page-tags` ↔ `tags` ↔ `parent`
+- **100% Automated Clean Child Page Creation**:
+  - Atomic child page creation with direct `Page Tags` entity reference `[parentId]` binding and `addBlockTag` tag linking
+  - Eliminated unwanted empty placeholder block injection (`prependBlockInPage`), producing completely clean child pages
+  - Auto parent branch reveal, newly created node highlighting, and double-check verification loop
+- **Real-Time Active Page Tracking & Path Auto-Reveal**:
+  - Bidirectional active page tracking across tree clicks and Logseq route changes (`onRouteChanged`)
+  - Clojure entity property extraction (`:block/original-name`, `:block/title`) and case-insensitive normalization
+  - Seamless path auto-expansion (`revealPath('merge')`) without disturbing existing user-expanded branches
 - Intelligent DB event filtering (`src/db-change.ts`): shields normal note typing, Enter/newline block creation (`split-block`), and block indents/moves from triggering tree reloads, ensuring zero disruption while writing
 - Event-driven real-time sync: instant tree updates triggered exclusively when adding, modifying, or removing page tags (`tags`, `page tags`, `:block/tags`) or hierarchy property values (`parent`), including inline text property syntax (`tags:: [[xxx]]`, `parent:: [[xxx]]`)
 - Ultra-fast Datascript bulk indexing: single Datomic query pulling all pages and tags in ~20ms (reduced from 10–30s of sequential RPCs, 500+ times speedup) with concurrent chunked fallback
@@ -19,15 +38,12 @@ The format follows a simple Keep a Changelog style and focuses on user-visible b
 - Focus current path action: keep only the current page path expanded
 - Collapse other branches action: collapse all branches outside the current page path
 - Search match navigation: previous/next match cycling with position display (N/M)
-- Create child page: inline input under any node with auto parent-property wiring
-- Duplicate page name prevention on child page creation
-- Automatic rollback of created page when parent-property write fails
-- Open page in right sidebar from tree nodes
 - All new actions available in both sidebar and floating panel modes
 
 ### Changed
 
-- Updated technical design (`technical-design.md`), feature list (`feature-list.md`), product roadmap PRD (`product-roadmap-prd.md`), and user guides (`user-guide.md`, `user-guide.en.md`) to reflect event filtering architecture, Datascript bulk querying, and performance benchmarks
+- Updated default hierarchy property configuration across documentation and code to `Page Tags`
+- Updated technical design (`technical-design.md`), feature list (`feature-list.md`), product roadmap PRD (`product-roadmap-prd.md`), user guides (`user-guide.md`, `user-guide.en.md`), and READMEs (`README.md`, `README.zh-CN.md`)
 - Expand/collapse all in search mode now operates on visible matched branches only
 - Added UI/UX optimization plan document with phased improvement roadmap
 

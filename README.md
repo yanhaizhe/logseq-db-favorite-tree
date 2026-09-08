@@ -7,7 +7,8 @@
 ## Overview
 
 - Uses favorite pages as tree roots
-- Uses the page property `parent` to build hierarchy
+- Uses the page property **`Page Tags`** (in Chinese UI: `🗋 页面标签`) to build hierarchy, with automatic alias support for `parent`, `tags`, and `page-tags`
+- Quick context menu on right-click or `···` hover (open in right sidebar, create child page, copy ref/title, expand/collapse, reset sort)
 - Supports `sidebar`, `floating`, and `mixed` display modes
 - Defaults to native sidebar mode, with optional floating panel switching
 - Designed for `DB graph` only and does not support `file graph`
@@ -15,7 +16,11 @@
 ## Features
 
 - Loads favorite pages as root nodes automatically
-- Resolves page hierarchy and supports lazy loading
+- Resolves page hierarchy and supports lazy loading aligned with Logseq DB native entity schema
+- **Context Menu & Quick Actions**: Follows cursor position with viewport boundary clamping; provides 7 core operations (Open in right sidebar, Create child page, Copy page reference `[[...]]`, Copy page title, Expand all children, Collapse all children, Reset custom sort)
+- **100% Automated Clean Child Page Creation**: Create child pages with bound `Page Tags` entity relationships in one step; pure new page without unwanted empty placeholder bullets (`• `)
+- **5-Layer Resilient Clipboard Engine**: Electron native API -> host async clipboard -> plugin async clipboard -> host DOM execCommand -> plugin DOM execCommand, eliminating clipboard failures across sandboxed iframe and unfocused states
+- **Real-Time Active Page Sync & Path Auto-Reveal**: Tracks active pages in real time across route changes (`onRouteChanged`) and tree clicks, auto-highlighting the node and expanding ancestor branches
 - Ultra-fast tree indexing via Datascript (~20ms), with seamless double-buffered replacement
 - Smart DB change filtering: note typing, Enter/newline block splitting, and indents never trigger refreshes; only page tag and parent property edits trigger instant real-time sync
 - Hides expand toggles on leaf nodes and keeps tree indentation clean
@@ -33,7 +38,7 @@
 2. Search for `DB Favorite Tree`
 3. Install and enable the plugin
 4. Favorite at least one page to create root nodes
-5. Add the `parent` property to child pages you want to organize in the tree
+5. Right-click on any tree node to "Create Child Page", or add `Page Tags` to existing pages
 
 ## Install from Source
 
@@ -63,23 +68,27 @@ npm run build
 - Add one or more pages to Logseq favorites
 - Favorited pages become the root nodes of the tree
 
-### 2. Configure the hierarchy property
+### 2. Establish page hierarchy (two methods)
 
-- The default hierarchy property is `parent`
-- Add `parent` to a child page and set its value to another page
-- The child page will then appear under that parent page
+**Method 1: Context Menu (Recommended ⭐)**
+- Right-click on any tree node (or click `···` on hover)
+- Click **"Create Child Page"**, type the title and hit Enter; the plugin creates the page and wires the hierarchy automatically.
+
+**Method 2: Manual property assignment**
+- The default hierarchy property is `Page Tags` (also matches `页面标签`, `parent`, or `tags`)
+- Add `Page Tags` to a child page and reference the parent page
+- The child page will immediately appear under that parent page
 
 Example:
 
 ```text
 Page: Weekly Plan
-Property: parent
-Value: [[Project Management]]
+Page Tags: [[Project Management]]
 ```
 
 ### 3. Multiple parents
 
-- The `parent` property can contain multiple page references
+- The `Page Tags` property can contain multiple page references
 - A page with multiple parents appears in multiple paths
 
 ## Display Modes
@@ -96,13 +105,14 @@ Value: [[Project Management]]
 - Use native sidebar mode for always-on navigation
 - Switch to the floating panel when you need dragging, resizing, or bubble mode
 - Expand nodes to lazy-load child pages
+- Right-click a node to open it in the right sidebar for split-screen reference, or copy its reference `[[...]]`
 - Use search to filter the tree and keep ancestor paths visible
 - Use `Locate current page` to reveal the current page in all matching paths
 - Drag sibling nodes to save a custom order when not searching
 
 ## Settings
 
-- `Hierarchy property`: the property used to describe parent page relations, default is `parent`
+- `Hierarchy property`: the property used to describe parent page relations, default is `Page Tags` (aliases `页面标签`, `parent`, `tags` supported)
 - `Panel width`: default floating panel width in pixels
 - `Auto-refresh interval (seconds)`: polling interval, default is `60`
 - `Initial side preference`: first-open side placement preference for floating mode
