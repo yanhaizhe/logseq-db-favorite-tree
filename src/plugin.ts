@@ -540,22 +540,28 @@ export class FavoriteTreePlugin {
   }
 
   openContextMenu = (menu: ContextMenuState): void => {
-    const isSidebar = this.displayMode === 'sidebar'
-    const doc = isSidebar ? this.getHostDocument() : document
-    const hostWin = isSidebar ? this.getHostWindow() : window
+    let viewportWidth = 1200
+    let viewportHeight = 800
 
-    const rawViewportWidth = Math.max(
-      doc.defaultView?.innerWidth || 0,
-      hostWin?.innerWidth || 0,
-      window.innerWidth || 0,
-    )
-    const rawViewportHeight = Math.max(
-      doc.defaultView?.innerHeight || 0,
-      hostWin?.innerHeight || 0,
-      window.innerHeight || 0,
-    )
-    const viewportWidth = rawViewportWidth > 200 ? rawViewportWidth : 1200
-    const viewportHeight = rawViewportHeight > 200 ? rawViewportHeight : 800
+    try {
+      // 1. window.screen is always accessible across origins and gives actual display dimensions
+      const screenW = typeof window !== 'undefined' ? (window.screen?.availWidth || window.screen?.width || 0) : 0
+      const screenH = typeof window !== 'undefined' ? (window.screen?.availHeight || window.screen?.height || 0) : 0
+      if (screenW > 300) viewportWidth = screenW
+      if (screenH > 300) viewportHeight = screenH
+
+      // 2. If host window is same-origin and accessible, use its innerWidth/innerHeight
+      const isSidebar = this.displayMode === 'sidebar'
+      const hostWin = isSidebar ? this.getHostWindow() : window
+      if (hostWin && hostWin !== window) {
+        const iw = hostWin.innerWidth
+        const ih = hostWin.innerHeight
+        if (typeof iw === 'number' && iw > 300) viewportWidth = iw
+        if (typeof ih === 'number' && ih > 300) viewportHeight = ih
+      }
+    } catch {
+      // Safe fallback - completely ignore cross-origin SecurityErrors
+    }
 
     const menuWidth = 200
     const menuHeight = 240
@@ -1300,7 +1306,12 @@ export class FavoriteTreePlugin {
       return
     }
 
-    const confirmed = this.getHostWindow().confirm(this.i18n.t('clearCustomSortConfirm'))
+    let confirmed = false
+    try {
+      confirmed = this.getHostWindow().confirm(this.i18n.t('clearCustomSortConfirm'))
+    } catch {
+      confirmed = true
+    }
     if (!confirmed) {
       return
     }
@@ -1953,26 +1964,31 @@ export class FavoriteTreePlugin {
 
   private getHostDocument(): Document {
     try {
-      if (window.top?.document) {
-        return window.top.document
+      if (typeof window !== 'undefined' && window.top && window.top !== window) {
+        if (window.top.document) {
+          return window.top.document
+        }
       }
     } catch {
       // Ignore cross-frame access failures and fall back to the plugin iframe document.
     }
 
-    return document
+    return typeof document !== 'undefined' ? document : ({} as Document)
   }
 
   private getHostWindow(): Window {
     try {
-      if (window.top) {
-        return window.top
+      if (typeof window !== 'undefined' && window.top && window.top !== window) {
+        // Crucial: Test same-origin accessibility. If cross-origin, reading .document throws SecurityError
+        if (window.top.document) {
+          return window.top
+        }
       }
     } catch {
       // Ignore cross-frame access failures and fall back to the plugin iframe window.
     }
 
-    return window
+    return typeof window !== 'undefined' ? window : ({} as Window)
   }
 
   private asSidebarSearchInput(target: EventTarget | null): HTMLInputElement | null {

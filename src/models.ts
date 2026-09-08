@@ -59,27 +59,31 @@ export function createModels(plugin: FavoriteTreePlugin) {
       x?: number
       y?: number
     }) => {
-      const page = event.dataset?.page
-      if (!page) {
-        return
+      try {
+        const page = event.dataset?.page
+        if (!page) {
+          return
+        }
+        const parentKey = event.dataset?.parentKey || ''
+        const nodeKey = event.dataset?.key || ''
+        const hasChildren = event.dataset?.hasChildren === 'true'
+        const hasCustomSort = event.dataset?.hasCustomSort === 'true'
+        const isExpanded = event.dataset?.isExpanded === 'true'
+        const pos = plugin.resolveContextMenuPosition(nodeKey, page, event.rect, event.id, event.x, event.y)
+        plugin.openContextMenu({
+          x: pos.x,
+          y: pos.y,
+          triggerTop: pos.triggerTop,
+          page,
+          parentKey,
+          nodeKey,
+          hasChildren,
+          hasCustomSort,
+          isExpanded,
+        })
+      } catch (err) {
+        console.error('[DB Favorite Tree] sidebarTreeOpenContextMenu error:', err)
       }
-      const parentKey = event.dataset?.parentKey || ''
-      const nodeKey = event.dataset?.key || ''
-      const hasChildren = event.dataset?.hasChildren === 'true'
-      const hasCustomSort = event.dataset?.hasCustomSort === 'true'
-      const isExpanded = event.dataset?.isExpanded === 'true'
-      const pos = plugin.resolveContextMenuPosition(nodeKey, page, event.rect, event.id, event.x, event.y)
-      plugin.openContextMenu({
-        x: pos.x,
-        y: pos.y,
-        triggerTop: pos.triggerTop,
-        page,
-        parentKey,
-        nodeKey,
-        hasChildren,
-        hasCustomSort,
-        isExpanded,
-      })
     },
 
     sidebarTreeContextAction: (event: { dataset?: Record<string, string> }) => {

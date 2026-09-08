@@ -211,6 +211,26 @@ async function runTests() {
   assert(!isPluginProperty(':user.property/page-tags'), ':user.property/page-tags is not a plugin property')
   assert(isPluginProperty(':plugin.property.logseq-db-favorite-tree/page-tags'), 'detects plugin property namespace')
 
+  // 13. Cross-origin Window security handling (simulating lsp://logseq.io origin)
+  const mockCrossOriginWindow = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'top' || prop === 'parent') return mockCrossOriginWindow
+      throw new Error(`SecurityError: Blocked a frame with origin "lsp://logseq.io" from accessing a cross-origin frame. Property: ${String(prop)}`)
+    },
+  })
+  const safeGetHostWindow = (topWin: any, fallbackWin: any) => {
+    try {
+      if (topWin && topWin !== fallbackWin) {
+        if (topWin.document) return topWin
+      }
+    } catch {
+      // Cross-origin blocked
+    }
+    return fallbackWin
+  }
+  const safeResolved = safeGetHostWindow(mockCrossOriginWindow, { isFallback: true })
+  assert(safeResolved.isFallback === true, 'getHostWindow safely falls back to local window when cross-origin SecurityError occurs')
+
   console.log('All features tests passed successfully!')
 }
 

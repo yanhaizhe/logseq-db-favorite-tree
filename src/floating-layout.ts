@@ -215,18 +215,32 @@ export class FloatingLayoutManager {
   }
 
   private getViewportSize(): { width: number; height: number } {
+    let width = 1280
+    let height = 800
+
     try {
-      const target = window.parent ?? window
-      return {
-        width: Math.max(320, target.innerWidth || window.innerWidth || document.documentElement.clientWidth || 1280),
-        height: Math.max(320, target.innerHeight || window.innerHeight || document.documentElement.clientHeight || 800),
+      const sw = typeof window !== 'undefined' ? (window.screen?.availWidth || window.screen?.width || 0) : 0
+      const sh = typeof window !== 'undefined' ? (window.screen?.availHeight || window.screen?.height || 0) : 0
+      if (sw > 320) width = sw
+      if (sh > 320) height = sh
+    } catch {
+      // ignore
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        if (window.parent.document) {
+          const pw = window.parent.innerWidth
+          const ph = window.parent.innerHeight
+          if (typeof pw === 'number' && pw > 320) width = pw
+          if (typeof ph === 'number' && ph > 320) height = ph
+        }
       }
     } catch {
-      return {
-        width: Math.max(320, window.screen?.availWidth || 3840),
-        height: Math.max(320, window.screen?.availHeight || 2160),
-      }
+      // Cross-origin access blocked
     }
+
+    return { width, height }
   }
 
   private getDefaultPanelHeight(): number {
