@@ -26,8 +26,17 @@ export function createModels(plugin: FavoriteTreePlugin) {
     },
 
     sidebarTreeCreateChildInput: (event: any) => {
-      const value = event.value || ''
+      const value = event.value ?? event.target?.value ?? ''
       plugin.setCreateChildDraftTitle(value)
+    },
+
+    sidebarTreeCreateChildKeydown: (event: any) => {
+      const key = event.key || event.code
+      if (key === 'Enter') {
+        void plugin.submitCreateChildPage()
+      } else if (key === 'Escape' || key === 'Esc') {
+        plugin.cancelCreateChildPage()
+      }
     },
 
     sidebarTreeCreateChildPage: (event: { dataset?: Record<string, string> }) => {

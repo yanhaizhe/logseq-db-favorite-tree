@@ -813,7 +813,14 @@ export class FavoriteTreePlugin {
     this.createChildDraftParent = parentTitle
     this.createChildDraftTitle = ''
     this.shouldFocusCreateChildInput = true
+    this.expandedKeys.add(normalizedParentKey)
+    this.loadedKeys.add(normalizedParentKey)
+    this.loadStates.set(normalizedParentKey, 'loaded')
     this.render()
+    if (this.displayMode === 'sidebar') {
+      await this.renderSidebarTreeUI()
+      this.scrollNodeIntoView(normalizedParentKey)
+    }
   }
 
   setCreateChildDraftTitle = (value: string): void => {
@@ -1547,7 +1554,19 @@ export class FavoriteTreePlugin {
       this.lastRefreshReason = reason
       this.lastRefreshError = message
       this.lastRefreshMs = Math.max(0, Math.round(performance.now() - refreshStartedAt))
-      logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
+      const isDbWorkerInit = message.toLowerCase().includes('db-worker')
+      if (isDbWorkerInit) {
+        console.warn(`[DB Favorite Tree] db-worker not ready yet (${reason}), scheduling retry in 1000ms...`)
+        window.setTimeout(() => {
+          if (!this.destroyed) {
+            void this.refresh(reason === 'startup' ? 'startup' : 'poll')
+          }
+        }, 1000)
+      } else if (reason === 'manual') {
+        logseq.UI.showMsg(this.i18n.t('refreshToastFailed', { message }), 'warning')
+      } else {
+        console.warn(`[DB Favorite Tree] refresh failed (${reason}): ${message}`)
+      }
     } finally {
       this.refreshing = false
       this.render()

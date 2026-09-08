@@ -32,11 +32,14 @@ function renderSidebarCreateChildComposer(state: SidebarCreateChildComposerState
         <input
           class="favorite-sidebar-tree__create-child-input"
           data-role="create-child-input"
+          data-on-input="sidebarTreeCreateChildInput"
           data-on-change="sidebarTreeCreateChildInput"
+          data-on-keydown="sidebarTreeCreateChildKeydown"
           type="text"
           value="${escapeHtml(state.draftTitle)}"
           placeholder="${escapeHtml(i18n.t('createChildInputPlaceholder'))}"
           spellcheck="false"
+          autofocus
         />
         <button class="favorite-sidebar-tree__text-btn" data-on-click="sidebarTreeSubmitCreateChild">${escapeHtml(i18n.t('createChildSubmit'))}</button>
         <button class="favorite-sidebar-tree__text-btn" data-on-click="sidebarTreeCancelCreateChild">${escapeHtml(i18n.t('createChildCancel'))}</button>
@@ -66,6 +69,7 @@ export function renderSidebarTree(
     ? state.rootFavorites.filter((title) => isSidebarNodeVisible(title, normalizedQuery, accessors, []))
     : state.rootFavorites
   const noticeMarkup = renderSidebarNotice(state, i18n)
+  const renderedParents = new Set<string>()
   const content = state.searching && isSearching
     ? renderSidebarStatusCard({ title: i18n.t('searchIndexing') })
     : state.searchError && isSearching
@@ -87,7 +91,7 @@ export function renderSidebarTree(
       })
     : state.rootFavorites.length > 0
     ? `${noticeMarkup}${visibleRoots
-        .map((title, index) => renderSidebarNode(title, 0, [], index === visibleRoots.length - 1, state, accessors, i18n, normalizedQuery))
+        .map((title, index) => renderSidebarNode(title, 0, [], index === visibleRoots.length - 1, state, accessors, i18n, normalizedQuery, renderedParents))
         .join('')}`
     : state.refreshing
     ? renderSidebarStatusCard({ title: i18n.t('loadingFavorites') })
@@ -149,7 +153,7 @@ export function renderSidebarTree(
             `
             : ''}
         </div>
-        ${state.createChildDraftParent
+        ${state.createChildDraftParent && !renderedParents.has(normalizeTitle(state.createChildDraftParent))
           ? renderSidebarCreateChildComposer(
               {
                 parentTitle: state.createChildDraftParent,
@@ -503,14 +507,21 @@ export const SIDEBAR_TREE_HOST_STYLE = `
   white-space: nowrap;
 }
 
+.favorite-sidebar-tree__inline-composer-wrap {
+  margin: 6px 8px 8px 18px;
+  position: relative;
+  z-index: 10;
+}
+
 .favorite-sidebar-tree__create-child-composer {
   display: grid;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--ls-link-text-color, #2563eb) 18%, transparent 82%);
+  border: 1px solid color-mix(in srgb, var(--ls-link-text-color, #2563eb) 24%, transparent 76%);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 6%, transparent 94%);
+  background: color-mix(in srgb, var(--ls-link-text-color, #2563eb) 8%, var(--ls-secondary-background-color, #ffffff) 92%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .favorite-sidebar-tree__create-child-copy {
@@ -1128,10 +1139,17 @@ function renderSidebarNode(
   accessors: SidebarTreeRenderAccessors,
   i18n: FavoriteTreeI18n,
   normalizedQuery: string,
+  renderedParents?: Set<string>,
 ): string {
   const key = normalizeTitle(title)
   if (!key) {
     return ''
+  }
+  const isTargetParent = Boolean(
+    state.createChildDraftParent && normalizeTitle(state.createChildDraftParent) === key,
+  )
+  if (isTargetParent && renderedParents) {
+    renderedParents.add(key)
   }
   const isCurrent = key === normalizeTitle(state.currentPageName)
   const isActiveSearchMatch = key === state.currentSearchMatchKey
@@ -1179,11 +1197,26 @@ function renderSidebarNode(
             accessors,
             i18n,
             normalizedQuery,
+            renderedParents,
           )
         }).join('')}
       </div>
     `
   }
+
+  const inlineComposerMarkup = isTargetParent
+    ? `
+      <div class="favorite-sidebar-tree__inline-composer-wrap">
+        ${renderSidebarCreateChildComposer(
+          {
+            parentTitle: state.createChildDraftParent!,
+            draftTitle: state.createChildDraftTitle,
+          },
+          i18n,
+        )}
+      </div>
+    `
+    : ''
 
   return `
     <div class="favorite-sidebar-tree__node ${depth > 0 ? 'favorite-sidebar-tree__node--child' : ''}" data-node-key="${escapeHtml(key)}" data-is-last="${isLast ? 'true' : 'false'}">
@@ -1229,6 +1262,7 @@ function renderSidebarNode(
         >${renderIcon('more', 'favorite-sidebar-tree__icon')}${renderTooltip(i18n.t('contextMenuMoreActions'), 'favorite-sidebar-tree__tooltip')}</button>
         ${renderSidebarSortModeControls(state, key, i18n)}
       </div>
+      ${inlineComposerMarkup}
       ${childrenMarkup}
     </div>
   `

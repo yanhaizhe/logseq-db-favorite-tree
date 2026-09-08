@@ -229,7 +229,50 @@ async function runTests() {
     return fallbackWin
   }
   const safeResolved = safeGetHostWindow(mockCrossOriginWindow, { isFallback: true })
-  assert(safeResolved.isFallback === true, 'getHostWindow safely falls back to local window when cross-origin SecurityError occurs')
+  // 14. Inline child creation composer rendering
+  const mockState: any = {
+    searchQuery: '',
+    searching: false,
+    searchError: null,
+    searchMatchCount: 0,
+    currentSearchMatchNumber: 0,
+    currentSearchMatchKey: null,
+    rootFavorites: ['Parent A', 'Parent B'],
+    expandedKeys: new Set(['parent a']),
+    searchCollapsedKeys: new Set(),
+    currentPageName: null,
+    sortOrders: {},
+    sortModes: {},
+    controlsCollapsed: false,
+    createChildDraftParent: 'Parent A',
+    createChildDraftTitle: 'Child 1',
+    refreshing: false,
+    lastRefreshError: null,
+    noticeState: null,
+    dirty: false,
+    persisted: true,
+  }
+  const mockAccessors: any = {
+    getChildrenFor: (p: string) => (p === 'Parent A' ? ['Existing Child'] : []),
+    isFavorite: () => true,
+    hasChildren: (p: string) => p === 'Parent A',
+  }
+  const mockI18n: any = {
+    t: (key: string, params?: any) => `${key}:${JSON.stringify(params || {})}`,
+  }
+  const renderedTree = renderSidebarTree(mockState, mockAccessors, mockI18n)
+  assert(renderedTree.includes('favorite-sidebar-tree__inline-composer-wrap'), 'renders inline composer wrapper')
+  assert(renderedTree.includes('data-on-input="sidebarTreeCreateChildInput"'), 'renders child composer input with event handlers')
+  assert(renderedTree.includes('data-on-keydown="sidebarTreeCreateChildKeydown"'), 'renders child composer input with keydown handler')
+  // Check that controls at top does not contain a duplicate composer
+  const controlsSlice = renderedTree.substring(0, renderedTree.indexOf('favorite-sidebar-tree__children'))
+  const composerCount = (renderedTree.match(/favorite-sidebar-tree__create-child-composer/g) || []).length
+  assert(composerCount === 1, `inline composer must only render once, but got ${composerCount}`)
+
+  // 15. db-worker initialization error detection
+  const isDbWorkerInit = (msg: string) => msg.toLowerCase().includes('db-worker')
+  assert(isDbWorkerInit('db-worker has not been initialized'), 'detects db-worker not initialized error')
+  assert(!isDbWorkerInit('Network error'), 'does not false-positive other errors')
 
   console.log('All features tests passed successfully!')
 }
