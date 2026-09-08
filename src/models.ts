@@ -52,7 +52,13 @@ export function createModels(plugin: FavoriteTreePlugin) {
       }
     },
 
-    sidebarTreeOpenContextMenu: (event: { dataset?: Record<string, string>; x?: number; y?: number }) => {
+    sidebarTreeOpenContextMenu: (event: {
+      id?: string
+      rect?: { top?: number; left?: number; right?: number; bottom?: number; width?: number; height?: number }
+      dataset?: Record<string, string>
+      x?: number
+      y?: number
+    }) => {
       const page = event.dataset?.page
       if (!page) {
         return
@@ -62,10 +68,11 @@ export function createModels(plugin: FavoriteTreePlugin) {
       const hasChildren = event.dataset?.hasChildren === 'true'
       const hasCustomSort = event.dataset?.hasCustomSort === 'true'
       const isExpanded = event.dataset?.isExpanded === 'true'
-      const pos = plugin.resolveContextMenuPosition(nodeKey, page, event.x, event.y)
+      const pos = plugin.resolveContextMenuPosition(nodeKey, page, event.rect, event.id, event.x, event.y)
       plugin.openContextMenu({
         x: pos.x,
         y: pos.y,
+        triggerTop: pos.triggerTop,
         page,
         parentKey,
         nodeKey,

@@ -541,8 +541,21 @@ export class FavoriteTreePlugin {
   openContextMenu = (menu: ContextMenuState): void => {
     const isSidebar = this.displayMode === 'sidebar'
     const doc = isSidebar ? this.getHostDocument() : document
-    const viewportWidth = doc.defaultView?.innerWidth ?? window.innerWidth ?? 800
-    const viewportHeight = doc.defaultView?.innerHeight ?? window.innerHeight ?? 600
+    const hostWin = isSidebar ? this.getHostWindow() : window
+
+    const rawViewportWidth = Math.max(
+      doc.defaultView?.innerWidth || 0,
+      hostWin?.innerWidth || 0,
+      window.innerWidth || 0,
+    )
+    const rawViewportHeight = Math.max(
+      doc.defaultView?.innerHeight || 0,
+      hostWin?.innerHeight || 0,
+      window.innerHeight || 0,
+    )
+    const viewportWidth = rawViewportWidth > 200 ? rawViewportWidth : 1200
+    const viewportHeight = rawViewportHeight > 200 ? rawViewportHeight : 800
+
     const menuWidth = 200
     const menuHeight = 240
 
@@ -550,13 +563,19 @@ export class FavoriteTreePlugin {
     let y = menu.y
 
     if (x + menuWidth > viewportWidth - 8) {
-      x = Math.max(8, x - menuWidth)
+      x = Math.max(8, viewportWidth - menuWidth - 8)
     } else {
       x = Math.max(8, x)
     }
 
     if (y + menuHeight > viewportHeight - 8) {
-      y = Math.max(8, y - menuHeight)
+      const anchorTop = menu.triggerTop ?? y
+      const upwardY = anchorTop - menuHeight - 4
+      if (upwardY >= 8) {
+        y = upwardY
+      } else {
+        y = Math.max(8, viewportHeight - menuHeight - 8)
+      }
     } else {
       y = Math.max(8, y)
     }
@@ -571,15 +590,51 @@ export class FavoriteTreePlugin {
   resolveContextMenuPosition(
     nodeKey: string,
     page: string,
+    rect?: { top?: number; left?: number; right?: number; bottom?: number; width?: number; height?: number } | null,
+    elementId?: string,
     explicitX?: number,
     explicitY?: number,
-  ): { x: number; y: number } {
+  ): { x: number; y: number; triggerTop?: number } {
+    if (
+      rect &&
+      typeof rect.left === 'number' &&
+      typeof rect.bottom === 'number' &&
+      !Number.isNaN(rect.left) &&
+      !Number.isNaN(rect.bottom) &&
+      (rect.left > 0 || (rect.top != null && rect.top > 0) || (rect.width ?? 0) > 0 || (rect.height ?? 0) > 0)
+    ) {
+      const isWideTrigger = typeof rect.width === 'number' && rect.width > 60
+      const x = isWideTrigger ? Math.round(rect.left + 40) : Math.round(rect.left)
+      const y = Math.round(rect.bottom + 4)
+      const triggerTop = typeof rect.top === 'number' ? Math.round(rect.top) : undefined
+      return { x, y, triggerTop }
+    }
+
     if (typeof explicitX === 'number' && typeof explicitY === 'number' && (explicitX > 0 || explicitY > 0)) {
-      return { x: explicitX, y: explicitY }
+      return { x: explicitX, y: explicitY, triggerTop: explicitY }
+    }
+
+    if (elementId) {
+      try {
+        const el = this.getHostDocument().getElementById(elementId)
+        if (el) {
+          const r = el.getBoundingClientRect()
+          if (r.width > 0 || r.height > 0 || r.bottom > 0 || r.left > 0) {
+            const isWide = r.width > 60
+            return {
+              x: isWide ? Math.round(r.left + 40) : Math.round(r.left),
+              y: Math.round(r.bottom + 4),
+              triggerTop: Math.round(r.top),
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     if (this.lastPointerPos && Date.now() - this.lastPointerPos.time < 2000) {
-      return { x: this.lastPointerPos.x, y: this.lastPointerPos.y }
+      return { x: this.lastPointerPos.x, y: this.lastPointerPos.y, triggerTop: this.lastPointerPos.y }
     }
 
     try {
@@ -593,17 +648,37 @@ export class FavoriteTreePlugin {
         doc.querySelector<HTMLElement>(`[data-page="${escapedPage}"]`)
 
       if (trigger) {
-        const rect = trigger.getBoundingClientRect()
-        return {
-          x: Math.round(rect.left),
-          y: Math.round(rect.bottom + 4),
+        const r = trigger.getBoundingClientRect()
+        if (r.width > 0 || r.height > 0 || r.bottom > 0 || r.left > 0) {
+          const isWide = r.width > 60
+          return {
+            x: isWide ? Math.round(r.left + 40) : Math.round(r.left),
+            y: Math.round(r.bottom + 4),
+            triggerTop: Math.round(r.top),
+          }
         }
       }
     } catch {
       // ignore
     }
 
-    return { x: 200, y: 200 }
+    try {
+      const container = this.getHostDocument().querySelector<HTMLElement>('[data-favorite-sidebar-tree="true"]')
+      if (container) {
+        const r = container.getBoundingClientRect()
+        if (r.width > 0 || r.height > 0 || r.bottom > 0) {
+          return {
+            x: Math.round(r.left + Math.max(16, r.width - 220)),
+            y: Math.round(r.top + 120),
+            triggerTop: Math.round(r.top + 120),
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return { x: 200, y: 200, triggerTop: 200 }
   }
 
   closeContextMenu = (): void => {
@@ -2041,6 +2116,7 @@ export class FavoriteTreePlugin {
       nodeKey,
       x: event.clientX,
       y: event.clientY,
+      triggerTop: event.clientY,
       hasChildren,
       hasCustomSort,
       isExpanded,
@@ -2069,6 +2145,7 @@ export class FavoriteTreePlugin {
         nodeKey,
         x: clickX,
         y: clickY,
+        triggerTop: Math.round(rect.top),
         hasChildren,
         hasCustomSort,
         isExpanded,

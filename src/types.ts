@@ -151,6 +151,7 @@ export type ContextMenuState = {
   nodeKey?: string
   x: number
   y: number
+  triggerTop?: number
   hasChildren: boolean
   hasCustomSort: boolean
   isExpanded: boolean

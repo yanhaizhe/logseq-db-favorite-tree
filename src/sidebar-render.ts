@@ -1,7 +1,7 @@
 import type { FavoriteTreeI18n } from './i18n'
 import { renderIcon, renderTooltip } from './render'
 import type { ContextMenuState, TreeStateSnapshot } from './types'
-import { escapeHtml, normalizeTitle } from './utils'
+import { escapeHtml, normalizeTitle, sanitizeDomId } from './utils'
 
 type SidebarTreeRenderAccessors = {
   getChildrenFor: (title: string) => string[]
@@ -241,7 +241,10 @@ export function renderSidebarTree(
       <div class="favorite-sidebar-tree__body">
         ${content}
       </div>
-      ${state.contextMenu ? renderSidebarContextMenu(state.contextMenu, i18n) : ''}
+      ${state.contextMenu ? `
+        <div class="favorite-sidebar-tree__context-backdrop" data-on-click="sidebarTreeCloseContextMenu"></div>
+        ${renderSidebarContextMenu(state.contextMenu, i18n)}
+      ` : ''}
     </section>
   `
 }
@@ -916,6 +919,19 @@ export const SIDEBAR_TREE_HOST_STYLE = `
 }
 
 /* Sidebar Context Menu */
+.favorite-sidebar-tree__context-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99998;
+  background: transparent;
+  cursor: default;
+}
+
 .favorite-sidebar-tree__context-menu {
   position: fixed;
   z-index: 99999;
@@ -1172,10 +1188,17 @@ function renderSidebarNode(
   return `
     <div class="favorite-sidebar-tree__node ${depth > 0 ? 'favorite-sidebar-tree__node--child' : ''}" data-node-key="${escapeHtml(key)}" data-is-last="${isLast ? 'true' : 'false'}">
       <div
+        id="${sanitizeDomId('row', key)}"
         class="favorite-sidebar-tree__row ${isCurrent ? 'is-current' : ''} ${isActiveSearchMatch ? 'is-search-match-current' : ''}"
         data-page="${escapeHtml(title)}"
         data-parent-key="${escapeHtml(ancestors[ancestors.length - 1] || normalizeTitle(title))}"
         data-key="${escapeHtml(key)}"
+        data-has-children="${hasChildren ? 'true' : 'false'}"
+        data-has-custom-sort="${Boolean(state.sortOrders[key]?.length) ? 'true' : 'false'}"
+        data-is-expanded="${effectiveExpanded ? 'true' : 'false'}"
+        data-on-contextmenu="sidebarTreeOpenContextMenu"
+        data-prevent-default="true"
+        data-rect="true"
       >
         ${toggleMarkup}
         <button
@@ -1191,9 +1214,11 @@ function renderSidebarNode(
             : ''}
         </button>
         <button
+          id="${sanitizeDomId('trigger', key)}"
           class="favorite-sidebar-tree__inline-action has-tooltip"
           data-role="sidebar-context-trigger"
           data-on-click="sidebarTreeOpenContextMenu"
+          data-rect="true"
           data-page="${escapeHtml(title)}"
           data-parent-key="${escapeHtml(ancestors[ancestors.length - 1] || normalizeTitle(title))}"
           data-key="${escapeHtml(key)}"
@@ -1240,13 +1265,21 @@ function renderSidebarSortModeControls(state: TreeStateSnapshot, parentKey: stri
 }
 
 function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI18n, normalizedQuery: string): string {
+  const key = normalizeTitle(title)
   return `
     <div class="favorite-sidebar-tree__node favorite-sidebar-tree__node--child">
       <div
+        id="${sanitizeDomId('row', key)}"
         class="favorite-sidebar-tree__row"
         data-page="${escapeHtml(title)}"
-        data-parent-key="${escapeHtml(normalizeTitle(title))}"
-        data-key="${escapeHtml(normalizeTitle(title))}"
+        data-parent-key="${escapeHtml(key)}"
+        data-key="${escapeHtml(key)}"
+        data-has-children="false"
+        data-has-custom-sort="false"
+        data-is-expanded="false"
+        data-on-contextmenu="sidebarTreeOpenContextMenu"
+        data-prevent-default="true"
+        data-rect="true"
       >
         <span class="favorite-sidebar-tree__toggle is-placeholder"></span>
         <button
@@ -1259,12 +1292,14 @@ function renderSidebarLeaf(title: string, isCycle: boolean, i18n: FavoriteTreeI1
           ${isCycle ? `<span class="favorite-sidebar-tree__badge">${escapeHtml(i18n.t('badgeCycle'))}</span>` : ''}
         </button>
         <button
+          id="${sanitizeDomId('trigger', key)}"
           class="favorite-sidebar-tree__inline-action has-tooltip"
           data-role="sidebar-context-trigger"
           data-on-click="sidebarTreeOpenContextMenu"
+          data-rect="true"
           data-page="${escapeHtml(title)}"
-          data-parent-key="${escapeHtml(normalizeTitle(title))}"
-          data-key="${escapeHtml(normalizeTitle(title))}"
+          data-parent-key="${escapeHtml(key)}"
+          data-key="${escapeHtml(key)}"
           data-has-children="false"
           data-has-custom-sort="false"
           data-is-expanded="false"

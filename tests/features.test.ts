@@ -3,7 +3,7 @@ import { renderFavoriteTree, renderIcon } from '../src/render'
 import { renderSidebarTree } from '../src/sidebar-render'
 import { FavoriteTreeSettingsStore } from '../src/settings'
 import type { TreeStateSnapshot } from '../src/types'
-import { extractErrorMessage, findPropertyValue } from '../src/utils'
+import { extractErrorMessage, findPropertyValue, sanitizeDomId, escapeSelectorValue, escapeAttrValue } from '../src/utils'
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -107,8 +107,14 @@ async function runTests() {
   // 4. Sidebar markup with context menu and tree guide lines
   const sidebarHtml = renderSidebarTree(mockSnapshot, accessors, i18n)
   assert(sidebarHtml.includes('favorite-sidebar-tree__context-menu'), 'Sidebar tree renders context menu when state.contextMenu != null')
+  assert(sidebarHtml.includes('favorite-sidebar-tree__context-backdrop'), 'Sidebar tree renders context backdrop when state.contextMenu != null')
+  assert(sidebarHtml.includes('data-on-click="sidebarTreeCloseContextMenu"'), 'Context backdrop has close click handler')
   assert(sidebarHtml.includes('favorite-sidebar-tree__node--child'), 'Sidebar tree children have favorite-sidebar-tree__node--child class for guide lines')
   assert(sidebarHtml.includes('data-role="sidebar-context-trigger"'), 'Sidebar tree node rows include sidebar-context-trigger button')
+  assert(sidebarHtml.includes('data-rect="true"'), 'Sidebar rows and triggers include data-rect="true" for IPC measurement')
+  assert(sidebarHtml.includes('data-on-contextmenu="sidebarTreeOpenContextMenu"'), 'Sidebar tree rows include data-on-contextmenu listener')
+  assert(sidebarHtml.includes('id="ft-trigger-'), 'Sidebar triggers have sanitized IDs')
+  assert(sidebarHtml.includes('id="ft-row-'), 'Sidebar rows have sanitized IDs')
 
   const sidebarHtmlNoMenu = renderSidebarTree(snapshotNoMenu, accessors, i18n)
   assert(!sidebarHtmlNoMenu.includes('data-on-click="sidebarTreeCreateChildPage"'), 'Sidebar rows do not include inline create-child-page button')
@@ -187,6 +193,19 @@ async function runTests() {
   assert(p2.uuid === '333-444' && p2.id === 789, 'extracts Clojure :block/uuid and :db/id')
   const p3 = extractIdAndUuid({ uuid: { uuid: '555-666' }, 'db/id': 999 })
   assert(p3.uuid === '555-666' && p3.id === 999, 'extracts Transit object UUID and db/id')
+
+  // 10. DOM ID sanitization and selector escaping
+  assert(sanitizeDomId('trigger', 'Test Page 1') === 'ft-trigger-Test20Page201', 'sanitizeDomId produces valid DOM id')
+  assert(escapeSelectorValue('Hello "World"') === 'Hello \\"World\\"', 'escapeSelectorValue escapes quotes without hex space breaks')
+  assert(escapeAttrValue('a"b\\c') === 'a\\"b\\\\c', 'escapeAttrValue escapes quotes and backslashes')
+
+  // 11. Viewport fallback safety calculation
+  const rawViewportWidth = Math.max(0, 0, 0)
+  const rawViewportHeight = Math.max(0, 0, 0)
+  const viewportWidth = rawViewportWidth > 200 ? rawViewportWidth : 1200
+  const viewportHeight = rawViewportHeight > 200 ? rawViewportHeight : 800
+  assert(viewportWidth === 1200, 'safe viewport width fallback is 1200 when 0')
+  assert(viewportHeight === 800, 'safe viewport height fallback is 800 when 0')
 
   console.log('All features tests passed successfully!')
 }

@@ -235,15 +235,26 @@ export function escapeHtml(value: string | null | undefined): string {
     .replace(/'/g, '&#39;')
 }
 
-export function escapeSelectorValue(value: string | null | undefined): string {
+export function sanitizeDomId(prefix: string, key?: string): string {
+  const source = key != null ? `${prefix}-${key}` : prefix
+  return 'ft-' + Array.from(source).map((c) => {
+    const code = c.charCodeAt(0)
+    if ((code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || c === '-' || c === '_') {
+      return c
+    }
+    return code.toString(16)
+  }).join('')
+}
+
+export function escapeAttrValue(value: string | null | undefined): string {
   if (value == null) {
     return ''
   }
-  if (window.CSS?.escape) {
-    return window.CSS.escape(value)
-  }
-
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export function escapeSelectorValue(value: string | null | undefined): string {
+  return escapeAttrValue(value)
 }
 
 const PAGE_DELETED_FLAGS = [
