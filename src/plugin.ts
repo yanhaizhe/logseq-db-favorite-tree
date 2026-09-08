@@ -1,6 +1,6 @@
 import type { ThemeMode } from '@logseq/libs/dist/LSPlugin'
 import { REFRESH_DEBOUNCE_MS, ROOT_SORT_KEY } from './constants'
-import { shouldRefreshOnDbChange } from './db-change'
+import { isMatchingPropertyKey, shouldRefreshOnDbChange } from './db-change'
 import { FloatingLayoutManager } from './floating-layout'
 import { createFavoriteTreeI18n, getFavoriteTreeI18n, type FavoriteTreeI18n } from './i18n'
 import { renderFavoriteTree } from './render'
@@ -116,6 +116,7 @@ export class FavoriteTreePlugin {
 
   async init(): Promise<void> {
     await this.initializeGraphContext()
+    void this.cleanupPluginProperties().catch(() => null)
     await this.syncLocale()
     const hostDocument = this.getHostDocument()
 
@@ -828,6 +829,130 @@ export class FavoriteTreePlugin {
     this.render()
   }
 
+  async cleanupPluginProperties(): Promise<void> {
+    try {
+      const isDb = await logseq.App.checkCurrentIsDbGraph().catch(() => false)
+      if (!isDb) return
+
+      const rawProps = (await logseq.DB.datascriptQuery(`
+        [:find (pull ?p [*])
+         :where
+         [?p :block/type "property"]]
+      `)) as unknown[]
+
+      if (Array.isArray(rawProps)) {
+        const entities = rawProps.map((r) => (Array.isArray(r) ? r[0] : r)) as Record<string, unknown>[]
+        for (const entity of entities) {
+          if (!entity || typeof entity !== 'object') continue
+          const rawIdent = entity[':block/ident'] ?? entity['ident']
+          const ident = typeof rawIdent === 'string' ? rawIdent : rawIdent != null ? String(rawIdent) : ''
+          if (ident.includes('plugin.property') && ident.includes('logseq-db-favorite-tree')) {
+            console.log('[DB Favorite Tree] Removing redundant plugin property:', ident)
+            await logseq.Editor.removeProperty(ident).catch(() => null)
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async resolveTargetPropertyKeys(parentPageUuid: string | null): Promise<string[]> {
+    const isDb = await logseq.App.checkCurrentIsDbGraph().catch(() => false)
+    const configuredProp = this.settings.getHierarchyProperty()
+    const targetNames = ['Page Tags', configuredProp, '页面标签', 'page tags', 'page-tags'].filter(Boolean)
+    const resolvedKeys: string[] = []
+
+    // 1. Check parent page's existing properties to match its exact key
+    if (parentPageUuid) {
+      try {
+        const parentProps =
+          (await logseq.Editor.getPageProperties(parentPageUuid).catch(() => null)) ??
+          (await logseq.Editor.getBlockProperties(parentPageUuid).catch(() => null))
+        if (parentProps && typeof parentProps === 'object') {
+          for (const key of Object.keys(parentProps)) {
+            // Ignore any plugin-namespaced keys
+            if (key.includes('plugin.property') || key.includes('logseq-db-favorite-tree')) {
+              continue
+            }
+            if (isMatchingPropertyKey(key, targetNames)) {
+              resolvedKeys.push(key)
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Query Datascript for existing property entities matching Page Tags / 页面标签
+    if (isDb) {
+      try {
+        const rawProps = (await logseq.DB.datascriptQuery(`
+          [:find (pull ?p [*])
+           :where
+           [?p :block/type "property"]]
+        `)) as unknown[]
+
+        if (Array.isArray(rawProps)) {
+          const entities = rawProps.map((r) => (Array.isArray(r) ? r[0] : r)) as Record<string, unknown>[]
+          for (const entity of entities) {
+            if (!entity || typeof entity !== 'object') continue
+
+            const rawIdent = entity[':block/ident'] ?? entity['ident']
+            const ident = typeof rawIdent === 'string' ? rawIdent : rawIdent != null ? String(rawIdent) : ''
+
+            // Skip any plugin properties!
+            if (ident.includes('plugin.property') || ident.includes('logseq-db-favorite-tree')) {
+              continue
+            }
+
+            const origName = (entity[':block/original-name'] ?? entity['original-name'] ?? '') as string
+            const name = (entity[':block/name'] ?? entity['name'] ?? '') as string
+            const title = entity[':block/title'] ?? entity['title']
+            const titleStr = typeof title === 'string' ? title : Array.isArray(title) ? String(title[0] ?? '') : ''
+
+            for (const target of targetNames) {
+              const normTarget = normalizeTitle(target)
+              if (
+                normTarget &&
+                (normalizeTitle(origName) === normTarget ||
+                  normalizeTitle(name) === normTarget ||
+                  normalizeTitle(titleStr) === normTarget ||
+                  (ident && normalizeTitle(ident.replace(/^:[^/]+\//, '')) === normTarget))
+              ) {
+                if (ident && ident.startsWith(':')) {
+                  resolvedKeys.push(ident)
+                }
+                if (origName) {
+                  resolvedKeys.push(`:user.property/${origName}`)
+                }
+                if (name) {
+                  resolvedKeys.push(`:user.property/${name}`)
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Fallback standard user property idents (ALWAYS use :user.property/ to prevent plugin namespacing)
+    resolvedKeys.push(
+      ':user.property/Page Tags',
+      ':user.property/page-tags',
+      ':logseq.property/page-tags',
+      ':user.property/页面标签',
+    )
+    if (configuredProp && !configuredProp.startsWith(':')) {
+      resolvedKeys.push(`:user.property/${configuredProp}`)
+    }
+
+    return Array.from(new Set(resolvedKeys))
+  }
+
   submitCreateChildPage = async (): Promise<void> => {
     const parentTitle = this.createChildDraftParent
     if (!parentTitle) {
@@ -869,7 +994,10 @@ export class FavoriteTreePlugin {
     const cleanParentTitle = unwrapPageRef(parentTitle).trim()
     let createdPageName: string | null = null
     try {
-      // 1. Resolve parent page and entity ID
+      // 1. Clean up any accidental plugin properties
+      await this.cleanupPluginProperties().catch(() => null)
+
+      // 2. Resolve parent page and entity ID
       const parentPage = await logseq.Editor.getPage(cleanParentTitle).catch(() => null)
       const parentRec = parentPage as Record<string, unknown> | null
       const parentId =
@@ -880,16 +1008,6 @@ export class FavoriteTreePlugin {
             : typeof parentRec?.['db/id'] === 'number'
               ? (parentRec['db/id'] as number)
               : null
-
-      const isDb = await logseq.App.checkCurrentIsDbGraph().catch(() => false)
-      const propEntity = await logseq.Editor.getProperty(pageTagProperty).catch(() => null)
-      const propRec = propEntity as Record<string, unknown> | null
-      const schema =
-        (propEntity as any)?.schema ??
-        (propRec?.[':property/schema'] as Record<string, unknown> | undefined) ??
-        (propRec?.['property/schema'] as Record<string, unknown> | undefined) ??
-        null
-      const propType = schema?.type ?? schema?.[':type'] ?? (propEntity as any)?.type
 
       // Check parent's own property value shape as a reference template
       let parentSampleVal: unknown = undefined
@@ -906,7 +1024,7 @@ export class FavoriteTreePlugin {
         }
       }
 
-      // Build ordered candidate values for 页面标签
+      // Build ordered candidate values for Page Tags
       const candidateValues: unknown[] = []
       if (parentSampleVal !== undefined) {
         if (Array.isArray(parentSampleVal)) {
@@ -926,33 +1044,20 @@ export class FavoriteTreePlugin {
         }
       }
 
-      if (isDb || propType === 'node') {
-        if (parentId != null) {
-          if (!candidateValues.some((c) => Array.isArray(c) && c[0] === parentId)) {
-            candidateValues.push([parentId])
-          }
-          if (!candidateValues.includes(parentId)) {
-            candidateValues.push(parentId)
-          }
+      if (parentId != null) {
+        if (!candidateValues.some((c) => Array.isArray(c) && c[0] === parentId)) {
+          candidateValues.push([parentId])
         }
-        if (!candidateValues.includes(cleanParentTitle)) {
-          candidateValues.push(cleanParentTitle)
-        }
-        if (!candidateValues.some((c) => Array.isArray(c) && c[0] === cleanParentTitle)) {
-          candidateValues.push([cleanParentTitle])
-        }
-      } else {
-        if (!candidateValues.includes(cleanParentTitle)) {
-          candidateValues.push(cleanParentTitle)
-        }
-        if (!candidateValues.some((c) => Array.isArray(c) && c[0] === cleanParentTitle)) {
-          candidateValues.push([cleanParentTitle])
-        }
-        if (parentId != null) {
-          candidateValues.push([parentId], parentId)
+        if (!candidateValues.includes(parentId)) {
+          candidateValues.push(parentId)
         }
       }
-      candidateValues.push(`[[${cleanParentTitle}]]`)
+      if (!candidateValues.includes(cleanParentTitle)) {
+        candidateValues.push(cleanParentTitle)
+      }
+      if (!candidateValues.some((c) => Array.isArray(c) && c[0] === cleanParentTitle)) {
+        candidateValues.push([cleanParentTitle])
+      }
 
       // Helper to extract UUID and ID safely across Transit / JS objects
       const extractIdAndUuid = (page: unknown): { uuid: string | null; id: number | null } => {
@@ -992,11 +1097,6 @@ export class FavoriteTreePlugin {
             if (findPropertyValue(fresh as Record<string, unknown>, pageTagProperty) != null) {
               return true
             }
-            const rec = fresh as Record<string, unknown>
-            const tags = rec[':block/tags'] ?? rec['block/tags'] ?? rec.tags
-            if (tags != null && (Array.isArray(tags) ? tags.length > 0 : Boolean(tags))) {
-              return true
-            }
           }
           const target = uuid ?? id ?? title
           const pageProps = await logseq.Editor.getPageProperties(target).catch(() => null)
@@ -1013,28 +1113,13 @@ export class FavoriteTreePlugin {
         return false
       }
 
-      // 2. Create page - first try atomic creation with the property directly
+      // 3. Create page purely without properties (avoiding plugin-namespaced property creation)
       let createdPage: PageEntity | null = null
-      for (const key of ['Page Tags', pageTagProperty, 'page-tags', '页面标签']) {
-        for (const val of candidateValues) {
-          if (val == null) continue
-          try {
-            createdPage = await logseq.Editor.createPage(
-              childTitle,
-              { [key]: val },
-              { redirect: false },
-            )
-            if (createdPage) {
-              break
-            }
-          } catch {
-            // Fall through to next candidate or fallback
-          }
-        }
-        if (createdPage) break
+      try {
+        createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false, createFirstBlock: true })
+      } catch {
+        // ignore
       }
-
-      // If createPage with property failed, try standard createPage
       if (!createdPage) {
         try {
           createdPage = await logseq.Editor.createPage(childTitle, {}, { redirect: false })
@@ -1042,7 +1127,6 @@ export class FavoriteTreePlugin {
           createdPage = await logseq.Editor.createPage(childTitle).catch(() => null)
         }
       }
-
       if (!createdPage) {
         createdPage = await logseq.Editor.getPage(childTitle).catch(() => null)
       }
@@ -1064,80 +1148,19 @@ export class FavoriteTreePlugin {
         }
       }
 
-      // 3. Resolve parent tag entity for Logseq DB tagging
-      let parentTagUuid: string | null = null
-      let parentTagId: number | null = parentId
+      // NOTE: We deliberately DO NOT call logseq.Editor.createTag or logseq.Editor.addBlockTag!
+      // The parent page must NEVER be turned into a tag (#parent) on the child page.
 
-      try {
-        const parentTag = await logseq.Editor.getTag(cleanParentTitle).catch(() => null)
-        if (parentTag) {
-          const ids = extractIdAndUuid(parentTag)
-          if (ids.uuid) parentTagUuid = ids.uuid
-          if (ids.id != null) parentTagId = ids.id
-        }
-      } catch {
-        // ignore
-      }
-
-      if (!parentTagUuid) {
-        try {
-          const createdTag = await logseq.Editor.createTag(cleanParentTitle).catch(() => null)
-          if (createdTag) {
-            const ids = extractIdAndUuid(createdTag)
-            if (ids.uuid) parentTagUuid = ids.uuid
-            if (ids.id != null) parentTagId = ids.id
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      if (!parentTagUuid && parentPage) {
-        const ids = extractIdAndUuid(parentPage)
-        if (ids.uuid) parentTagUuid = ids.uuid
-        if (ids.id != null && parentTagId == null) parentTagId = ids.id
-      }
-
-      // 4. In Logseq DB, page tags (Page Tags / 页面标签) are attached via addBlockTag(pageUuid, parentTagUuid)
-      if (pageUuid && parentTagUuid) {
-        try {
-          await logseq.Editor.addBlockTag(pageUuid, parentTagUuid)
-        } catch (tagErr) {
-          console.warn('[DB Favorite Tree] addBlockTag with parentTagUuid failed:', tagErr)
-        }
-      }
-      if (pageUuid && parentPage) {
-        const pUuid = extractIdAndUuid(parentPage).uuid
-        if (pUuid && pUuid !== parentTagUuid) {
-          try {
-            await logseq.Editor.addBlockTag(pageUuid, pUuid)
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      // 5. Upsert hierarchy property values directly on page entity
+      // 4. Resolve user property keys to set Page Tags property
       const targetIdentities: Array<string | number> = []
       if (pageUuid) targetIdentities.push(pageUuid)
       if (pageDbId != null && !targetIdentities.includes(pageDbId)) targetIdentities.push(pageDbId)
 
-      const propertyKeysToTry = Array.from(
-        new Set([
-          'Page Tags',
-          'page-tags',
-          'page tags',
-          pageTagProperty,
-          '页面标签',
-          ':logseq.property/page-tags',
-          ':user.property/Page Tags',
-          pageTagProperty.startsWith(':') ? pageTagProperty : `:user.property/${pageTagProperty}`,
-        ])
-      ).filter(Boolean)
+      const propertyKeysToTry = await this.resolveTargetPropertyKeys(parentPage?.uuid ?? null)
 
       const candidateValsToTry: unknown[] = []
-      if (parentTagId != null) {
-        candidateValsToTry.push([parentTagId], parentTagId)
+      if (parentId != null) {
+        candidateValsToTry.push([parentId], parentId)
       }
       for (const c of candidateValues) {
         if (!candidateValsToTry.includes(c)) candidateValsToTry.push(c)
@@ -1191,7 +1214,7 @@ export class FavoriteTreePlugin {
         }
       }
 
-      // 7. Verify linking with tree service & properties
+      // 5. Verify linking with tree service & properties
       const isChildLinked = async (): Promise<boolean> => {
         this.treeService.invalidateIndex()
         await this.treeService.ensureChildIndex(pageTagProperty, true)

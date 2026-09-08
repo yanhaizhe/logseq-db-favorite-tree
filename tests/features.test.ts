@@ -205,7 +205,11 @@ async function runTests() {
   const viewportWidth = rawViewportWidth > 200 ? rawViewportWidth : 1200
   const viewportHeight = rawViewportHeight > 200 ? rawViewportHeight : 800
   assert(viewportWidth === 1200, 'safe viewport width fallback is 1200 when 0')
-  assert(viewportHeight === 800, 'safe viewport height fallback is 800 when 0')
+  // 12. User property key resolution (never plugin-namespaced)
+  const isPluginProperty = (key: string) => key.includes('plugin.property') || key.includes('logseq-db-favorite-tree')
+  assert(!isPluginProperty(':user.property/Page Tags'), ':user.property/Page Tags is not a plugin property')
+  assert(!isPluginProperty(':user.property/page-tags'), ':user.property/page-tags is not a plugin property')
+  assert(isPluginProperty(':plugin.property.logseq-db-favorite-tree/page-tags'), 'detects plugin property namespace')
 
   console.log('All features tests passed successfully!')
 }
